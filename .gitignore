@@ -1,0 +1,20 @@
+# Secrets — never commit
+.streamlit/secrets.toml
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.venv/
+venv/
+
+# OS / editor cruft
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Local working files (keep data/ tracked — it holds the production xlsx and pkl)
+*.log
+*.tmp
