@@ -143,7 +143,7 @@ def extract_roster_from_image(image_bytes: bytes,
 
     msg = client.messages.create(
         model=MODEL,
-        max_tokens=4096,
+        max_tokens=16384,
         messages=[{
             "role": "user",
             "content": [
