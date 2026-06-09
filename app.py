@@ -37,7 +37,13 @@ PKL_PATH  = DATA_DIR / "pbr_rankings.pkl"
 # <script_dir>/data/pbr_rankings.pkl by default, so nothing to mirror.
 from db_loader import parse_xlsx
 import gen_roster_pdf
-from photo_to_roster import extract_roster_from_image, to_pdf_payload
+from photo_to_roster import extract_roster_from_image, extract_roster_from_images, to_pdf_payload
+from post_event_extractor import extract_post_event_page
+from post_event_flow import (
+    NEW_PLAYER_COLUMNS, UPDATE_COLUMNS,
+    split_pools, prefill_new_player_rows, build_updates_rows,
+    rows_to_csv, today_str,
+)
 
 
 # ---------------------- helpers ----------------------
@@ -171,7 +177,7 @@ def _generate_pdf(extracted: dict, event_name: str, division: str) -> bytes:
         out_pdf = Path(td) / "out.pdf"
         in_json.write_text(json.dumps(payload))
         # Build with raw_sheet_text="" — our xlsx DB is already installed.
-        gen_roster_pdf.build_pdf(str(in_json), str(out_pdf), raw_sheet_text="")
+        gen_roster_pdf.build_pdf(str(in_json), str(out_pdf), raw_sheet_text="", skip_cover=True)
         return out_pdf.read_bytes()
 
 
@@ -189,7 +195,7 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-tab_field, tab_admin = st.tabs(["🎯 Field Tool", "⚙️  Admin"])
+tab_field, tab_post, tab_admin = st.tabs(["🎯 Field Tool", "📥 Post-Event", "⚙️  Admin"])
 
 
 # ---- Field Tool ----
@@ -210,11 +216,14 @@ with tab_field:
                 st.write("• Anthropic API key missing — set `ANTHROPIC_API_KEY` "
                          "in Streamlit secrets or env")
 
-    st.write("**1. Photo of the roster**")
-    img_file = st.file_uploader(
-        "Take or upload a photo",
+    st.write("**1. Photo(s) of the roster**")
+    img_files = st.file_uploader(
+        "Take or upload photo(s)",
         type=["jpg", "jpeg", "png", "heic", "webp"],
+        accept_multiple_files=True,
         label_visibility="collapsed",
+        help="For long rosters, shoot 2-3 close-up sections (~15-20 players each) "
+             "so the text is big and sharp. They'll be merged into one team.",
     )
 
     col1, col2 = st.columns(2)
@@ -235,7 +244,7 @@ with tab_field:
 
     go = st.button("🚀 Generate PDF",
                    type="primary", use_container_width=True,
-                   disabled=not (img_file and event_name and api_key
+                   disabled=not (img_files and event_name and api_key
                                  and db_ready and pbr_ready))
 
     if go:
@@ -248,23 +257,34 @@ with tab_field:
 
         with st.status("Working…", expanded=True) as status:
             try:
-                # Step 1: vision extract
-                status.update(label="📸 Reading roster from photo…")
-                img_bytes = img_file.read()
-                media_type = "image/jpeg" if img_file.type in (None, "") else img_file.type
-                if media_type == "image/jpg":
-                    media_type = "image/jpeg"
-                extracted = extract_roster_from_image(
-                    img_bytes, media_type=media_type, api_key=api_key,
-                )
+                # Step 1: vision extract — each photo processed at full resolution
+                n_photos = len(img_files)
+                label = ("📸 Reading roster from photo…" if n_photos == 1
+                         else f"📸 Reading {n_photos} sections…")
+                status.update(label=label)
+                images = []
+                for f in img_files:
+                    mt = "image/jpeg" if f.type in (None, "") else f.type
+                    if mt == "image/jpg":
+                        mt = "image/jpeg"
+                    images.append((f.read(), mt))
+
+                if len(images) == 1:
+                    extracted = extract_roster_from_image(
+                        images[0][0], media_type=images[0][1], api_key=api_key,
+                    )
+                else:
+                    extracted = extract_roster_from_images(images, api_key=api_key)
+
                 n = len(extracted.get("players", []))
                 team = extracted.get("team_name", "")
-                st.write(f"✓ Extracted **{n}** players from **{team or 'team'}**")
+                src = "photo" if n_photos == 1 else f"{n_photos} sections"
+                st.write(f"✓ Extracted **{n}** players from **{team or 'team'}** ({src})")
 
                 if n == 0:
                     status.update(label="No players found", state="error")
-                    st.error("Couldn't read any players from the photo. "
-                             "Try a sharper/closer shot.")
+                    st.error("Couldn't read any players. "
+                             "Try sharper/closer shots — get the text big in frame.")
                     st.stop()
 
                 # Step 2: summary of hits
@@ -336,6 +356,131 @@ with tab_field:
             use_container_width=True,
             type="primary",
         )
+
+
+# ---- Post-Event ----
+with tab_post:
+    st.subheader("Post-event ratings")
+    st.caption("Drop your annotated GoodNotes pages (exported as JPGs). I read the "
+               "hand-written New★, split existing-board players from new players, and "
+               "give you two paste-ready files.")
+
+    pe_api_key = _get_api_key()
+    if not pe_api_key:
+        st.warning("Anthropic API key missing — set `ANTHROPIC_API_KEY` in Streamlit "
+                   "secrets (the Admin tab shows status).")
+
+    st.write("**1. Annotated pages (JPG)**")
+    pe_imgs = st.file_uploader(
+        "Export each GoodNotes page as a JPG and drop them here",
+        type=["jpg", "jpeg", "png", "webp"],
+        accept_multiple_files=True,
+        label_visibility="collapsed",
+        key="post_event_imgs",
+        help="JPG, not PDF — PDF export garbles the handwriting.",
+    )
+
+    colA, colB = st.columns(2)
+    with colA:
+        pe_by = st.selectbox("By (initials)", ["CB", "AP", "TR", "AM", "CR"],
+                             index=0, key="pe_by")
+    with colB:
+        pe_event = st.text_input("Event (optional — fills 'Seen')",
+                                 placeholder="e.g. NPI 2026", key="pe_event")
+
+    pe_go = st.button("📥 Extract & split", type="primary",
+                      use_container_width=True,
+                      disabled=not (pe_imgs and pe_api_key))
+
+    if pe_go:
+        with st.status("Reading pages…", expanded=True) as pstatus:
+            try:
+                pages = []
+                for i, f in enumerate(pe_imgs):
+                    mt = f.type or "image/jpeg"
+                    if mt == "image/jpg":
+                        mt = "image/jpeg"
+                    pstatus.update(label=f"📄 Reading page {i+1}/{len(pe_imgs)}…")
+                    page = extract_post_event_page(f.read(), media_type=mt,
+                                                   api_key=pe_api_key)
+                    pages.append(page)
+                    st.write(f"✓ {page.get('team_name') or 'page'} — "
+                             f"{len(page.get('players', []))} rows read")
+                result = split_pools(pages)
+                pstatus.update(label="Done", state="complete")
+            except Exception as e:
+                pstatus.update(label="Error", state="error")
+                st.exception(e)
+                st.stop()
+
+        new_rows = prefill_new_player_rows(
+            result["new_players"], date_added=today_str(), by_initials=pe_by)
+        if pe_event:
+            for r in new_rows:
+                r["Seen"] = pe_event
+        st.session_state["pe_new_rows"] = new_rows
+        st.session_state["pe_upd_rows"] = build_updates_rows(result["updates"])
+        st.session_state["pe_stats"] = result["stats"]
+
+    if "pe_stats" in st.session_state:
+        import pandas as pd
+        s = st.session_state["pe_stats"]
+        st.divider()
+        c1, c2, c3 = st.columns(3)
+        c1.metric("New players", s["new_players"])
+        c2.metric("Rating updates", s["updates"])
+        c3.metric("Skipped (no New★)", s["skipped"])
+
+        # Flag non-standard / ambiguous ratings (e.g. a "2/3" written by hand)
+        _ok = {"0.1", "1", "2", "3", "4"}
+        flags = []
+        for r in st.session_state["pe_new_rows"]:
+            v = str(r.get("★", "")).strip()
+            if v and v not in _ok:
+                flags.append(f"{r['First']} {r['Last']} — New★ '{v}'")
+        for r in st.session_state["pe_upd_rows"]:
+            v = str(r.get("New ★", "")).strip()
+            if v and v not in _ok:
+                flags.append(f"{r['Name']} — New★ '{v}'")
+        if flags:
+            st.warning("Review these ratings (non-standard / ambiguous) before you "
+                       "paste:\n\n" + "\n".join(f"• {x}" for x in flags))
+
+        # --- Updates ---
+        st.markdown("**📈 Rating updates** — existing board players")
+        if st.session_state["pe_upd_rows"]:
+            st.dataframe(pd.DataFrame(st.session_state["pe_upd_rows"]),
+                         use_container_width=True, hide_index=True)
+            upd_tsv = rows_to_csv(st.session_state["pe_upd_rows"],
+                                  UPDATE_COLUMNS, delimiter="\t")
+            st.download_button("⬇️  Updates (TSV — paste into the sheet)",
+                               data=upd_tsv, file_name="rating_updates.tsv",
+                               mime="text/tab-separated-values",
+                               use_container_width=True)
+        else:
+            st.caption("No rating updates on these pages.")
+
+        # --- New players (editable before download) ---
+        st.markdown("**🆕 New players** — review/edit, then download")
+        if st.session_state["pe_new_rows"]:
+            df = pd.DataFrame(st.session_state["pe_new_rows"],
+                              columns=NEW_PLAYER_COLUMNS)
+            edited = st.data_editor(
+                df, use_container_width=True, hide_index=True,
+                num_rows="dynamic", key="pe_editor",
+                column_config={
+                    "By": st.column_config.SelectboxColumn(
+                        "By", options=["CB", "AP", "TR", "AM", "CR"], width="small"),
+                },
+            )
+            new_csv = rows_to_csv(edited.fillna("").to_dict("records"),
+                                  NEW_PLAYER_COLUMNS)
+            st.download_button("⬇️  New players (CSV)",
+                               data=new_csv, file_name="new_players.csv",
+                               mime="text/csv", use_container_width=True,
+                               type="primary")
+        else:
+            st.caption("No new players on these pages.")
 
 
 # ---- Admin ----
