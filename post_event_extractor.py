@@ -38,9 +38,19 @@ Recruiting roster PDF that a coach has annotated in the dugout during a
 recruiting event. Your job is to extract EVERY row of the table exactly as it
 appears, including handwritten coach annotations.
 
-THE TABLE has these columns, left to right:
-  #  |  First  |  Last  |  Pos  |  Ht  |  Wt  |  Class  |  School  |
-  Cur★  |  New★  |  PBR Rank  |  Commit  |  NOTES
+THE TABLE has a printed HEADER ROW. Read every value by the column header it
+sits UNDER — never by a fixed left-to-right position. The set of columns can
+differ between printouts, so anchor on the headers, not their order.
+
+Columns you may see (some printouts include St and/or Acad, some don't):
+  #  |  First  |  Last  |  Pos  |  Ht  |  Wt  |  Class  |  School  |  St  |
+  Cur★  |  New★  |  PBR Rank  |  Commit  |  Acad  |  NOTES
+
+The two rating columns are always labeled "Cur ★"/"Cur*" and "New ★"/"New*".
+Find those two headers and read the value directly beneath each. When present,
+the St column (2-letter state) sits just LEFT of Cur★, and the Acad column sits
+between Commit and NOTES. Do NOT let an inserted St or Acad column shift which
+value you read as Cur★ or New★ — go by the header above the cell, every time.
 
 CRITICAL DISTINCTIONS — read carefully:
 
@@ -101,6 +111,7 @@ OUTPUT — return ONLY valid JSON, no markdown fence, no prose:
       "wt": "200",
       "class": "2027",
       "school": "Calvert Hall",
+      "state": "MD",
       "cur_star": "",
       "new_star": "2",
       "pbr_rank": "#71 MD",
@@ -192,7 +203,7 @@ def _normalize_player(p: dict) -> dict:
     """Force the player dict into a consistent shape."""
     out = {
         "jersey": "", "first": "", "last": "", "pos": "", "ht": "", "wt": "",
-        "class": "", "school": "", "cur_star": "", "new_star": "",
+        "class": "", "school": "", "state": "", "cur_star": "", "new_star": "",
         "pbr_rank": "", "commit": "", "notes_handwritten": "",
     }
     for k in out:
@@ -270,7 +281,7 @@ def extract_post_event_page(image_bytes: bytes,
         # Skip empty rows
         if not (n["first"] or n["last"] or n["jersey"]):
             continue
-        n["state"] = _extract_state_from_pbr(n["pbr_rank"])
+        n["state"] = n["state"] or _extract_state_from_pbr(n["pbr_rank"])
         normalized.append(n)
 
     return {

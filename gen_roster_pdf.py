@@ -3,7 +3,7 @@
 LOCKED FORMAT — do not change without explicit instruction.
 
 Key features:
-- Multi-page cover: event title, dates, teams by age division, Navy★ dots (C/1/2/4)
+- Multi-page cover: event title, dates, teams by age division, Navy★ dots (C/1/2/3/4)
 - Org tier label (from travel_programs.json) shown on cover + each roster page
 - Division assigned from schedule_team_divs dict > team data > name inference
 - Teams sorted alphabetically within each age group on cover AND roster pages
@@ -11,7 +11,7 @@ Key features:
 - Cover expands to as many pages as needed, legend always on last page
 - Event name + dates auto-parsed from raw event string
 - Roster rows: alternating gray/white, Cur★ cell yellow for DB players
-- Cols: # | First | Last | Pos | Ht | Wt | Class | School | Cur★ | New★ | Commit | NOTES
+- Cols: # | First | Last | Pos | Ht | Wt | Class | School | St | Cur★ | New★ | PBR Rank | Commit | Acad | NOTES
 - Notes fixed 2.50", Commit 0.80", School gets remaining width
 - Commit: DB value takes priority, roster packet commit is fallback
 - Running header: NAVY BASEBALL RECRUITING left | event center | Page N right
@@ -27,8 +27,8 @@ from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.enums import TA_CENTER, TA_LEFT
 from reportlab.pdfgen import canvas as rl_canvas
 
-import sys as _sys, os as _os
-_sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__)))
+import sys as _sys
+_sys.path.insert(0, '/home/claude')
 from fetch_db import build_db_from_raw
 from db_loader import strip_suffix
 
@@ -44,12 +44,14 @@ LINE_LITE  = colors.HexColor('#CCCCCC')
 DOT_COMMIT = colors.HexColor('#1A3A6B')
 DOT_T1     = colors.HexColor('#2E7D32')
 DOT_T2     = colors.HexColor('#F9A825')
+DOT_T3     = colors.HexColor('#7E57C2')
 DOT_T4     = colors.HexColor('#90CAF9')
 
 TIER_DOT_COLOR = {
     '0.1': (DOT_COMMIT, colors.white, 'C'),
     '1':   (DOT_T1,     colors.white, '1'),
     '2':   (DOT_T2,     colors.HexColor('#333300'), '2'),
+    '3':   (DOT_T3,     colors.white, '3'),
     '4':   (DOT_T4,     colors.HexColor('#1A3A6B'), '4'),
 }
 
@@ -57,12 +59,22 @@ SHEET_ID = '1ecpbBbWaVaSlmz4qmHUWJw9Esj6P0x5R4y81QQYhMzE'
 _DB = None
 
 def init_db(raw_sheet_text):
-    """No-op when raw_sheet_text is empty/blank, so callers can pre-install
-    their own DB object (e.g. xlsx-backed) before build_pdf runs."""
     global _DB
-    if not (raw_sheet_text and raw_sheet_text.strip()):
-        return
     _DB = build_db_from_raw(raw_sheet_text)
+
+def init_db_from_xlsx(xlsx_path, sheet_name='High School Players'):
+    """LOCKED DB source — parse the High School Players tab via openpyxl.
+    Sets the module-level _DB so db_lookup() resolves against the xlsx."""
+    global _DB
+    import db_loader
+    _db = db_loader.parse_xlsx(xlsx_path, sheet_name=sheet_name)
+    class _XlsxDB:
+        def __init__(self, d): self._d = d
+        def lookup(self, name): return db_loader.lookup(self._d, name)
+        def all_names(self):
+            return sorted({e['canonical_name'] for e in self._d.values()})
+    _DB = _XlsxDB(_db)
+    return _DB
 
 def db_lookup(name):
     return _DB.lookup(name) if _DB else None
@@ -198,25 +210,34 @@ def draw_cover_page(c, event_name, event_dates, division_chunks, W, H, page_num,
         c.line(L, ly + 0.14*inch, R, ly + 0.14*inch)
         legend_items = [
             ('0.1', 'Committed'),
-            ('1',   'Tier 1 — offer'),
-            ('2',   'Tier 2 — follow'),
-            ('4',   'Tier 4 — recruiting board'),
+            ('1',   'Tier 1 - Offer'),
+            ('2',   'Tier 2 - Need 1 More Look'),
+            ('3',   'Tier 3 - Follow'),
+            ('4',   'Tier 4 - Rec, Need to See'),
         ]
+        from reportlab.pdfbase.pdfmetrics import stringWidth
+        L_FONT = 7
+        DOT_R = 0.075 * inch
         lx = L
-        DOT_R = 0.085 * inch
+        row_y = ly
         for tier, label in legend_items:
             cfg = TIER_DOT_COLOR.get(tier)
             if not cfg: continue
             dot_color, text_color, lbl = cfg
+            text_w = stringWidth(label, 'Helvetica', L_FONT)
+            item_w = DOT_R*2 + 0.05*inch + text_w
+            if lx + item_w > R and lx > L:   # wrap to a second row if needed
+                row_y -= 0.22*inch
+                lx = L
             c.setFillColor(dot_color)
-            c.circle(lx + DOT_R, ly, DOT_R, fill=1, stroke=0)
-            c.setFont('Helvetica-Bold', 7)
+            c.circle(lx + DOT_R, row_y, DOT_R, fill=1, stroke=0)
+            c.setFont('Helvetica-Bold', 6)
             c.setFillColor(text_color)
-            c.drawCentredString(lx + DOT_R, ly - 0.026*inch, lbl)
-            c.setFont('Helvetica', 8)
+            c.drawCentredString(lx + DOT_R, row_y - 0.022*inch, lbl)
+            c.setFont('Helvetica', L_FONT)
             c.setFillColor(TEXT_MED)
-            c.drawString(lx + DOT_R*2 + 0.05*inch, ly - 0.022*inch, label)
-            lx += 1.55*inch
+            c.drawString(lx + DOT_R*2 + 0.05*inch, row_y - 0.018*inch, label)
+            lx += item_w + 0.18*inch
 
     c.setFont('Helvetica', 8)
     c.setFillColor(colors.HexColor('#AAAAAA'))
@@ -282,6 +303,88 @@ def _infer_division(team_name):
     return 'Unknown'
 
 
+def parse_divisions_pdf(pdf_path):
+    """Parse an age-groups PDF (screenshot of event Teams tab) to extract
+    ordered division names. Works for PS, PBR, Five Tool pages.
+
+    Looks for lines matching 'Division Name##' followed by ⌄ or ⌃ characters
+    (the expand/collapse arrows on the website).
+
+    Returns: ordered list of division names (Exhibition Game filtered out).
+    """
+    import re
+    from pypdf import PdfReader
+    reader = PdfReader(pdf_path)
+    divs = []
+    seen = set()
+    for page in reader.pages:
+        text = page.extract_text() or ''
+        for line in text.split('\n'):
+            line = line.strip()
+            m = re.match(r'^(.+?)(\d+)\s*[⌄⌃]\s*$', line)
+            if m:
+                name = m.group(1).strip()
+                count = int(m.group(2))
+                if len(name) < 3 or name.lower() in ('page',):
+                    continue
+                if name not in seen:
+                    seen.add(name)
+                    divs.append((name, count))
+    # Filter out Exhibition Game — those teams are rarely scraped
+    result = [name for name, count in divs if name.lower() != 'exhibition game']
+    if result:
+        print(f'[DIV-PDF] Parsed {len(result)} divisions from {pdf_path}:')
+        for name, count in divs:
+            if name.lower() != 'exhibition game':
+                print(f'  {name}: {count} teams')
+    return result
+
+
+def _stamp_divisions_from_resets(teams, division_names):
+    """Detect division boundaries via alphabetical resets and stamp team['division'].
+
+    Works for any event source (PS, PBR, Five Tool, PG) where teams are listed
+    alphabetically within each division. Caller provides the ordered division
+    names matching the event website's age-group order.
+
+    Args:
+        teams: list of team dicts (modified in place)
+        division_names: ordered list of division names, one per detected group
+    """
+    if not teams or not division_names:
+        return
+    if all(t.get('division') for t in teams):
+        return
+
+    # Detect alphabetical resets
+    names = [t.get('name', '') for t in teams]
+    boundaries = [0]
+    for i in range(1, len(names)):
+        if names[i].lower().strip() < names[i-1].lower().strip():
+            boundaries.append(i)
+    groups = []
+    for i, start in enumerate(boundaries):
+        end = boundaries[i+1] if i+1 < len(boundaries) else len(teams)
+        groups.append((start, end))
+
+    # Match groups to division names
+    if len(groups) != len(division_names):
+        print(f'[DIV] ERROR: detected {len(groups)} alpha-reset groups '
+              f'but got {len(division_names)} division names — skipping auto-stamp.')
+        print(f'[DIV] Groups detected:')
+        for gi, (s, e) in enumerate(groups):
+            print(f'  Group {gi+1}: {e-s} teams, first="{names[s]}", last="{names[e-1]}"')
+        return
+
+    for (start, end), dname in zip(groups, division_names):
+        for i in range(start, end):
+            teams[i]['division'] = dname
+
+    print(f'[DIV] Stamped {len(division_names)} divisions:')
+    for (start, end), dname in zip(groups, division_names):
+        print(f'  {dname}: {end - start} teams')
+
+
 def build_cover_data(teams, db_lookup_fn, schedule_team_divs=None):
     by_div = defaultdict(list)
     for team in teams:
@@ -296,7 +399,7 @@ def build_cover_data(teams, db_lookup_fn, schedule_team_divs=None):
             entry = db_lookup_fn(p.get('name',''))
             if entry and entry.get('tier') in TIER_DOT_COLOR:
                 dots.append(entry['tier'])
-        order = {'0.1':0,'1':1,'2':2,'4':3}
+        order = {'0.1':0,'1':1,'2':2,'3':3,'4':4}
         dots.sort(key=lambda t: order.get(t, 99))
         by_div[div].append((team['name'], dots))
     for div in by_div:
@@ -304,8 +407,9 @@ def build_cover_data(teams, db_lookup_fn, schedule_team_divs=None):
     return by_div
 
 
-def build_pdf(json_path, out_path, raw_sheet_text="", proof_only=False):
-    init_db(raw_sheet_text)
+def build_pdf(json_path, out_path, raw_sheet_text="", proof_only=False, divisions_pdf=None, skip_cover=False):
+    if raw_sheet_text or _DB is None:
+        init_db(raw_sheet_text)
 
     with open(json_path) as f:
         data = json.load(f)
@@ -333,23 +437,32 @@ def build_pdf(json_path, out_path, raw_sheet_text="", proof_only=False):
     if proof_only:
         all_teams = all_teams[:3]
 
+    # Division stamping via alphabetical resets — works for any event source
+    # (PS, PBR, Five Tool, PG) when division_names is provided in the JSON or
+    # parsed from an age-groups PDF. Skipped when schedule_team_divs is set
+    # (single-division events stamp those upstream in run_event).
+    _sched_divs = data.get('schedule_team_divs', {})
+    _div_names = data.get('division_names')
+    if not _div_names and divisions_pdf:
+        _div_names = parse_divisions_pdf(divisions_pdf)
+    if _div_names and not _sched_divs:
+        _stamp_divisions_from_resets(all_teams, _div_names)
+
     L_MARGIN = 0.30 * inch
     R_MARGIN = 0.30 * inch
     Wp, Hp = letter
 
-    _sched_divs = data.get('schedule_team_divs', {})
     cover_divs = build_cover_data(all_teams, db_lookup, schedule_team_divs=_sched_divs)
 
-    # Load PBR rankings — look next to the script first, then legacy /home/claude
+    # Load PBR rankings
     import pickle as _pickle, os as _os
     _pbr_nat = {}; _pbr_st = {}
     _script_dir = _os.path.dirname(_os.path.abspath(__file__))
-    _pkl_candidates = [
+    _pkl = next((p for p in [
         _os.path.join(_script_dir, 'data', 'pbr_rankings.pkl'),
         _os.path.join(_script_dir, 'pbr_rankings.pkl'),
         '/home/claude/pbr_rankings.pkl',
-    ]
-    _pkl = next((p for p in _pkl_candidates if _os.path.exists(p)), None)
+    ] if _os.path.exists(p)), None)
     if _pkl:
         with open(_pkl,'rb') as _f:
             _pbr = _pickle.load(_f)
@@ -439,35 +552,51 @@ def build_pdf(json_path, out_path, raw_sheet_text="", proof_only=False):
 
     sTeam   = ParagraphStyle('TM', fontName='Helvetica-Bold', fontSize=20,
                               textColor=TEXT_DARK, alignment=TA_CENTER, spaceBefore=4, spaceAfter=16)
+    sBanner = ParagraphStyle('BN', fontName='Helvetica-Bold', fontSize=7.5,
+                              textColor=TEXT_DARK, alignment=TA_LEFT, leading=9)
     sDivLabel = ParagraphStyle('DL', fontName='Helvetica-Bold', fontSize=9,
                                textColor=TEXT_MED, alignment=TA_CENTER, spaceBefore=8, spaceAfter=2)
-    sHdr    = ParagraphStyle('HD', fontName='Helvetica-Bold', fontSize=6.5,
-                              textColor=WHITE, alignment=TA_CENTER, leading=8)
-    sNum    = ParagraphStyle('NM', fontName='Helvetica-Bold', fontSize=7.5,
+    sHdr    = ParagraphStyle('HD', fontName='Helvetica-Bold', fontSize=5.5,
+                              textColor=WHITE, alignment=TA_CENTER, leading=6.5)
+    sHdrSm  = ParagraphStyle('HDS', fontName='Helvetica-Bold', fontSize=4.5,
+                              textColor=WHITE, alignment=TA_CENTER, leading=5.5)
+    sNum    = ParagraphStyle('NM', fontName='Helvetica-Bold', fontSize=6.5,
+                              textColor=TEXT_DARK, alignment=TA_CENTER, leading=8)
+    sName   = ParagraphStyle('NA', fontName='Helvetica-Bold', fontSize=7.5,
                               textColor=TEXT_DARK, alignment=TA_CENTER, leading=9)
-    sName   = ParagraphStyle('NA', fontName='Helvetica-Bold', fontSize=8.5,
-                              textColor=TEXT_DARK, alignment=TA_CENTER, leading=10)
     sCell   = ParagraphStyle('CE', fontName='Helvetica', fontSize=6.5,
                               textColor=TEXT_DARK, alignment=TA_CENTER, leading=8)
-    sSchl   = ParagraphStyle('SC', fontName='Helvetica', fontSize=6.5,
-                              textColor=TEXT_DARK, alignment=TA_CENTER, leading=8)
+    sSchl   = ParagraphStyle('SC', fontName='Helvetica', fontSize=4.5,
+                              textColor=TEXT_DARK, alignment=TA_CENTER, leading=5.5)
+    sCommit = ParagraphStyle('CM', fontName='Helvetica', fontSize=5.5,
+                              textColor=TEXT_DARK, alignment=TA_CENTER, leading=6.5)
     sStarHL = ParagraphStyle('SH', fontName='Helvetica-Bold', fontSize=7,
                               textColor=TEXT_DARK, alignment=TA_CENTER, leading=9)
     sNL     = ParagraphStyle('NL', fontName='Helvetica', fontSize=5.5,
                               textColor=colors.HexColor('#BBBBBB'), alignment=TA_LEFT, leading=7)
 
-    BASE_CW  = [0.25, 0.68, 0.85, 0.30, 0.30, 0.25, 0.30]
-    STAR_CW  = [0.33, 0.33]
-    COMMIT_W = 0.70 * inch
-    PBR_W    = 0.48 * inch
-    school_w = W - NOTES_W - sum(c*inch for c in BASE_CW) - sum(c*inch for c in STAR_CW) - COMMIT_W - PBR_W
-    CW       = [c*inch for c in BASE_CW] + [school_w] + [c*inch for c in STAR_CW] + [PBR_W] + [COMMIT_W] + [NOTES_W]
-    HEADERS  = ['#','First','Last','Pos','Ht','Wt','Class','School','Cur *','New *','PBR Rank','Commit','NOTES']
+    # #/First/Last sized individually; everything Pos..Acad shares one even
+    # width, except School which is SCHOOL_EXTRA wider. NOTES stays fixed.
+    NUM_W, FIRST_W, LAST_W = 0.23*inch, 0.62*inch, 0.80*inch
+    SCHOOL_EXTRA = 0.25 * inch
+    # 11 columns Pos..Acad: 10 at even_w + School at even_w + SCHOOL_EXTRA
+    even_w   = (W - NOTES_W - NUM_W - FIRST_W - LAST_W - SCHOOL_EXTRA) / 11.0
+    school_w = even_w + SCHOOL_EXTRA
+    CW = [NUM_W, FIRST_W, LAST_W,             # #  First  Last
+          even_w, even_w, even_w, even_w,     # Pos Ht Wt Class
+          school_w,                           # School (+0.25")
+          even_w,                             # St
+          even_w, even_w,                     # Cur★ New★
+          even_w,                             # PBR Rank
+          even_w,                             # Commit
+          even_w,                             # Acad
+          NOTES_W]                            # NOTES
+    HEADERS  = ['#','First','Last','Pos','Ht','Wt','Class','School','St','Cur *','New *','PBR Rank','Commit','Acad','NOTES']
     ROW_H    = 0.46*inch
     HDR_H    = 0.26*inch
 
     def hdr_row():
-        return [Paragraph(h, sHdr) for h in HEADERS]
+        return [Paragraph(h, sHdrSm if h=='Commit' else sHdr) for h in HEADERS]
 
     def data_row(p):
         first, last = split_name(p.get('name',''))
@@ -492,16 +621,27 @@ def build_pdf(json_path, out_path, raw_sheet_text="", proof_only=False):
         pbr_str = pbr_rank_str(p.get('name',''), p.get('pg_rank',''), grad_year=yr or None, state=state or None)
         sPBR = ParagraphStyle('PBR', fontName='Helvetica', fontSize=6,
                               textColor=TEXT_DARK, alignment=TA_CENTER, leading=7)
+        acad = (p.get('acad','') or p.get('academic','') or '').strip()
+        sAcad = ParagraphStyle('AC', fontName='Helvetica', fontSize=4.5,
+                              textColor=TEXT_DARK, alignment=TA_CENTER, leading=5.5)
+        sSt = ParagraphStyle('ST', fontName='Helvetica', fontSize=6,
+                              textColor=TEXT_DARK, alignment=TA_CENTER, leading=7)
         jlabel = f'#{j} ' if j else ''
+        # NOTES label = full player ID: "#22 First Last 'YY POS ST"
+        gy = f"'{yr[-2:]}" if yr else ''
+        nl_extra = ' '.join(x for x in (gy, pos, state) if x)
+        nl_label = f'{jlabel}{first} {last}' + (f' {nl_extra}' if nl_extra else '')
         return [
             Paragraph(j, sNum), Paragraph(first, sName), Paragraph(last, sName),
             Paragraph(pos, sCell), Paragraph(ht, sCell), Paragraph(wt, sCell),
             Paragraph(yr, sCell), Paragraph(sch, sSchl),
+            Paragraph(state, sSt),
             Paragraph(cur, sStarHL if db else sCell),
             Paragraph('', sCell),
             Paragraph(pbr_str, sPBR),
-            Paragraph(commit_val, sCell),
-            Paragraph(f'{jlabel}{first} {last}', sNL),
+            Paragraph(commit_val, sCommit),
+            Paragraph(acad, sAcad),
+            Paragraph(nl_label, sNL),
         ]
 
     def team_sort_key(t):
@@ -521,35 +661,53 @@ def build_pdf(json_path, out_path, raw_sheet_text="", proof_only=False):
         org_t = lookup_org_tier(team['name'])
         if org_t:
             story.append(Paragraph(f'Tier {org_t}', sDivLabel))
-        rows = [hdr_row()]
-        rh   = [HDR_H]
+        # Row 0 = thin team banner (spans all cols), Row 1 = column headers,
+        # Row 2+ = players. repeatRows=2 repeats BOTH on overflow pages so the
+        # continuation page carries the column names AND a team-name indicator
+        # for post-event identification.
+        BANNER_H = 0.18*inch
+        banner_row = [Paragraph(team['name'], sBanner)] + [''] * (len(HEADERS) - 1)
+        rows = [banner_row, hdr_row()]
+        rh   = [BANNER_H, HDR_H]
         for p in players:
             rows.append(data_row(p))
             rh.append(ROW_H)
-        tbl = Table(rows, colWidths=CW, rowHeights=rh)
+        tbl = Table(rows, colWidths=CW, rowHeights=rh, repeatRows=2)
         ts = [
-            ('BACKGROUND',(0,0),(-1,0),HEADER_BG), ('ALIGN',(0,0),(-1,0),'CENTER'),
-            ('VALIGN',(0,0),(-1,0),'MIDDLE'), ('TOPPADDING',(0,0),(-1,0),4),
-            ('BOTTOMPADDING',(0,0),(-1,0),4), ('ALIGN',(0,1),(-1,-1),'CENTER'),
-            ('VALIGN',(0,1),(-1,-1),'MIDDLE'), ('TOPPADDING',(0,1),(-1,-1),0),
-            ('BOTTOMPADDING',(0,1),(-1,-1),0), ('LEFTPADDING',(0,0),(-1,-1),3),
-            ('RIGHTPADDING',(0,0),(-1,-1),3), ('ALIGN',(12,1),(12,-1),'LEFT'),
-            ('VALIGN',(12,1),(12,-1),'TOP'), ('TOPPADDING',(12,1),(12,-1),3),
-            ('LEFTPADDING',(12,1),(12,-1),4), ('BOX',(0,0),(-1,-1),0.7,LINE_DARK),
+            # team banner (row 0)
+            ('SPAN',(0,0),(-1,0)),
+            ('BACKGROUND',(0,0),(-1,0), colors.HexColor('#E8E8E8')),
+            ('ALIGN',(0,0),(-1,0),'LEFT'), ('VALIGN',(0,0),(-1,0),'MIDDLE'),
+            ('LEFTPADDING',(0,0),(-1,0),5),
+            ('TOPPADDING',(0,0),(-1,0),2), ('BOTTOMPADDING',(0,0),(-1,0),2),
+            # column header (row 1)
+            ('BACKGROUND',(0,1),(-1,1),HEADER_BG), ('ALIGN',(0,1),(-1,1),'CENTER'),
+            ('VALIGN',(0,1),(-1,1),'MIDDLE'), ('TOPPADDING',(0,1),(-1,1),4),
+            ('BOTTOMPADDING',(0,1),(-1,1),4),
+            # data rows (row 2+)
+            ('ALIGN',(0,2),(-1,-1),'CENTER'),
+            ('VALIGN',(0,2),(-1,-1),'MIDDLE'), ('TOPPADDING',(0,2),(-1,-1),0),
+            ('BOTTOMPADDING',(0,2),(-1,-1),0), ('LEFTPADDING',(0,0),(-1,-1),3),
+            ('RIGHTPADDING',(0,0),(-1,-1),3), ('ALIGN',(14,2),(14,-1),'LEFT'),
+            ('VALIGN',(14,2),(14,-1),'TOP'), ('TOPPADDING',(14,2),(14,-1),3),
+            ('LEFTPADDING',(14,2),(14,-1),4), ('BOX',(0,0),(-1,-1),0.7,LINE_DARK),
+            ('LEFTPADDING',(7,2),(7,-1),1), ('RIGHTPADDING',(7,2),(7,-1),1),
             ('LINEBELOW',(0,0),(-1,-1),0.4,LINE_LITE),
-            ('LINEAFTER',(0,0),(0,-1),0.4,LINE_LITE), ('LINEAFTER',(1,0),(1,-1),0.4,LINE_LITE),
-            ('LINEAFTER',(2,0),(2,-1),0.7,LINE_DARK), ('LINEAFTER',(3,0),(3,-1),0.4,LINE_LITE),
-            ('LINEAFTER',(4,0),(4,-1),0.4,LINE_LITE), ('LINEAFTER',(5,0),(5,-1),0.4,LINE_LITE),
-            ('LINEAFTER',(6,0),(6,-1),0.4,LINE_LITE), ('LINEAFTER',(7,0),(7,-1),0.4,LINE_LITE),
-            ('LINEAFTER',(8,0),(8,-1),0.4,LINE_LITE), ('LINEAFTER',(9,0),(9,-1),0.4,LINE_LITE),
-            ('LINEAFTER',(10,0),(10,-1),0.4,LINE_LITE), ('LINEAFTER',(11,0),(11,-1),0.7,LINE_DARK),
+            # vertical column dividers — start at the header row (skip the banner)
+            ('LINEAFTER',(0,1),(0,-1),0.4,LINE_LITE), ('LINEAFTER',(1,1),(1,-1),0.4,LINE_LITE),
+            ('LINEAFTER',(2,1),(2,-1),0.7,LINE_DARK), ('LINEAFTER',(3,1),(3,-1),0.4,LINE_LITE),
+            ('LINEAFTER',(4,1),(4,-1),0.4,LINE_LITE), ('LINEAFTER',(5,1),(5,-1),0.4,LINE_LITE),
+            ('LINEAFTER',(6,1),(6,-1),0.4,LINE_LITE), ('LINEAFTER',(7,1),(7,-1),0.4,LINE_LITE),
+            ('LINEAFTER',(8,1),(8,-1),0.4,LINE_LITE), ('LINEAFTER',(9,1),(9,-1),0.4,LINE_LITE),
+            ('LINEAFTER',(10,1),(10,-1),0.4,LINE_LITE), ('LINEAFTER',(11,1),(11,-1),0.4,LINE_LITE),
+            ('LINEAFTER',(12,1),(12,-1),0.4,LINE_LITE), ('LINEAFTER',(13,1),(13,-1),0.7,LINE_DARK),
         ]
         for i, p in enumerate(players):
-            ri = i + 1
+            ri = i + 2
             is_db = db_lookup(p.get('name','')) is not None
             ts.append(('BACKGROUND',(0,ri),(-1,ri), ROW_ALT if i%2==0 else WHITE))
             if is_db:
-                ts.append(('BACKGROUND',(8,ri),(8,ri), DB_YELLOW))
+                ts.append(('BACKGROUND',(9,ri),(9,ri), DB_YELLOW))
         tbl.setStyle(TableStyle(ts))
         story.append(tbl)
         if ti < len(teams)-1:
@@ -569,27 +727,33 @@ def build_pdf(json_path, out_path, raw_sheet_text="", proof_only=False):
 
     doc.build(story, onFirstPage=on_page, onLaterPages=on_page)
 
-    from reportlab.pdfgen.canvas import Canvas as RLCanvas
-    cv = RLCanvas(cover_file, pagesize=letter)
-    draw_cover(cv, event_name, event_dates, cover_divs, Wp, Hp)
-    cv.showPage()
-    cv.save()
-
-    try:
-        import pypdf
-        writer = pypdf.PdfWriter()
-        for src in [cover_file, tmp]:
-            for page in pypdf.PdfReader(src).pages:
-                writer.add_page(page)
-        with open(out_path, 'wb') as f:
-            writer.write(f)
-    except ImportError:
+    if skip_cover:
+        # Field Tool / roster-only output: no cover page, just the roster
+        # (the page running header is already applied above).
         import shutil
-        shutil.copy(tmp, out_path)
-        print("WARNING: pypdf not found — cover page omitted")
+        shutil.move(tmp, out_path)
+    else:
+        from reportlab.pdfgen.canvas import Canvas as RLCanvas
+        cv = RLCanvas(cover_file, pagesize=letter)
+        draw_cover(cv, event_name, event_dates, cover_divs, Wp, Hp)
+        cv.showPage()
+        cv.save()
 
-    for f in [tmp, cover_file]:
-        try: os.remove(f)
-        except: pass
+        try:
+            import pypdf
+            writer = pypdf.PdfWriter()
+            for src in [cover_file, tmp]:
+                for page in pypdf.PdfReader(src).pages:
+                    writer.add_page(page)
+            with open(out_path, 'wb') as f:
+                writer.write(f)
+        except ImportError:
+            import shutil
+            shutil.copy(tmp, out_path)
+            print("WARNING: pypdf not found — cover page omitted")
+
+        for f in [tmp, cover_file]:
+            try: os.remove(f)
+            except: pass
 
     print(f'Done -> {out_path}')

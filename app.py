@@ -44,6 +44,7 @@ from post_event_flow import (
     split_pools, prefill_new_player_rows, build_updates_rows,
     rows_to_csv, today_str,
 )
+import run_event
 
 
 # ---------------------- helpers ----------------------
@@ -195,7 +196,8 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-tab_field, tab_post, tab_admin = st.tabs(["🎯 Field Tool", "📥 Post-Event", "⚙️  Admin"])
+tab_field, tab_tourney, tab_post, tab_admin = st.tabs(
+    ["🎯 Field Tool", "🏟️ Tournament Builder", "📥 Post-Event", "⚙️  Admin"])
 
 
 # ---- Field Tool ----
@@ -356,6 +358,105 @@ with tab_field:
             use_container_width=True,
             type="primary",
         )
+
+
+# ---- Tournament Builder ----
+with tab_tourney:
+    st.subheader("Tournament Builder")
+    st.caption("Upload a whole event — rosters, plus an optional schedule and "
+               "age-groups PDF — and get the full roster book (cover, divisions, "
+               "running header) and the schedule CSV.")
+
+    tb_db_ready = XLSX_PATH.exists()
+    if not tb_db_ready:
+        st.warning("Recruiting xlsx not loaded — load it on the **Admin** tab first.")
+    if not PKL_PATH.exists():
+        st.info("No PBR rankings loaded — the build still works, but PBR columns "
+                "and counts will be blank. Load them on the Admin tab.")
+
+    st.write("**1. Rosters JSON**")
+    tb_roster = st.file_uploader("Scraped rosters for the whole event", type=["json"],
+                                 label_visibility="collapsed", key="tb_roster")
+
+    st.write("**2. Schedule JSON** (optional — PDF only if omitted)")
+    tb_sched = st.file_uploader("Scraped schedule", type=["json"],
+                                label_visibility="collapsed", key="tb_sched")
+
+    st.write("**3. Age-groups PDF** (optional — for multi-division events)")
+    tb_divpdf = st.file_uploader("Teams-tab screenshots as a PDF; divisions are "
+                                 "read from it", type=["pdf"],
+                                 label_visibility="collapsed", key="tb_divpdf")
+
+    c1, c2 = st.columns(2)
+    with c1:
+        tb_event = st.text_input("Event name (optional)",
+                                 placeholder="e.g. National Program Invitational (NPI)",
+                                 key="tb_event")
+    with c2:
+        tb_division = st.text_input("Division label (single-division events)",
+                                    value="17U/18U", key="tb_division",
+                                    help="Ignored when an age-groups PDF is provided.")
+
+    tb_go = st.button("🏟️ Build tournament", type="primary",
+                      use_container_width=True,
+                      disabled=not (tb_roster and tb_db_ready))
+
+    if tb_go:
+        import tempfile
+        with st.status("Building…", expanded=True) as tstatus:
+            try:
+                tdir = tempfile.mkdtemp()
+                roster_path = os.path.join(tdir, "rosters.json")
+                Path(roster_path).write_bytes(tb_roster.read())
+                sched_path = None
+                if tb_sched:
+                    sched_path = os.path.join(tdir, "schedule.json")
+                    Path(sched_path).write_bytes(tb_sched.read())
+                divpdf_path = None
+                if tb_divpdf:
+                    divpdf_path = os.path.join(tdir, "agegroups.pdf")
+                    Path(divpdf_path).write_bytes(tb_divpdf.read())
+
+                tstatus.update(label="📄 Generating roster book + schedule "
+                                     "(a full event can take a minute)…")
+                pdf_path, csv_path = run_event.run_event(
+                    xlsx=str(XLSX_PATH), roster=roster_path, schedule=sched_path,
+                    event=(tb_event or None), division=(tb_division or "17U/18U"),
+                    outdir=tdir, div_pdf=divpdf_path,
+                )
+                st.session_state["tb_pdf"] = Path(pdf_path).read_bytes()
+                st.session_state["tb_pdfname"] = os.path.basename(pdf_path)
+                st.session_state["tb_csv"] = (Path(csv_path).read_text()
+                                              if csv_path else None)
+                st.session_state["tb_csvname"] = (os.path.basename(csv_path)
+                                                  if csv_path else None)
+                tstatus.update(label="Done", state="complete")
+            except Exception as e:
+                tstatus.update(label="Error", state="error")
+                st.exception(e)
+                st.stop()
+
+    if "tb_pdf" in st.session_state:
+        import csv as _csv
+        import pandas as pd
+        st.divider()
+        st.download_button("⬇️  Roster book (PDF)", data=st.session_state["tb_pdf"],
+                           file_name=st.session_state["tb_pdfname"],
+                           mime="application/pdf", use_container_width=True,
+                           type="primary")
+        if st.session_state.get("tb_csv"):
+            csv_text = st.session_state["tb_csv"]
+            reader = list(_csv.reader(io.StringIO(csv_text)))
+            header, data = reader[0], reader[1:]
+            st.markdown(f"**📅 Schedule** — {len(data)} games")
+            st.dataframe(pd.DataFrame(data, columns=header),
+                         use_container_width=True, hide_index=True)
+            st.caption("Tap the copy icon to grab the whole schedule, or download the CSV.")
+            tsv = "\n".join("\t".join(r) for r in reader)
+            st.code(tsv, language=None)
+            st.download_button("⬇️  Schedule (CSV)", data=csv_text,
+                               file_name=st.session_state["tb_csvname"],
+                               mime="text/csv", use_container_width=True)
 
 
 # ---- Post-Event ----
