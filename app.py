@@ -451,9 +451,14 @@ with tab_post:
         if st.session_state["pe_upd_rows"]:
             st.dataframe(pd.DataFrame(st.session_state["pe_upd_rows"]),
                          use_container_width=True, hide_index=True)
-            upd_tsv = rows_to_csv(st.session_state["pe_upd_rows"],
-                                  UPDATE_COLUMNS, delimiter="\t")
-            st.download_button("⬇️  Updates (TSV — paste into the sheet)",
+            st.caption("Tap the copy icon (top-right of the box), then paste into the "
+                       "next empty row of your sheet — columns split automatically.")
+            upd_copy = rows_to_csv(st.session_state["pe_upd_rows"], UPDATE_COLUMNS,
+                                   delimiter="\t", header=False).decode()
+            st.code(upd_copy, language=None)
+            upd_tsv = rows_to_csv(st.session_state["pe_upd_rows"], UPDATE_COLUMNS,
+                                  delimiter="\t")
+            st.download_button("⬇️  Or download (TSV, with headers)",
                                data=upd_tsv, file_name="rating_updates.tsv",
                                mime="text/tab-separated-values",
                                use_container_width=True)
@@ -461,7 +466,7 @@ with tab_post:
             st.caption("No rating updates on these pages.")
 
         # --- New players (editable before download) ---
-        st.markdown("**🆕 New players** — review/edit, then download")
+        st.markdown("**🆕 New players** — review/edit, then copy or download")
         if st.session_state["pe_new_rows"]:
             df = pd.DataFrame(st.session_state["pe_new_rows"],
                               columns=NEW_PLAYER_COLUMNS)
@@ -473,12 +478,17 @@ with tab_post:
                         "By", options=["CB", "AP", "TR", "AM", "CR"], width="small"),
                 },
             )
-            new_csv = rows_to_csv(edited.fillna("").to_dict("records"),
-                                  NEW_PLAYER_COLUMNS)
-            st.download_button("⬇️  New players (CSV)",
+            edited_rows = edited.fillna("").to_dict("records")
+            st.caption("Tap the copy icon (top-right of the box), then paste into the "
+                       "next empty row of your sheet — columns split automatically. "
+                       "Reflects any edits you made above.")
+            new_copy = rows_to_csv(edited_rows, NEW_PLAYER_COLUMNS,
+                                   delimiter="\t", header=False).decode()
+            st.code(new_copy, language=None)
+            new_csv = rows_to_csv(edited_rows, NEW_PLAYER_COLUMNS)
+            st.download_button("⬇️  Or download (CSV, with headers)",
                                data=new_csv, file_name="new_players.csv",
-                               mime="text/csv", use_container_width=True,
-                               type="primary")
+                               mime="text/csv", use_container_width=True)
         else:
             st.caption("No new players on these pages.")
 

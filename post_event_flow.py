@@ -158,12 +158,14 @@ def build_updates_rows(updates):
     return rows
 
 
-def rows_to_csv(rows, columns, delimiter=","):
-    """Generic builder: only the requested columns, in order. delimiter='\\t' => TSV."""
+def rows_to_csv(rows, columns, delimiter=",", header=True):
+    """Generic builder: only the requested columns, in order.
+    delimiter='\\t' => TSV; header=False => data rows only (paste-append)."""
     buf = io.StringIO()
     w = csv.DictWriter(buf, fieldnames=columns, extrasaction="ignore",
                        lineterminator="\n", delimiter=delimiter)
-    w.writeheader()
+    if header:
+        w.writeheader()
     for r in rows:
         w.writerow({c: r.get(c, "") for c in columns})
     return buf.getvalue().encode("utf-8")
