@@ -192,7 +192,7 @@ st.set_page_config(
 
 st.markdown(
     "<h2 style='margin-bottom:0'>⚓ Navy Recruiting Tools</h2>"
-    "<p style='color:#666;margin-top:0.2em'>Generate pdf rosters, csv schedules, and post event summaries/p>",
+    "<p style='color:#666;margin-top:0.2em'>Generate PDF Rosters, CSV Schedules, and Post Event Summaries",
     unsafe_allow_html=True,
 )
 
