@@ -445,18 +445,42 @@ with tab_tourney:
         st.info("No PBR rankings loaded — the build still works, but PBR columns "
                 "and counts will be blank. Load them on the Admin tab.")
 
-    st.write("**1. Rosters JSON**")
+    st.write("**1. Rosters JSON** (upload one, or several to combine — PG splits by age group)")
     tb_roster = st.file_uploader("Scraped rosters for the whole event", type=["json"],
+                                 accept_multiple_files=True,
                                  label_visibility="collapsed", key="tb_roster")
 
-    st.write("**2. Schedule JSON** (optional — PDF only if omitted)")
-    tb_sched = st.file_uploader("Scraped schedule", type=["json"],
+    st.write("**2. Schedule JSON** (optional — one or several; PDF only if omitted)")
+    tb_sched = st.file_uploader("Scraped schedule(s)", type=["json"],
+                                accept_multiple_files=True,
                                 label_visibility="collapsed", key="tb_sched")
 
-    st.write("**3. Age-groups PDF** (optional — for multi-division events)")
-    tb_divpdf = st.file_uploader("Teams-tab screenshots as a PDF; divisions are "
-                                 "read from it", type=["pdf"],
-                                 label_visibility="collapsed", key="tb_divpdf")
+    st.write("**3. Age-group PDFs** (optional — one PDF per age group)")
+    tb_divpdfs = st.file_uploader(
+        "One PDF per age group (PG 'Participating Teams' export, or a Ctrl-P "
+        "print of a single age group). Each PDF is the authoritative team list "
+        "for its division.",
+        type=["pdf"], accept_multiple_files=True,
+        label_visibility="collapsed", key="tb_divpdfs")
+
+    def _guess_div_label(fname):
+        n = fname.upper()
+        for tok, lbl in (("18U", "18U"), ("17U", "17/18U"), ("16U", "15/16U"),
+                         ("15U", "15U"), ("14U", "14U")):
+            if tok in n:
+                return lbl
+        return ""
+
+    tb_div_labels = {}
+    if tb_divpdfs:
+        st.caption("Confirm the division label for each PDF (auto-filled from the "
+                   "filename). Leave a single PDF's label blank to fall back to "
+                   "automatic multi-division detection.")
+        for f in tb_divpdfs:
+            tb_div_labels[f.name] = st.text_input(
+                f"Division label — {f.name}",
+                value=_guess_div_label(f.name),
+                key=f"tb_divlabel_{f.name}")
 
     c1, c2 = st.columns(2)
     with c1:
@@ -477,23 +501,39 @@ with tab_tourney:
         with st.status("Building…", expanded=True) as tstatus:
             try:
                 tdir = tempfile.mkdtemp()
-                roster_path = os.path.join(tdir, "rosters.json")
-                Path(roster_path).write_bytes(tb_roster.read())
-                sched_path = None
-                if tb_sched:
-                    sched_path = os.path.join(tdir, "schedule.json")
-                    Path(sched_path).write_bytes(tb_sched.read())
+                roster_paths = []
+                for i, f in enumerate(tb_roster):
+                    rp = os.path.join(tdir, f"rosters_{i}.json")
+                    Path(rp).write_bytes(f.read())
+                    roster_paths.append(rp)
+                sched_paths = []
+                for i, f in enumerate(tb_sched or []):
+                    sp = os.path.join(tdir, f"schedule_{i}.json")
+                    Path(sp).write_bytes(f.read())
+                    sched_paths.append(sp)
+                # Age-group PDFs: labeled files -> division_pdfs (per-group team
+                # lists). A single unlabeled PDF -> div_pdf (reset detection).
+                division_pdfs = None
                 divpdf_path = None
-                if tb_divpdf:
-                    divpdf_path = os.path.join(tdir, "agegroups.pdf")
-                    Path(divpdf_path).write_bytes(tb_divpdf.read())
+                if tb_divpdfs:
+                    saved = []
+                    for i, f in enumerate(tb_divpdfs):
+                        p = os.path.join(tdir, f"agegroup_{i}.pdf")
+                        Path(p).write_bytes(f.read())
+                        saved.append((tb_div_labels.get(f.name, "").strip(), p))
+                    labeled = [(lbl, p) for lbl, p in saved if lbl]
+                    if labeled:
+                        division_pdfs = labeled
+                    elif len(saved) == 1:
+                        divpdf_path = saved[0][1]
 
                 tstatus.update(label="📄 Generating roster book + schedule "
                                      "(a full event can take a minute)…")
                 pdf_path, csv_path = run_event.run_event(
-                    xlsx=str(XLSX_PATH), roster=roster_path, schedule=sched_path,
+                    xlsx=str(XLSX_PATH), roster=roster_paths,
+                    schedule=(sched_paths or None),
                     event=(tb_event or None), division=(tb_division or "17U/18U"),
-                    outdir=tdir, div_pdf=divpdf_path,
+                    outdir=tdir, div_pdf=divpdf_path, division_pdfs=division_pdfs,
                 )
                 st.session_state["tb_pdf"] = Path(pdf_path).read_bytes()
                 st.session_state["tb_pdfname"] = os.path.basename(pdf_path)

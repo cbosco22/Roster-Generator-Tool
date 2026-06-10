@@ -74,6 +74,72 @@ def _safe_stub(event_name):
     return re.sub(r'\s+', '_', stub) or 'Event'
 
 
+def _as_list(x):
+    """Coerce a single path or a list/tuple of paths into a clean list."""
+    if x is None:
+        return []
+    if isinstance(x, (list, tuple)):
+        return [p for p in x if p]
+    return [x]
+
+
+def _load_roster_dict(path):
+    """Load one roster JSON, normalizing the plain-list form to {'teams': [...]}."""
+    with open(path) as f:
+        d = json.load(f)
+    if isinstance(d, list):
+        d = {'teams': d}
+    return d
+
+
+def _merge_rosters(paths):
+    """Combine one or more roster JSONs into a single {'teams': [...]} dict.
+
+    PG splits a single event across age-group exports (a 16U file and a 17U
+    file); this folds them into one roster in upload order so the divisions and
+    duplicate-team tiebreak resolve correctly. The first usable event string and
+    any pre-set schedule_team_divs are carried over.
+    """
+    merged = {'teams': []}
+    event_name = ''
+    sched_divs = {}
+    for p in paths:
+        d = _load_roster_dict(p)
+        merged['teams'].extend(d.get('teams', []))
+        if not event_name:
+            ev = (d.get('event') or '').strip()
+            if ev and ev.lower() != 'event':
+                event_name = ev
+        sd = d.get('schedule_team_divs') or {}
+        if isinstance(sd, dict):
+            sched_divs.update(sd)
+    if event_name:
+        merged['event'] = event_name
+    if sched_divs:
+        merged['schedule_team_divs'] = sched_divs
+    return merged
+
+
+def _merge_schedules(paths):
+    """Combine one or more schedule JSONs into a single {'games': [...]} dict.
+    Returns None when no schedule was supplied. Non-games top-level keys are
+    taken from the first file."""
+    if not paths:
+        return None
+    merged = None
+    for p in paths:
+        with open(p) as f:
+            d = json.load(f)
+        if isinstance(d, list):
+            d = {'games': d}
+        if merged is None:
+            merged = dict(d)
+            merged['games'] = list(d.get('games', []))
+        else:
+            merged['games'].extend(d.get('games', []))
+    return merged
+
+
 def _ensure_pbr_pkl(pbr_files):
     """Make sure pbr_rankings.pkl exists next to the scripts. Build it if we
     were handed ranking JSONs and no pkl is present yet."""
@@ -101,13 +167,25 @@ def _ensure_pbr_pkl(pbr_files):
 # Core
 # ----------------------------------------------------------------------------
 def run_event(xlsx, roster, schedule=None, pbr=None,
-              event=None, division='17U/18U', outdir='out', div_pdf=None):
+              event=None, division='17U/18U', outdir='out',
+              div_pdf=None, division_pdfs=None):
     """Run the full event workup. Returns (pdf_path, csv_path|None).
-    
-    div_pdf: path to an age-groups PDF (screenshot of event Teams tab).
-             When provided, divisions are parsed from the PDF and stamped via
-             alphabetical-reset detection instead of using the single --division
-             label. Works for multi-division events (PS, PBR, Five Tool).
+
+    roster: a roster JSON path, OR a list of paths to combine (PG often splits
+            one event into per-age-group exports — pass them all and they're
+            merged in order).
+    schedule: a schedule JSON path, OR a list of paths to combine. PDF-only if
+            omitted.
+
+    div_pdf: path to a single age-groups PDF (screenshot of event Teams tab).
+             Divisions are parsed from the PDF and stamped via alphabetical-reset
+             detection. Works for PS / PBR / Five Tool multi-division pages.
+
+    division_pdfs: list of (label, pdf_path) tuples — one PDF per age group
+             (e.g. a PG 'Participating Teams' export or a Ctrl-P print of one
+             age group). Each PDF is the authoritative team list for its
+             division; teams are matched by name. This is the robust, no-guessing
+             path and takes priority over div_pdf when provided.
     """
     pbr = pbr or []
     os.makedirs(outdir, exist_ok=True)
@@ -117,13 +195,9 @@ def run_event(xlsx, roster, schedule=None, pbr=None,
     #    only needs the pkl present on disk before build_pdf is called.
     _ensure_pbr_pkl(pbr)
 
-    # 2) Load roster JSON and patch the event name + divisions
-    with open(roster) as f:
-        roster_data = json.load(f)
-
-    # Some roster JSONs are a plain list of teams instead of a dict
-    if isinstance(roster_data, list):
-        roster_data = {'teams': roster_data}
+    # 2) Load + merge roster JSON(s) and patch the event name + divisions
+    roster_paths = _as_list(roster)
+    roster_data = _merge_rosters(roster_paths)
 
     # Normalize the team-name key. Some scrapes emit 'team' / 'team_name' /
     # 'teamName' instead of 'name'; the rest of the pipeline (here and in
@@ -170,34 +244,30 @@ def run_event(xlsx, roster, schedule=None, pbr=None,
         event_name = raw_event
     else:
         # PG scraped it as "Event" (or blank) — recover from the filename
-        event_name = _event_name_from_filename(roster)
+        event_name = _event_name_from_filename(roster_paths[0]) if roster_paths else 'Event'
     roster_data['event'] = event_name
 
+    # Merge schedule JSON(s) once (PG may split these per age group too).
+    schedule_paths = _as_list(schedule)
+    schedule_data = _merge_schedules(schedule_paths)
+    has_schedule = schedule_data is not None
+
     # Stamp every team with the division so the cover groups correctly.
-    # When a div_pdf is provided (multi-division event), skip this — build_pdf
-    # will parse the PDF and use alphabetical-reset detection instead.
-    if not div_pdf:
+    # When divisions come from PDF(s) — either a single reset-detected PDF
+    # (div_pdf) or one PDF per age group (division_pdfs) — skip this; build_pdf
+    # assigns divisions from the PDF(s) instead.
+    _pdf_divisions = bool(div_pdf or division_pdfs)
+    if not _pdf_divisions:
         sched_divs = dict(roster_data.get('schedule_team_divs', {}))
         for t in roster_data.get('teams', []):
             sched_divs.setdefault(t['name'], t.get('division') or division)
-        if schedule:
-            with open(schedule) as f:
-                schedule_data = json.load(f)
+        if has_schedule:
             for g in schedule_data.get('games', []):
                 for key in ('team1', 'team2'):
                     nm = g.get(key)
                     if nm:
                         sched_divs.setdefault(nm, division)
-        else:
-            schedule_data = None
         roster_data['schedule_team_divs'] = sched_divs
-    else:
-        # Multi-division: load schedule but don't stamp divisions
-        if schedule:
-            with open(schedule) as f:
-                schedule_data = json.load(f)
-        else:
-            schedule_data = None
 
     # Write the patched roster to a temp file the generator can read
     patched_roster = os.path.join(outdir, '_patched_roster.json')
@@ -206,16 +276,17 @@ def run_event(xlsx, roster, schedule=None, pbr=None,
 
     stub = _safe_stub(event_name)
     pdf_path = os.path.join(outdir, f'{stub}.pdf')
-    csv_path = os.path.join(outdir, f'{stub}_Schedule.csv') if schedule else None
+    csv_path = os.path.join(outdir, f'{stub}_Schedule.csv') if has_schedule else None
 
     # 3) Load the DB straight from the xlsx, then build the PDF
     import gen_roster_pdf as grp
     grp.init_db_from_xlsx(xlsx)              # <- the correct, only DB source
     grp.build_pdf(patched_roster, pdf_path,
-                  divisions_pdf=div_pdf)     # build_pdf keeps the loaded DB
+                  divisions_pdf=div_pdf,
+                  division_pdfs=division_pdfs)   # build_pdf keeps the loaded DB
 
-    # 4) Schedule CSV (if a schedule was provided)
-    if schedule:
+    # 4) Schedule CSV (if any schedule was provided)
+    if has_schedule:
         from db_loader import parse_xlsx, lookup
         from gen_schedule_csv import build_schedule_csv
         db = parse_xlsx(xlsx)
@@ -242,18 +313,29 @@ def run_event(xlsx, roster, schedule=None, pbr=None,
 def main():
     ap = argparse.ArgumentParser(description='Navy Baseball event workup')
     ap.add_argument('--xlsx', required=True, help='Navy Recruiting Sheet .xlsx')
-    ap.add_argument('--roster', required=True, help='roster JSON')
-    ap.add_argument('--schedule', help='schedule JSON (optional; PDF-only if omitted)')
+    ap.add_argument('--roster', required=True, nargs='+',
+                    help='roster JSON(s) — pass several to combine (PG splits by age group)')
+    ap.add_argument('--schedule', nargs='*', default=None,
+                    help='schedule JSON(s) (optional; combined if several; PDF-only if omitted)')
     ap.add_argument('--pbr', nargs='*', default=[], help='PBR ranking JSON files (optional)')
     ap.add_argument('--event', help='override event name (optional)')
     ap.add_argument('--division', default='17U/18U', help='event division label')
-    ap.add_argument('--div-pdf', dest='div_pdf',
-                    help='age-groups PDF (Teams tab screenshot) for multi-division events')
+    ap.add_argument('--div-pdf', dest='div_pdf', action='append', default=[],
+                    help='Age-groups PDF. Repeatable. Use "LABEL=path.pdf" for one '
+                         'PDF per age group (e.g. --div-pdf "15/16U=16u.pdf" '
+                         '--div-pdf "17/18U=17u.pdf"). A bare path (no "=") uses the '
+                         'single-PDF alphabetical-reset detection (PS/PBR/Five Tool).')
     ap.add_argument('--outdir', default='out', help='output directory')
     args = ap.parse_args()
+
+    labeled = [v for v in args.div_pdf if '=' in v]
+    bare    = [v for v in args.div_pdf if '=' not in v]
+    division_pdfs = [tuple(v.split('=', 1)) for v in labeled] or None
+    single_div_pdf = bare[0] if (bare and not division_pdfs) else None
+
     run_event(args.xlsx, args.roster, schedule=args.schedule, pbr=args.pbr,
               event=args.event, division=args.division, outdir=args.outdir,
-              div_pdf=args.div_pdf)
+              div_pdf=single_div_pdf, division_pdfs=division_pdfs)
 
 
 if __name__ == '__main__':

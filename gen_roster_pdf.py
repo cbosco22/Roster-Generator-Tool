@@ -22,7 +22,7 @@ from collections import defaultdict
 from reportlab.lib.pagesizes import letter
 from reportlab.lib import colors
 from reportlab.lib.units import inch
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, PageBreak
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, PageBreak, Flowable
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.enums import TA_CENTER, TA_LEFT
 from reportlab.pdfgen import canvas as rl_canvas
@@ -385,6 +385,73 @@ def _stamp_divisions_from_resets(teams, division_names):
         print(f'  {dname}: {end - start} teams')
 
 
+def _norm_team(s):
+    """Space/punctuation-insensitive lowercase key for robust name matching.
+    Handles PG's wrapped-text mangling ('WEST COAST' -> 'WESTCOAST',
+    'Group 16uNational' -> 'group16unational')."""
+    import re
+    return re.sub(r'[^a-z0-9]', '', (s or '').lower())
+
+
+def _pdf_text_blob(pdf_path):
+    """Return the full text of a PDF as one normalized blob for containment tests."""
+    from pypdf import PdfReader
+    reader = PdfReader(pdf_path)
+    return _norm_team(' '.join((p.extract_text() or '') for p in reader.pages))
+
+
+def assign_divisions_from_pdfs(teams, pdf_specs):
+    """Assign team['division'] using one age-group PDF per division.
+
+    This is the robust, no-guessing division path: each PDF is the authoritative
+    roster of teams for that age group (e.g. a PG 'Participating Teams' export, a
+    Ctrl-P print of a single age group). A roster team is matched to a division if
+    its normalized name appears in that division's PDF text. Teams that appear in
+    more than one age group (e.g. 'BPA', 'ZT National Prospects' entered in both a
+    16U and a 17U event) are split across the matching divisions in roster order.
+
+    Args:
+        teams: list of team dicts (modified in place); roster/scrape order matters
+               for resolving teams that appear in multiple age groups.
+        pdf_specs: ordered list of (division_label, pdf_path) tuples.
+    """
+    if not teams or not pdf_specs:
+        return
+    blobs = [(label, _pdf_text_blob(path)) for label, path in pdf_specs]
+
+    deferred = []  # (team, normalized_name, [candidate_labels])
+    for team in teams:
+        n = _norm_team(team.get('name', ''))
+        cands = [label for label, blob in blobs if n and n in blob]
+        if len(cands) == 1:
+            team['division'] = cands[0]
+        elif not cands:
+            team['division'] = team.get('division') or 'Unknown'
+        else:
+            deferred.append((team, n, cands))
+
+    # Teams that match multiple age groups: distribute across candidate labels
+    # round-robin, in roster order (1st 'BPA' -> 1st group, 2nd 'BPA' -> 2nd group).
+    from collections import defaultdict as _dd
+    rr = _dd(int)
+    for team, n, cands in deferred:
+        team['division'] = cands[rr[n] % len(cands)]
+        rr[n] += 1
+
+    # Report
+    summary = _dd(list)
+    for team in teams:
+        summary[team.get('division', 'Unknown')].append(team['name'])
+    print(f'[DIV-PDF] Assigned {len(teams)} teams across {len(pdf_specs)} age-group PDF(s):')
+    for label, _ in pdf_specs:
+        names = summary.get(label, [])
+        print(f'  {label}: {len(names)} teams')
+    if summary.get('Unknown'):
+        print(f'  Unknown (no PDF match — verify manually): {len(summary["Unknown"])} teams')
+        for nm in summary['Unknown']:
+            print(f'    - {nm}')
+
+
 def build_cover_data(teams, db_lookup_fn, schedule_team_divs=None):
     by_div = defaultdict(list)
     for team in teams:
@@ -407,7 +474,8 @@ def build_cover_data(teams, db_lookup_fn, schedule_team_divs=None):
     return by_div
 
 
-def build_pdf(json_path, out_path, raw_sheet_text="", proof_only=False, divisions_pdf=None, skip_cover=False):
+def build_pdf(json_path, out_path, raw_sheet_text="", proof_only=False,
+              divisions_pdf=None, division_pdfs=None, skip_cover=False):
     if raw_sheet_text or _DB is None:
         init_db(raw_sheet_text)
 
@@ -437,16 +505,20 @@ def build_pdf(json_path, out_path, raw_sheet_text="", proof_only=False, division
     if proof_only:
         all_teams = all_teams[:3]
 
-    # Division stamping via alphabetical resets — works for any event source
-    # (PS, PBR, Five Tool, PG) when division_names is provided in the JSON or
-    # parsed from an age-groups PDF. Skipped when schedule_team_divs is set
-    # (single-division events stamp those upstream in run_event).
+    # Division assignment. Priority:
+    #   1. division_pdfs  — one PDF per age group (robust, no guessing). Each PDF
+    #      is the authoritative team list for its division; teams matched by name.
+    #   2. division_names + alphabetical-reset stamp (PS/PBR/Five Tool single PDF).
+    #   3. schedule_team_divs / team data / name inference (fallbacks downstream).
     _sched_divs = data.get('schedule_team_divs', {})
-    _div_names = data.get('division_names')
-    if not _div_names and divisions_pdf:
-        _div_names = parse_divisions_pdf(divisions_pdf)
-    if _div_names and not _sched_divs:
-        _stamp_divisions_from_resets(all_teams, _div_names)
+    if division_pdfs and not _sched_divs:
+        assign_divisions_from_pdfs(all_teams, division_pdfs)
+    else:
+        _div_names = data.get('division_names')
+        if not _div_names and divisions_pdf:
+            _div_names = parse_divisions_pdf(divisions_pdf)
+        if _div_names and not _sched_divs:
+            _stamp_divisions_from_resets(all_teams, _div_names)
 
     L_MARGIN = 0.30 * inch
     R_MARGIN = 0.30 * inch
@@ -650,10 +722,27 @@ def build_pdf(json_path, out_path, raw_sheet_text="", proof_only=False, division
 
     teams = sorted(all_teams, key=team_sort_key)
 
+    # GoodNotes / Acrobat sidebar outline: record the page each team block lands
+    # on. _PageMarker is a zero-size flowable that captures its page number at
+    # draw time; after build() we have (division, team, roster_page) for every
+    # team and write a Division -> Team outline tree during the merge.
+    _page_markers = []  # list of [division, team_name, roster_page]
+
+    class _PageMarker(Flowable):
+        def __init__(self, division, team_name):
+            super().__init__()
+            self._div = division
+            self._team = team_name
+        def wrap(self, *a):
+            return (0, 0)
+        def draw(self):
+            _page_markers.append([self._div, self._team, self.canv.getPageNumber()])
+
     story = []
     for ti, team in enumerate(teams):
         players = sorted(team['players'], key=jersey_key)
         div = _sched_divs.get(team['name']) or team.get('division') or team.get('age_group') or _infer_division(team['name'])
+        story.append(_PageMarker(div or 'Unknown', team['name']))
         if div and div != 'Unknown':
             story.append(Paragraph(div, sDivLabel))
         story.append(Paragraph(team['name'], sTeam))
@@ -727,11 +816,39 @@ def build_pdf(json_path, out_path, raw_sheet_text="", proof_only=False, division
 
     doc.build(story, onFirstPage=on_page, onLaterPages=on_page)
 
+    def _write_outline(writer, cover_offset):
+        """Build a collapsible Division -> Team sidebar outline from _page_markers.
+        cover_offset = number of cover pages prepended before the roster."""
+        from collections import OrderedDict
+        markers = sorted(_page_markers, key=lambda m: m[2])  # by roster page
+        by_div = OrderedDict()
+        for div, team, rpage in markers:
+            by_div.setdefault(div, []).append((team, rpage))
+        for div, entries in by_div.items():
+            first_abs = cover_offset + (entries[0][1] - 1)
+            try:
+                parent = writer.add_outline_item(div, first_abs)
+            except Exception:
+                parent = None
+            for team, rpage in entries:
+                abs_pg = cover_offset + (rpage - 1)
+                try:
+                    writer.add_outline_item(team, abs_pg, parent=parent)
+                except Exception:
+                    pass
+
+    import pypdf
     if skip_cover:
         # Field Tool / roster-only output: no cover page, just the roster
-        # (the page running header is already applied above).
-        import shutil
-        shutil.move(tmp, out_path)
+        # (the page running header is already applied above). Outline still added.
+        writer = pypdf.PdfWriter()
+        for page in pypdf.PdfReader(tmp).pages:
+            writer.add_page(page)
+        _write_outline(writer, cover_offset=0)
+        with open(out_path, 'wb') as f:
+            writer.write(f)
+        try: os.remove(tmp)
+        except: pass
     else:
         from reportlab.pdfgen.canvas import Canvas as RLCanvas
         cv = RLCanvas(cover_file, pagesize=letter)
@@ -739,18 +856,18 @@ def build_pdf(json_path, out_path, raw_sheet_text="", proof_only=False, division
         cv.showPage()
         cv.save()
 
+        cover_pages = len(pypdf.PdfReader(cover_file).pages)
+        writer = pypdf.PdfWriter()
+        for src in [cover_file, tmp]:
+            for page in pypdf.PdfReader(src).pages:
+                writer.add_page(page)
         try:
-            import pypdf
-            writer = pypdf.PdfWriter()
-            for src in [cover_file, tmp]:
-                for page in pypdf.PdfReader(src).pages:
-                    writer.add_page(page)
-            with open(out_path, 'wb') as f:
-                writer.write(f)
-        except ImportError:
-            import shutil
-            shutil.copy(tmp, out_path)
-            print("WARNING: pypdf not found — cover page omitted")
+            writer.add_outline_item('Cover', 0)
+        except Exception:
+            pass
+        _write_outline(writer, cover_offset=cover_pages)
+        with open(out_path, 'wb') as f:
+            writer.write(f)
 
         for f in [tmp, cover_file]:
             try: os.remove(f)
