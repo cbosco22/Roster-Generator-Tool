@@ -1,9 +1,9 @@
 """
-Navy Baseball Recruiting — Field Tool
+Navy Baseball Recruiting Tools
 
 Streamlit app for coaches in the field:
-  * Snap a photo of a team's printed roster
-  * Type the event + division
+  * Generate rosters and schedules for teams and events
+  * Generate post event summaries allowing for fast player entry
   * Get back a Navy-formatted PDF + on-screen summary of DB/PBR hits
 
 Admin tab lets Chris swap in a new recruiting xlsx or rebuild PBR rankings.
