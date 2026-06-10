@@ -191,8 +191,11 @@ st.set_page_config(
 )
 
 st.markdown(
-    "<h2 style='margin-bottom:0'>⚓ Navy Recruiting — Field Tool</h2>"
-    "<p style='color:#666;margin-top:0.2em'>Photo of a roster → Navy PDF + dugout summary</p>",
+    "<h2 style='margin-bottom:0'>⚓ Navy Recruiting Tools</h2>"
+    "<p style='color:#666;margin-top:0.2em'>Navy Baseball Recruiting Tools
+
+Streamlit app for coaches in the field:
+  * Generate pdf rosters, csv schedules, and post event summaries</p>",
     unsafe_allow_html=True,
 )
 
