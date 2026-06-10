@@ -168,7 +168,7 @@ def _ensure_pbr_pkl(pbr_files):
 # ----------------------------------------------------------------------------
 def run_event(xlsx, roster, schedule=None, pbr=None,
               event=None, division='17U/18U', outdir='out',
-              div_pdf=None, division_pdfs=None):
+              div_pdf=None, division_pdfs=None, schedule_specs=None):
     """Run the full event workup. Returns (pdf_path, csv_path|None).
 
     roster: a roster JSON path, OR a list of paths to combine (PG often splits
@@ -176,6 +176,12 @@ def run_event(xlsx, roster, schedule=None, pbr=None,
             merged in order).
     schedule: a schedule JSON path, OR a list of paths to combine. PDF-only if
             omitted.
+
+    schedule_specs: list of (division_label, schedule_path) tuples — one schedule
+            per age group. When provided, the schedule CSV is built per age group
+            so each game's Division column is correct, then the rows are stitched
+            into one CSV with continuous Game# numbering. Takes priority over
+            `schedule` for CSV generation.
 
     div_pdf: path to a single age-groups PDF (screenshot of event Teams tab).
              Divisions are parsed from the PDF and stamped via alphabetical-reset
@@ -248,8 +254,15 @@ def run_event(xlsx, roster, schedule=None, pbr=None,
     roster_data['event'] = event_name
 
     # Merge schedule JSON(s) once (PG may split these per age group too).
-    schedule_paths = _as_list(schedule)
-    schedule_data = _merge_schedules(schedule_paths)
+    # schedule_specs (labeled, one per age group) takes priority and is also kept
+    # grouped so the CSV can stamp the right Division per game.
+    if schedule_specs:
+        schedule_groups = [(lbl, _merge_schedules([p])) for lbl, p in schedule_specs]
+        schedule_data = _merge_schedules([p for _, p in schedule_specs])
+    else:
+        schedule_paths = _as_list(schedule)
+        schedule_data = _merge_schedules(schedule_paths)
+        schedule_groups = [(division, schedule_data)] if schedule_data is not None else []
     has_schedule = schedule_data is not None
 
     # Stamp every team with the division so the cover groups correctly.
@@ -261,12 +274,14 @@ def run_event(xlsx, roster, schedule=None, pbr=None,
         sched_divs = dict(roster_data.get('schedule_team_divs', {}))
         for t in roster_data.get('teams', []):
             sched_divs.setdefault(t['name'], t.get('division') or division)
-        if has_schedule:
-            for g in schedule_data.get('games', []):
+        # Use each schedule's own label so teams seen only in the schedule land
+        # in the correct age group.
+        for lbl, sd in schedule_groups:
+            for g in (sd or {}).get('games', []):
                 for key in ('team1', 'team2'):
                     nm = g.get(key)
                     if nm:
-                        sched_divs.setdefault(nm, division)
+                        sched_divs.setdefault(nm, lbl)
         roster_data['schedule_team_divs'] = sched_divs
 
     # Write the patched roster to a temp file the generator can read
@@ -285,13 +300,43 @@ def run_event(xlsx, roster, schedule=None, pbr=None,
                   divisions_pdf=div_pdf,
                   division_pdfs=division_pdfs)   # build_pdf keeps the loaded DB
 
-    # 4) Schedule CSV (if any schedule was provided)
+    # 4) Schedule CSV (if any schedule was provided). When schedules are labeled
+    #    per age group, build each separately so its Division column is correct,
+    #    then stitch the rows under one header with continuous Game# numbering.
     if has_schedule:
+        import csv as _csv
+        import io as _io
         from db_loader import parse_xlsx, lookup
         from gen_schedule_csv import build_schedule_csv
         db = parse_xlsx(xlsx)
-        csv_text = build_schedule_csv(roster_data, schedule_data, db, lookup,
-                                      division=division)
+
+        if schedule_specs:
+            header = None
+            data_rows = []
+            for lbl, sd in schedule_groups:
+                if sd is None:
+                    continue
+                txt = build_schedule_csv(roster_data, sd, db, lookup, division=lbl)
+                rows = list(_csv.reader(_io.StringIO(txt)))
+                if not rows:
+                    continue
+                if header is None:
+                    header = rows[0]
+                data_rows.extend(rows[1:])
+            # Continuous Game# in column 0 (only if that's what the column is).
+            if header and header[0].strip().lower() in ('game#', 'game #', 'game'):
+                for i, r in enumerate(data_rows, 1):
+                    if r:
+                        r[0] = str(i)
+            buf = _io.StringIO()
+            w = _csv.writer(buf, lineterminator='\n')
+            if header:
+                w.writerow(header)
+            w.writerows(data_rows)
+            csv_text = buf.getvalue()
+        else:
+            csv_text = build_schedule_csv(roster_data, schedule_data, db, lookup,
+                                          division=division)
         with open(csv_path, 'w') as f:
             f.write(csv_text)
 
@@ -316,7 +361,9 @@ def main():
     ap.add_argument('--roster', required=True, nargs='+',
                     help='roster JSON(s) — pass several to combine (PG splits by age group)')
     ap.add_argument('--schedule', nargs='*', default=None,
-                    help='schedule JSON(s) (optional; combined if several; PDF-only if omitted)')
+                    help='schedule JSON(s). Use "LABEL=path.json" per age group so the '
+                         'CSV Division column is correct (e.g. --schedule "15/16U=s16.json" '
+                         '"17/18U=s17.json"). Bare paths are merged under --division.')
     ap.add_argument('--pbr', nargs='*', default=[], help='PBR ranking JSON files (optional)')
     ap.add_argument('--event', help='override event name (optional)')
     ap.add_argument('--division', default='17U/18U', help='event division label')
@@ -333,9 +380,16 @@ def main():
     division_pdfs = [tuple(v.split('=', 1)) for v in labeled] or None
     single_div_pdf = bare[0] if (bare and not division_pdfs) else None
 
-    run_event(args.xlsx, args.roster, schedule=args.schedule, pbr=args.pbr,
+    sched_args = args.schedule or []
+    sched_labeled = [v for v in sched_args if '=' in v]
+    sched_bare    = [v for v in sched_args if '=' not in v]
+    schedule_specs = [tuple(v.split('=', 1)) for v in sched_labeled] or None
+    schedule_arg = sched_bare or None
+
+    run_event(args.xlsx, args.roster, schedule=schedule_arg, pbr=args.pbr,
               event=args.event, division=args.division, outdir=args.outdir,
-              div_pdf=single_div_pdf, division_pdfs=division_pdfs)
+              div_pdf=single_div_pdf, division_pdfs=division_pdfs,
+              schedule_specs=schedule_specs)
 
 
 if __name__ == '__main__':

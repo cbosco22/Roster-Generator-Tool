@@ -450,10 +450,28 @@ with tab_tourney:
                                  accept_multiple_files=True,
                                  label_visibility="collapsed", key="tb_roster")
 
+    def _guess_div_label(fname):
+        n = fname.upper()
+        for tok, lbl in (("18U", "18U"), ("17U", "17/18U"), ("16U", "15/16U"),
+                         ("15U", "15U"), ("14U", "14U")):
+            if tok in n:
+                return lbl
+        return ""
+
     st.write("**2. Schedule JSON** (optional — one or several; PDF only if omitted)")
     tb_sched = st.file_uploader("Scraped schedule(s)", type=["json"],
                                 accept_multiple_files=True,
                                 label_visibility="collapsed", key="tb_sched")
+    tb_sched_labels = {}
+    if tb_sched:
+        st.caption("For a multi-age-group event, label each schedule so the CSV's "
+                   "Division column is right (auto-filled from the filename). Leave "
+                   "blank to use the single-division label below.")
+        for f in tb_sched:
+            tb_sched_labels[f.name] = st.text_input(
+                f"Age group — {f.name}",
+                value=_guess_div_label(f.name),
+                key=f"tb_schedlabel_{f.name}")
 
     st.write("**3. Age-group PDFs** (optional — one PDF per age group)")
     tb_divpdfs = st.file_uploader(
@@ -462,14 +480,6 @@ with tab_tourney:
         "for its division.",
         type=["pdf"], accept_multiple_files=True,
         label_visibility="collapsed", key="tb_divpdfs")
-
-    def _guess_div_label(fname):
-        n = fname.upper()
-        for tok, lbl in (("18U", "18U"), ("17U", "17/18U"), ("16U", "15/16U"),
-                         ("15U", "15U"), ("14U", "14U")):
-            if tok in n:
-                return lbl
-        return ""
 
     tb_div_labels = {}
     if tb_divpdfs:
@@ -511,6 +521,16 @@ with tab_tourney:
                     sp = os.path.join(tdir, f"schedule_{i}.json")
                     Path(sp).write_bytes(f.read())
                     sched_paths.append(sp)
+                # Labeled schedules -> schedule_specs so the CSV Division column
+                # is correct per age group. If no labels were entered, fall back
+                # to the merged single-division behavior.
+                schedule_specs = None
+                if tb_sched:
+                    labeled_s = [(tb_sched_labels.get(f.name, "").strip(), sp)
+                                 for f, sp in zip(tb_sched, sched_paths)]
+                    if any(lbl for lbl, _ in labeled_s):
+                        fallback = tb_division or "17U/18U"
+                        schedule_specs = [(lbl or fallback, p) for lbl, p in labeled_s]
                 # Age-group PDFs: labeled files -> division_pdfs (per-group team
                 # lists). A single unlabeled PDF -> div_pdf (reset detection).
                 division_pdfs = None
@@ -531,7 +551,7 @@ with tab_tourney:
                                      "(a full event can take a minute)…")
                 pdf_path, csv_path = run_event.run_event(
                     xlsx=str(XLSX_PATH), roster=roster_paths,
-                    schedule=(sched_paths or None),
+                    schedule=(sched_paths or None), schedule_specs=schedule_specs,
                     event=(tb_event or None), division=(tb_division or "17U/18U"),
                     outdir=tdir, div_pdf=divpdf_path, division_pdfs=division_pdfs,
                 )
