@@ -196,8 +196,8 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-tab_field, tab_tourney, tab_post, tab_admin = st.tabs(
-    ["🎯 Field Tool", "🏟️ Tournament Builder", "📥 Post-Event", "⚙️  Admin"])
+tab_field, tab_import, tab_tourney, tab_post, tab_admin = st.tabs(
+    ["🎯 Field Tool", "🧩 Importer", "🏟️ Tournament Builder", "📥 Post-Event", "⚙️  Admin"])
 
 
 # ---- Field Tool ----
@@ -358,6 +358,77 @@ with tab_field:
             use_container_width=True,
             type="primary",
         )
+
+
+# ---- Importer ----
+with tab_import:
+    st.subheader("PDF Importer")
+    st.caption("Drop an event PDF — a showcase roster or a tournament export — and "
+               "turn it into the roster JSON the Tournament Builder uses.")
+
+    imp_api_key = _get_api_key()
+    if not imp_api_key:
+        st.warning("Anthropic API key missing — set `ANTHROPIC_API_KEY` in Streamlit secrets.")
+
+    imp_pdf = st.file_uploader("Event PDF", type=["pdf"], key="imp_pdf")
+    imp_name = st.text_input("Event / list name",
+                             placeholder="e.g. 2026 PA State Games Session 1",
+                             key="imp_name")
+    imp_mode = st.radio(
+        "How is this PDF organized?",
+        ["Split into teams (multiple squads in the file)",
+         "One big list (single showcase roster)"],
+        key="imp_mode",
+    )
+    imp_instr = st.text_area(
+        "Anything I should know? (optional)",
+        placeholder="e.g. 'split by the Team/Color column', or "
+                    "'ignore the Travel Team column — that's their club, not the squad'",
+        key="imp_instr", height=80,
+    )
+
+    imp_go = st.button("🧩 Generate JSON", type="primary",
+                       use_container_width=True,
+                       disabled=not (imp_pdf and imp_api_key))
+
+    if imp_go:
+        import pdf_to_roster
+        mode = "split" if imp_mode.startswith("Split") else "one_list"
+        with st.status("Reading the PDF…", expanded=True) as istatus:
+            try:
+                result = pdf_to_roster.extract_roster_from_pdf(
+                    imp_pdf.read(), mode=mode,
+                    list_name=(imp_name or "Event"),
+                    instructions=imp_instr, api_key=imp_api_key,
+                )
+                istatus.update(label="Done", state="complete")
+            except Exception as e:
+                istatus.update(label="Error", state="error")
+                st.exception(e)
+                st.stop()
+        st.session_state["imp_result"] = result
+
+    if "imp_result" in st.session_state:
+        res = st.session_state["imp_result"]
+        nteams = len(res["teams"])
+        nplayers = sum(len(t["players"]) for t in res["teams"])
+        st.divider()
+        c1, c2 = st.columns(2)
+        c1.metric("Teams", nteams)
+        c2.metric("Players", nplayers)
+        with st.expander("Team breakdown", expanded=(nteams > 1)):
+            for t in res["teams"]:
+                st.write(f"- **{t['name']}** — {len(t['players'])} players")
+
+        js = json.dumps(res, indent=2)
+        st.download_button("⬇️  roster JSON",
+                           data=js,
+                           file_name=(imp_name or "rosters").replace(" ", "_") + ".json",
+                           mime="application/json",
+                           use_container_width=True, type="primary")
+        st.caption("Split look wrong? Adjust the note above and Generate again. When "
+                   "it's right, download and load it in the Tournament Builder tab.")
+        st.code(js, language="json")
 
 
 # ---- Tournament Builder ----
