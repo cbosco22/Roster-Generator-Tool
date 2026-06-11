@@ -161,7 +161,10 @@ def draw_cover_page(c, event_name, event_dates, division_chunks, W, H, page_num,
         c.drawRightString(R, y + 0.04*inch, 'NAVY TARGETS')
         y -= 0.20*inch
 
-        for row_i, (team_name, dots) in enumerate(teams):
+        for row_i, row in enumerate(teams):
+            team_name = row[0]
+            dots = row[1]
+            ranked_n = row[2] if len(row) > 2 else 0
             if y - ROW_H < FOOTER_Y:
                 break
             bg = colors.HexColor('#F9F9F9') if row_i % 2 == 0 else WHITE
@@ -171,15 +174,19 @@ def draw_cover_page(c, event_name, event_dates, division_chunks, W, H, page_num,
             c.setFillColor(TEXT_DARK)
             name_display = team_name if len(team_name) <= 45 else team_name[:43] + '...'
             c.drawString(L + 0.08*inch, y + 0.07*inch, name_display)
-            # Org tier label
+            # Inline gray labels after the name: "— Tier N   N Ranked"
             from org_tier import lookup_org_tier
             _org_t = lookup_org_tier(team_name)
+            _gray = colors.HexColor('#AAAAAA')
+            _cursor_x = L + 0.08*inch + c.stringWidth(name_display, 'Helvetica-Bold', 10) + 0.10*inch
+            c.setFont('Helvetica', 7.5)
+            c.setFillColor(_gray)
             if _org_t:
-                _name_w = c.stringWidth(name_display, 'Helvetica-Bold', 10)
-                _label_x = L + 0.08*inch + _name_w + 0.10*inch
-                c.setFont('Helvetica', 7.5)
-                c.setFillColor(colors.HexColor('#AAAAAA'))
-                c.drawString(_label_x, y + 0.07*inch, f'— Tier {_org_t}')
+                _seg = f'— Tier {_org_t}'
+                c.drawString(_cursor_x, y + 0.07*inch, _seg)
+                _cursor_x += c.stringWidth(_seg, 'Helvetica', 7.5) + 0.10*inch
+            if ranked_n:
+                c.drawString(_cursor_x, y + 0.07*inch, f'{ranked_n} Ranked')
             if dots:
                 dot_x = R
                 for tier in reversed(dots):
@@ -452,7 +459,7 @@ def assign_divisions_from_pdfs(teams, pdf_specs):
             print(f'    - {nm}')
 
 
-def build_cover_data(teams, db_lookup_fn, schedule_team_divs=None):
+def build_cover_data(teams, db_lookup_fn, schedule_team_divs=None, ranked_fn=None):
     by_div = defaultdict(list)
     for team in teams:
         div = None
@@ -468,7 +475,10 @@ def build_cover_data(teams, db_lookup_fn, schedule_team_divs=None):
                 dots.append(entry['tier'])
         order = {'0.1':0,'1':1,'2':2,'3':3,'4':4}
         dots.sort(key=lambda t: order.get(t, 99))
-        by_div[div].append((team['name'], dots))
+        # Count of players with any value in the ranking column (state, national,
+        # or PG). Computed per-team here so duplicate team names don't collide.
+        ranked = sum(1 for p in team.get('players', []) if ranked_fn(p)) if ranked_fn else 0
+        by_div[div].append((team['name'], dots, ranked))
     for div in by_div:
         by_div[div].sort(key=lambda x: x[0].lower())
     return by_div
@@ -524,7 +534,8 @@ def build_pdf(json_path, out_path, raw_sheet_text="", proof_only=False,
     R_MARGIN = 0.30 * inch
     Wp, Hp = letter
 
-    cover_divs = build_cover_data(all_teams, db_lookup, schedule_team_divs=_sched_divs)
+    # cover_divs is built later, after pbr_rank_str is defined, so the cover can
+    # show each team's count of ranked players.
 
     # Load PBR rankings
     import pickle as _pickle, os as _os
@@ -609,6 +620,20 @@ def build_pdf(json_path, out_path, raw_sheet_text="", proof_only=False,
         if pg_rank and str(pg_rank).strip().isdigit():
             lines.append(f"#{str(pg_rank).strip()} PG")
         return '\n'.join(lines)
+
+    def _player_is_ranked(p):
+        """True if the player has any value in the ranking column — a PBR state
+        rank, a PBR national rank, or a numeric PG rank. Uses the same inputs as
+        the roster PBR Rank cell so the cover count always matches the page."""
+        yr = str(p.get('grad', '')) if str(p.get('grad', '')) not in ('0', '') else ''
+        state = (p.get('state', '') or p.get('home_state', '') or '').strip()
+        return bool(pbr_rank_str(p.get('name', ''), p.get('pg_rank', ''),
+                                 grad_year=yr or None, state=state or None).strip())
+
+    # Now that ranking lookups exist, build the cover with per-team ranked counts.
+    cover_divs = build_cover_data(all_teams, db_lookup,
+                                  schedule_team_divs=_sched_divs,
+                                  ranked_fn=_player_is_ranked)
 
     import os, tempfile
     tmp        = out_path + '.tmp.pdf'
