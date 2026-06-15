@@ -148,6 +148,22 @@ def _repair_json(text: str) -> dict:
 
     raise ValueError(f"Could not parse roster JSON. First 500 chars:\n{text[:500]}")
 
+def _finalize_roster(text: str) -> dict:
+    """Parse model output into a normalized, deduplicated roster dict.
+    Shared by the image and PDF extraction paths."""
+    data = _repair_json(text)
+    data.setdefault("team_name", "")
+    data.setdefault("players", [])
+    for p in data["players"]:
+        for k in ("jersey", "name", "pos", "ht", "wt", "grad", "hs", "state", "commit"):
+            p.setdefault(k, "")
+        p["jersey"] = re.sub(r"\D", "", str(p["jersey"]))
+        g = re.sub(r"\D", "", str(p["grad"]))
+        p["grad"] = g if len(g) == 4 else ""
+    data["players"] = _dedupe(data["players"])
+    return data
+
+
 def extract_roster_from_image(image_bytes: bytes,
                               media_type: str = "image/jpeg",
                               api_key: str | None = None) -> dict:
@@ -174,20 +190,7 @@ def extract_roster_from_image(image_bytes: bytes,
     stop = getattr(msg, "stop_reason", "?")
     print(f"[photo_to_roster] stop_reason={stop}  output_chars={len(text)}")
 
-    data = _repair_json(text)
-
-    # Guarantee shape + normalize
-    data.setdefault("team_name", "")
-    data.setdefault("players", [])
-    for p in data["players"]:
-        for k in ("jersey", "name", "pos", "ht", "wt", "grad", "hs", "state", "commit"):
-            p.setdefault(k, "")
-        p["jersey"] = re.sub(r"\D", "", str(p["jersey"]))
-        g = re.sub(r"\D", "", str(p["grad"]))
-        p["grad"] = g if len(g) == 4 else ""
-
-    data["players"] = _dedupe(data["players"])
-    return data
+    return _finalize_roster(text)
 
 
 def extract_roster_from_images(images: list, api_key: str | None = None) -> dict:
@@ -208,6 +211,57 @@ def extract_roster_from_images(images: list, api_key: str | None = None) -> dict
             team_name = result["team_name"]
         got = result.get("players", [])
         print(f"[photo_to_roster] photo {idx+1}/{len(images)}: {len(got)} players")
+        all_players.extend(got)
+    return {"team_name": team_name, "players": _dedupe(all_players)}
+
+
+def extract_roster_from_pdf(pdf_bytes: bytes, api_key: str | None = None) -> dict:
+    """Extract a roster from a PDF.
+
+    The PDF is handed to Claude as a document block (pages read natively — the
+    same approach the Importer uses), then parsed/normalized with the same logic
+    as the image path. Intended for a SINGLE team's roster (one or more pages).
+    """
+    if anthropic is None:
+        raise RuntimeError("anthropic package not installed — check requirements.txt and reboot the app")
+    client = anthropic.Anthropic(api_key=api_key) if api_key else anthropic.Anthropic()
+    b64 = base64.standard_b64encode(pdf_bytes).decode("ascii")
+    msg = client.messages.create(
+        model=MODEL,
+        max_tokens=_MAX_TOKENS,
+        messages=[{
+            "role": "user",
+            "content": [
+                {"type": "document",
+                 "source": {"type": "base64", "media_type": "application/pdf", "data": b64}},
+                {"type": "text", "text": _PROMPT},
+            ],
+        }],
+    )
+    text = "".join(getattr(b, "text", "") for b in msg.content if getattr(b, "type", "") == "text")
+    print(f"[photo_to_roster] pdf stop_reason={getattr(msg, 'stop_reason', '?')}  output_chars={len(text)}")
+    return _finalize_roster(text)
+
+
+def extract_roster_from_files(files: list, api_key: str | None = None) -> dict:
+    """Process several uploads (images and/or PDFs) of ONE team's roster and merge
+    into a single deduplicated roster.
+
+    files: list of (data_bytes, media_type) tuples. media_type 'application/pdf'
+    routes to the PDF document path; everything else is treated as an image.
+    Repeated players across overlapping sources collapse via the name dedupe.
+    """
+    team_name = ""
+    all_players = []
+    for idx, (data, mt) in enumerate(files):
+        if (mt or "").lower() == "application/pdf":
+            result = extract_roster_from_pdf(data, api_key=api_key)
+        else:
+            result = extract_roster_from_image(data, media_type=mt, api_key=api_key)
+        if not team_name and result.get("team_name"):
+            team_name = result["team_name"]
+        got = result.get("players", [])
+        print(f"[photo_to_roster] source {idx+1}/{len(files)} ({mt}): {len(got)} players")
         all_players.extend(got)
     return {"team_name": team_name, "players": _dedupe(all_players)}
 

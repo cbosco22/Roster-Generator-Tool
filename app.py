@@ -37,7 +37,7 @@ PKL_PATH  = DATA_DIR / "pbr_rankings.pkl"
 # <script_dir>/data/pbr_rankings.pkl by default, so nothing to mirror.
 from db_loader import parse_xlsx
 import gen_roster_pdf
-from photo_to_roster import extract_roster_from_image, extract_roster_from_images, to_pdf_payload
+from photo_to_roster import extract_roster_from_image, extract_roster_from_images, extract_roster_from_files, to_pdf_payload
 from post_event_extractor import extract_post_event_page
 from post_event_flow import (
     NEW_PLAYER_COLUMNS, UPDATE_COLUMNS,
@@ -182,6 +182,27 @@ def _generate_pdf(extracted: dict, event_name: str, division: str) -> bytes:
         return out_pdf.read_bytes()
 
 
+def _pdf_open_link(pdf_bytes: bytes, filename: str,
+                   label: str = "📂 Open in a browser tab (mobile-safe)") -> None:
+    """Render a link that opens the PDF in a real browser tab.
+
+    On an iPhone/iPad home-screen shortcut the app runs full-screen with no
+    browser toolbar, so the normal download can open the PDF with no way back —
+    you get stuck and have to close the app. This link uses target=_blank so the
+    PDF opens in Safari (which has a Done/back button) instead of trapping the
+    app. Best for normally-sized rosters; very large event books may be slow.
+    """
+    import base64 as _b64
+    href = "data:application/pdf;base64," + _b64.b64encode(pdf_bytes).decode("ascii")
+    st.markdown(
+        f'<a href="{href}" target="_blank" rel="noopener" download="{filename}" '
+        f'style="display:inline-block;margin-top:0.4em;padding:0.45em 0.9em;'
+        f'border:1px solid #1A3A6B;border-radius:0.4em;color:#1A3A6B;'
+        f'text-decoration:none;font-weight:600;">{label}</a>',
+        unsafe_allow_html=True,
+    )
+
+
 # ---------------------- UI ----------------------
 
 st.set_page_config(
@@ -218,14 +239,15 @@ with tab_field:
                 st.write("• Anthropic API key missing — set `ANTHROPIC_API_KEY` "
                          "in Streamlit secrets or env")
 
-    st.write("**1. Photo(s) of the roster**")
+    st.write("**1. Photo(s) or PDF of the roster**")
     img_files = st.file_uploader(
-        "Take or upload photo(s)",
-        type=["jpg", "jpeg", "png", "heic", "webp"],
+        "Take or upload photo(s) or a PDF",
+        type=["jpg", "jpeg", "png", "heic", "webp", "pdf"],
         accept_multiple_files=True,
         label_visibility="collapsed",
         help="For long rosters, shoot 2-3 close-up sections (~15-20 players each) "
-             "so the text is big and sharp. They'll be merged into one team.",
+             "so the text is big and sharp — or upload a single-team PDF. "
+             "Everything uploaded is merged into one team.",
     )
 
     col1, col2 = st.columns(2)
@@ -259,28 +281,26 @@ with tab_field:
 
         with st.status("Working…", expanded=True) as status:
             try:
-                # Step 1: vision extract — each photo processed at full resolution
-                n_photos = len(img_files)
-                label = ("📸 Reading roster from photo…" if n_photos == 1
-                         else f"📸 Reading {n_photos} sections…")
+                # Step 1: vision extract — each source processed at full resolution
+                n_src = len(img_files)
+                label = ("📸 Reading roster…" if n_src == 1
+                         else f"📸 Reading {n_src} files…")
                 status.update(label=label)
-                images = []
+                sources = []
                 for f in img_files:
-                    mt = "image/jpeg" if f.type in (None, "") else f.type
+                    mt = f.type or ""
                     if mt == "image/jpg":
                         mt = "image/jpeg"
-                    images.append((f.read(), mt))
+                    if not mt:
+                        mt = ("application/pdf"
+                              if f.name.lower().endswith(".pdf") else "image/jpeg")
+                    sources.append((f.read(), mt))
 
-                if len(images) == 1:
-                    extracted = extract_roster_from_image(
-                        images[0][0], media_type=images[0][1], api_key=api_key,
-                    )
-                else:
-                    extracted = extract_roster_from_images(images, api_key=api_key)
+                extracted = extract_roster_from_files(sources, api_key=api_key)
 
                 n = len(extracted.get("players", []))
                 team = extracted.get("team_name", "")
-                src = "photo" if n_photos == 1 else f"{n_photos} sections"
+                src = "1 file" if n_src == 1 else f"{n_src} files"
                 st.write(f"✓ Extracted **{n}** players from **{team or 'team'}** ({src})")
 
                 if n == 0:
@@ -358,6 +378,10 @@ with tab_field:
             use_container_width=True,
             type="primary",
         )
+        _pdf_open_link(st.session_state["last_pdf"], fname)
+        st.caption("On phone and the download opens full-screen with no way back? "
+                   "Use the link above — or open this app from Safari instead of a "
+                   "home-screen shortcut.")
 
 
 # ---- Importer ----
@@ -575,6 +599,7 @@ with tab_tourney:
                            file_name=st.session_state["tb_pdfname"],
                            mime="application/pdf", use_container_width=True,
                            type="primary")
+        _pdf_open_link(st.session_state["tb_pdf"], st.session_state["tb_pdfname"])
         if st.session_state.get("tb_csv"):
             csv_text = st.session_state["tb_csv"]
             reader = list(_csv.reader(io.StringIO(csv_text)))
