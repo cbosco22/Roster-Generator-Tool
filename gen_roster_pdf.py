@@ -143,8 +143,10 @@ def draw_cover_page(c, event_name, event_dates, division_chunks, W, H, page_num,
     DOT_R   = 0.085 * inch
     DOT_GAP = 0.22 * inch
 
-    for division, teams in division_chunks:
+    overflow = []
+    for di, (division, teams) in enumerate(division_chunks):
         if y - 0.40*inch < FOOTER_Y:
+            overflow.extend(division_chunks[di:])
             break
 
         c.setFont('Helvetica-Bold', 8)
@@ -161,12 +163,14 @@ def draw_cover_page(c, event_name, event_dates, division_chunks, W, H, page_num,
         c.drawRightString(R, y + 0.04*inch, 'NAVY TARGETS')
         y -= 0.20*inch
 
+        _stopped = None
         for row_i, row in enumerate(teams):
+            if y - ROW_H < FOOTER_Y:
+                _stopped = row_i
+                break
             team_name = row[0]
             dots = row[1]
             ranked_n = row[2] if len(row) > 2 else 0
-            if y - ROW_H < FOOTER_Y:
-                break
             bg = colors.HexColor('#F9F9F9') if row_i % 2 == 0 else WHITE
             c.setFillColor(bg)
             c.rect(L, y - 0.04*inch, R - L, ROW_H, fill=1, stroke=0)
@@ -209,18 +213,22 @@ def draw_cover_page(c, event_name, event_dates, division_chunks, W, H, page_num,
                 c.setFillColor(colors.HexColor('#DDDDDD'))
                 c.drawRightString(R, y + 0.07*inch, '—')
             y -= ROW_H
+        if _stopped is not None:
+            overflow.append((division, teams[_stopped:]))
+            overflow.extend(division_chunks[di+1:])
+            break
         y -= 0.16*inch
 
-    if is_last:
+    if not overflow:
         ly = 0.55*inch
         c.setStrokeColor(LINE_LITE)
         c.line(L, ly + 0.14*inch, R, ly + 0.14*inch)
         legend_items = [
             ('0.1', 'Committed'),
-            ('1',   'Tier 1 - Offer'),
-            ('2',   'Tier 2 - Need 1 More Look'),
-            ('3',   'Tier 3 - Follow'),
-            ('4',   'Tier 4 - Rec, Need to See'),
+            ('1',   'Offer'),
+            ('2',   'High Follow'),
+            ('3',   'Follow'),
+            ('4',   'Rec'),
         ]
         from reportlab.pdfbase.pdfmetrics import stringWidth
         L_FONT = 7
@@ -249,45 +257,26 @@ def draw_cover_page(c, event_name, event_dates, division_chunks, W, H, page_num,
     c.setFont('Helvetica', 8)
     c.setFillColor(colors.HexColor('#AAAAAA'))
     c.drawCentredString(W/2, 0.20*inch, str(page_num))
+    return overflow
 
 
 def draw_cover(c, event_name, event_dates, teams_by_division, W, H):
-    """Draw cover — auto-expands to multiple pages if needed."""
-    FOOTER_Y = 0.85 * inch
-    ROW_H = 0.26 * inch
-    DIV_HEADER_H = 0.46 * inch
+    """Draw cover — auto-expands to as many pages as needed.
 
-    all_divs = sorted(teams_by_division.items())
-
-    def available_height(page_num):
-        if page_num == 1:
-            return H - 0.95*inch - 1.60*inch - FOOTER_Y
-        return H - 0.95*inch - 0.70*inch - FOOTER_Y
-
-    pages = []
-    current_page_divs = []
-    avail = available_height(1)
-    used = 0
-
-    for div, teams in all_divs:
-        needed = DIV_HEADER_H + len(teams) * ROW_H + 0.16*inch
-        if used + needed > avail and current_page_divs:
-            pages.append(current_page_divs)
-            current_page_divs = []
-            used = 0
-            avail = available_height(len(pages) + 1)
-        current_page_divs.append((div, teams))
-        used += needed
-
-    if current_page_divs:
-        pages.append(current_page_divs)
-
-    total_pages = len(pages)
-    for i, page_divs in enumerate(pages):
-        if i > 0:
+    Pagination is renderer-driven: draw_cover_page() draws everything that fits
+    on the current page and returns the overflow as a list of
+    (division, remaining_teams) chunks. A division larger than one page is split
+    across pages, repeating its header at the top of each continuation page, so
+    no team is ever silently dropped. Legend renders only on the final page.
+    """
+    remaining = [(div, list(teams)) for div, teams in sorted(teams_by_division.items())]
+    page_num = 1
+    while remaining:
+        if page_num > 1:
             c.showPage()
-        draw_cover_page(c, event_name, event_dates, page_divs, W, H,
-                        page_num=i+1, total_pages=total_pages, is_last=(i==total_pages-1))
+        remaining = draw_cover_page(c, event_name, event_dates, remaining, W, H,
+                                    page_num=page_num, total_pages=0, is_last=False)
+        page_num += 1
 
 
 def _infer_division(team_name):
