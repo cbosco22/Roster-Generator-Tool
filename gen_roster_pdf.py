@@ -473,6 +473,181 @@ def build_cover_data(teams, db_lookup_fn, schedule_team_divs=None, ranked_fn=Non
     return by_div
 
 
+def build_event_summary_pdf(summary_path, event_name, event_dates, all_teams,
+                            db_lookup_fn, abbrev_fn):
+    """Write a standalone 'event intel' summary PDF (1+ pages) to summary_path.
+
+    Layout (single event):
+      - Big event title + dates
+      - Tier-count table (Committed / Tier 1 / 2 / 3 / 4 / board total)
+      - Tiered, by-team player lists:
+          Committed / Tier 1 / Tier 2  -> named with full ID, grouped by team
+          Tier 3 / Tier 4              -> count + by-team compact list
+
+    Reuses the same db_lookup the roster uses, so tiers always match the pages.
+    State is taken from the DB entry first, then the roster player's own field,
+    abbreviated via the generator's abbrev_fn so it reads 'MA' not 'Massachusetts'.
+    Player-name collisions are NOT filtered here — this mirrors exactly what the
+    roster tables show, by design (no silent divergence between summary and pages).
+    """
+    from reportlab.platypus import SimpleDocTemplate as _SDT
+    from reportlab.lib.styles import getSampleStyleSheet as _gss
+
+    NAVY = colors.HexColor('#1A3A6B')
+    T1C  = DOT_T1
+    T2C  = DOT_T2
+    MED  = TEXT_MED
+    LINE = LINE_LITE
+
+    TIER_META = [
+        ('0.1', 'COMMITTED — verbal to Navy', NAVY),
+        ('1',   'TIER 1 — Offer',             T1C),
+        ('2',   'TIER 2 — High Follow',       T2C),
+    ]
+
+    # Collect this event's board players keyed by tier.
+    by_tier = defaultdict(list)
+    for team in all_teams:
+        for p in team.get('players', []):
+            entry = db_lookup_fn(p.get('name', ''))
+            if not entry:
+                continue
+            tier = entry.get('tier', '')
+            st = (entry.get('state', '') or p.get('state', '')
+                  or p.get('home_state', '') or '').strip()
+            yr = str(entry.get('class', '') or p.get('grad', '') or '')
+            if yr.endswith('.0'):
+                yr = yr[:-2]
+            by_tier[tier].append({
+                'team': team['name'],
+                'name': entry.get('canonical_name') or p.get('name', ''),
+                'class': yr,
+                'pos': entry.get('pos', '') or p.get('pos', ''),
+                'state': abbrev_fn(st) if st else '',
+                'commit': entry.get('commit', '') or '',
+            })
+
+    def _count(t):
+        return len(by_tier.get(t, []))
+
+    def _pid(p):
+        cls = f"'{p['class'][-2:]}" if p['class'] else ''
+        st  = p['state'] or '\u2014'
+        s = f"{p['name']}, {cls} {p['pos']}, {st}".replace(' ,', ',')
+        if p['commit'] and p['commit'].upper() != 'NAVY':
+            s += f"  ({p['commit']})"
+        return s
+
+    styles = _gss()
+    H1 = ParagraphStyle('SUMH1', parent=styles['Title'], fontSize=26,
+                        textColor=NAVY, alignment=TA_CENTER, spaceAfter=2,
+                        fontName='Helvetica-Bold', leading=30)
+    SUB = ParagraphStyle('SUMSUB', fontSize=11, textColor=MED,
+                         alignment=TA_CENTER, spaceAfter=16)
+    TIERHEAD = ParagraphStyle('SUMTH', fontSize=11.5, fontName='Helvetica-Bold',
+                              spaceBefore=10, spaceAfter=3)
+    TEAMLBL = ParagraphStyle('SUMTL', fontSize=8.5, textColor=MED,
+                             leftIndent=8, leading=11, spaceBefore=3)
+    PLAYER = ParagraphStyle('SUMPL', fontSize=9.5, leading=13,
+                            leftIndent=16, textColor=TEXT_DARK)
+    COMPACT = ParagraphStyle('SUMCO', fontSize=8, leading=11,
+                             textColor=TEXT_DARK, leftIndent=8)
+
+    story = []
+    story.append(Spacer(1, 0.15*inch))
+    story.append(Paragraph(event_name.upper(), H1))
+    if event_dates:
+        story.append(Paragraph(event_dates, SUB))
+    else:
+        story.append(Spacer(1, 10))
+
+    # ---- Tier count table ----
+    board_total = sum(_count(t) for t in ['0.1', '1', '2', '3', '4'])
+    hdr = ['Committed', 'Tier 1', 'Tier 2', 'Tier 3', 'Tier 4', 'Board Total']
+    vals = [_count('0.1'), _count('1'), _count('2'),
+            _count('3'), _count('4'), board_total]
+    ct = Table([hdr, vals], colWidths=[1.15*inch]*6)
+    ct.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), NAVY),
+        ('TEXTCOLOR',  (0, 0), (-1, 0), colors.white),
+        ('FONTNAME',   (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTNAME',   (0, 1), (-1, 1), 'Helvetica-Bold'),
+        ('FONTSIZE',   (0, 0), (-1, 0), 9),
+        ('FONTSIZE',   (0, 1), (-1, 1), 14),
+        ('BACKGROUND', (5, 1), (5, 1), colors.HexColor('#F2F2F2')),
+        ('ALIGN',      (0, 0), (-1, -1), 'CENTER'),
+        ('VALIGN',     (0, 0), (-1, -1), 'MIDDLE'),
+        ('GRID',       (0, 0), (-1, -1), 0.4, LINE),
+        ('TOPPADDING', (0, 0), (-1, -1), 6),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+    ]))
+    story.append(ct)
+    story.append(Spacer(1, 6))
+    story.append(Paragraph(
+        "<b>Committed</b> = verbal to Navy &nbsp;&bull;&nbsp; <b>Tier 1</b> = offer "
+        "&nbsp;&bull;&nbsp; <b>Tier 2</b> = high follow &nbsp;&bull;&nbsp; "
+        "<b>Tier 3/4</b> = recruiting board",
+        ParagraphStyle('SUMNOTE', fontSize=8, textColor=MED, alignment=TA_CENTER)))
+
+    # ---- Named lists: Committed / Tier 1 / Tier 2 by team ----
+    for tier, label, col in TIER_META:
+        plist = by_tier.get(tier, [])
+        if not plist:
+            continue
+        story.append(Paragraph(
+            f"<font color='#{col.hexval()[2:]}'>{label} ({len(plist)})</font>",
+            TIERHEAD))
+        bt = defaultdict(list)
+        for p in plist:
+            bt[p['team']].append(p)
+        for team in sorted(bt):
+            story.append(Paragraph(f"<b>{team}</b>", TEAMLBL))
+            for p in sorted(bt[team], key=lambda x: (x['class'], x['name'])):
+                story.append(Paragraph("&bull; " + _pid(p), PLAYER))
+
+    # ---- Tier 3 / 4: count + by-team compact ----
+    for tier, label in [('3', 'TIER 3'), ('4', 'TIER 4')]:
+        plist = by_tier.get(tier, [])
+        if not plist:
+            continue
+        bt = defaultdict(list)
+        for p in plist:
+            bt[p['team']].append(p)
+        story.append(Paragraph(
+            f"{label} \u2014 {len(plist)} players on {len(bt)} teams", TIERHEAD))
+        lines = []
+        for team in sorted(bt):
+            nms = '; '.join(
+                f"{p['name']} '{p['class'][-2:]} {p['pos']} {p['state'] or '\u2014'}"
+                for p in sorted(bt[team], key=lambda x: x['name']))
+            lines.append(f"<b>{team}</b> ({len(bt[team])}): {nms}")
+        story.append(Paragraph('<br/>'.join(lines), COMPACT))
+
+    if not any(by_tier.get(t) for t in ['0.1', '1', '2', '3', '4']):
+        story.append(Spacer(1, 12))
+        story.append(Paragraph(
+            "No players from the recruiting board were found on this event's rosters.",
+            ParagraphStyle('SUMEMPTY', fontSize=10, textColor=MED)))
+
+    sdoc = _SDT(summary_path, pagesize=letter,
+                topMargin=0.5*inch, bottomMargin=0.5*inch,
+                leftMargin=0.55*inch, rightMargin=0.55*inch)
+
+    def _sum_footer(c, d):
+        c.saveState()
+        c.setFont('Helvetica', 7.5)
+        c.setFillColor(MED)
+        c.drawString(0.55*inch, 0.32*inch, 'NAVY BASEBALL RECRUITING — Board Coverage')
+        c.setStrokeColor(LINE)
+        c.setLineWidth(0.4)
+        c.line(0.55*inch, 0.45*inch, letter[0]-0.55*inch, 0.45*inch)
+        c.restoreState()
+
+    sdoc.build(story, onFirstPage=_sum_footer, onLaterPages=_sum_footer)
+    from pypdf import PdfReader as _PR
+    return len(_PR(summary_path).pages)
+
+
 def build_pdf(json_path, out_path, raw_sheet_text="", proof_only=False,
               divisions_pdf=None, division_pdfs=None, skip_cover=False):
     if raw_sheet_text or _DB is None:
@@ -870,20 +1045,42 @@ def build_pdf(json_path, out_path, raw_sheet_text="", proof_only=False,
         cv.showPage()
         cv.save()
 
+        # Board-coverage summary page(s): title + tier-count table + tiered,
+        # by-team player lists. Sits FIRST in the packet, ahead of the existing
+        # division/dots cover. Reuses db_lookup + _abbrev so it never diverges
+        # from the roster tables. Best-effort: if it fails, fall back to the
+        # cover-only packet rather than aborting the whole build.
+        summary_file = out_path + '.summary.pdf'
+        summary_pages = 0
+        try:
+            summary_pages = build_event_summary_pdf(
+                summary_file, event_name, event_dates, all_teams,
+                db_lookup, _abbrev)
+        except Exception as _e:
+            print(f'[SUMMARY] WARNING: summary page skipped ({_e})')
+            summary_file = None
+            summary_pages = 0
+
         cover_pages = len(pypdf.PdfReader(cover_file).pages)
         writer = pypdf.PdfWriter()
-        for src in [cover_file, tmp]:
+        _merge_srcs = ([summary_file] if summary_file else []) + [cover_file, tmp]
+        for src in _merge_srcs:
             for page in pypdf.PdfReader(src).pages:
                 writer.add_page(page)
         try:
-            writer.add_outline_item('Cover', 0)
+            if summary_pages:
+                writer.add_outline_item('Board Summary', 0)
+            writer.add_outline_item('Cover', summary_pages)
         except Exception:
             pass
-        _write_outline(writer, cover_offset=cover_pages)
+        # Roster outline pages sit after summary + cover.
+        _write_outline(writer, cover_offset=summary_pages + cover_pages)
         with open(out_path, 'wb') as f:
             writer.write(f)
 
-        for f in [tmp, cover_file]:
+        for f in [tmp, cover_file, summary_file]:
+            if not f:
+                continue
             try: os.remove(f)
             except: pass
 
