@@ -49,7 +49,8 @@ _HEADERS = {
 }
 _GID_RE  = re.compile(r"GameID:\s*(\d+)", re.I)
 _TIME_RE = re.compile(r"(\d{1,2}:\d{2}\s*[AP]M)", re.I)
-_DATE_RE = re.compile(r"[?&]Date=(\d{1,2}/\d{1,2}/\d{4})", re.I)
+_DATE_RE = re.compile(
+    r"[?&]Date=(\d{1,2})(?:/|%2[Ff])(\d{1,2})(?:/|%2[Ff])(\d{4})", re.I)
 _TEAM_SEL = 'a[href*="Tournaments/Teams/Default.aspx?team="]'
 
 FEED_COLUMNS = ["Game#", "Date", "Time", "Location", "GameID", "Team1", "Team2"]
@@ -87,11 +88,15 @@ def _fmt_date(date_str: str) -> str:
 
 
 def _discover_dates(html: str) -> list:
-    """Return event dates as normalized 'M/D/YYYY' strings, deduped & sorted
-    (PG mixes padded '06/23/2026' and unpadded '6/23/2026' for the same day)."""
+    """Return event dates as normalized 'M/D/YYYY' strings, deduped & sorted.
+    Handles PG's encoded ('6%2F24%2F2026') and plain ('6/24/2026') links, and
+    its mix of padded/unpadded days."""
     seen = []
     for m in _DATE_RE.finditer(html):
-        d = _date_key(m.group(1))
+        try:
+            d = _dt.date(int(m.group(3)), int(m.group(1)), int(m.group(2)))
+        except ValueError:
+            continue
         if d not in seen:
             seen.append(d)
     seen.sort()
@@ -261,19 +266,19 @@ def render():
                    f"Game # {df['Game#'].min()}–{df['Game#'].max()}.")
         st.dataframe(df, use_container_width=True, hide_index=True)
 
-        csv = df.to_csv(index=False).encode("utf-8")
-        st.download_button("Download feed.csv", data=csv,
-                           file_name="feed.csv", mime="text/csv")
-
-        # paste-ready block (just the 4 columns the Feed tab needs)
+        # paste-ready block (the 4 columns the Feed tab needs) — copy icon top-right
         core = df[["Game#", "Date", "Time", "Location"]]
-        st.text_area(
-            "Or copy-paste these four columns straight into the Feed tab",
-            value=core.to_csv(index=False, sep="\t"),
-            height=200,
-        )
-        st.info("Paste columns **A–D** into the **Feed** tab to update the schedule. "
-                "First time wiring up the sheet? See **First-time setup** at the top.")
+        st.markdown("**Copy into the Feed tab**")
+        st.caption("Tap the copy icon (top-right of the box), then paste into cell "
+                   "**A1** of the `Feed` tab — it overwrites the four columns and the "
+                   "main schedule updates itself.")
+        st.code(core.to_csv(index=False, sep="\t"), language=None)
+
+        csv = df.to_csv(index=False).encode("utf-8")
+        st.download_button("⬇️  Or download feed.csv", data=csv,
+                           file_name="feed.csv", mime="text/csv",
+                           use_container_width=True)
+        st.info("First time wiring up the sheet? See **First-time setup** at the top.")
 
 
 # Allows: `streamlit run schedule_refresh.py` for a quick standalone test.
