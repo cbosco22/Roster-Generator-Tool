@@ -49,9 +49,27 @@ _HEADERS = {
 }
 _GID_RE  = re.compile(r"GameID:\s*(\d+)", re.I)
 _TIME_RE = re.compile(r"(\d{1,2}:\d{2}\s*[AP]M)", re.I)
-_DATE_RE = re.compile(
-    r"[?&]Date=(\d{1,2})(?:/|%2[Ff])(\d{1,2})(?:/|%2[Ff])(\d{4})", re.I)
 _TEAM_SEL = 'a[href*="Tournaments/Teams/Default.aspx?team="]'
+
+_MONTHS = {m: i for i, m in enumerate(
+    ["jan", "feb", "mar", "apr", "may", "jun",
+     "jul", "aug", "sep", "oct", "nov", "dec"], 1)}
+
+# Date discovery — three independent, encoding-proof sources:
+# (A) the visible day strip "Tue Jun 23 183 Games" (primary; plain text)
+_DAYLABEL_RE = re.compile(
+    r"(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)[a-z]*\.?\s+"
+    r"(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s+"
+    r"(\d{1,2})\s+\d+\s+Games?", re.I)
+# (B) explicit Date= params, tolerant of &amp;(-> ;), %2F, padding, param order
+_DATEPARAM_RE = re.compile(
+    r"(?<![A-Za-z])Date=\s*(\d{1,2})(?:/|%2[Ff])(\d{1,2})(?:/|%2[Ff])(\d{4})", re.I)
+# (C) event range header "Jun 23-30" / "Jun 28-Jul 2" (fallback enumeration)
+_RANGE_RE = re.compile(
+    r"\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s+(\d{1,2})\s*"
+    r"(?:-|\u2013|\u2014|to)\s*"
+    r"(?:(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s+)?(\d{1,2})\b",
+    re.I)
 
 FEED_COLUMNS = ["Game#", "Date", "Time", "Location", "GameID", "Team1", "Team2"]
 
@@ -76,6 +94,22 @@ def _day_url(event_id: str, date_str: str) -> str:
     return f"{PG_SCHEDULE}?event={event_id}&Date={date_str}"
 
 
+def _get_html(url: str, cache: dict) -> str:
+    if url not in cache:
+        cache[url] = _fetch(url)
+    return cache[url]
+
+
+def _url_date(url: str):
+    """The Date= already in the pasted URL, normalized to 'M/D/YYYY' (or None)."""
+    q = parse_qs(urlparse(url).query)
+    raw = (q.get("Date") or q.get("date") or [None])[0]
+    if not raw:
+        return None
+    m = re.match(r"(\d{1,2})\D(\d{1,2})\D(\d{4})", raw)
+    return f"{int(m.group(1))}/{int(m.group(2))}/{int(m.group(3))}" if m else None
+
+
 def _date_key(s: str) -> _dt.date:
     mo, da, yr = (int(x) for x in s.split("/"))
     return _dt.date(yr, mo, da)
@@ -87,20 +121,52 @@ def _fmt_date(date_str: str) -> str:
     return f"{d.strftime('%A')}, {d.month}/{d.day}"
 
 
-def _discover_dates(html: str) -> list:
-    """Return event dates as normalized 'M/D/YYYY' strings, deduped & sorted.
-    Handles PG's encoded ('6%2F24%2F2026') and plain ('6/24/2026') links, and
-    its mix of padded/unpadded days."""
-    seen = []
-    for m in _DATE_RE.finditer(html):
+def _discover_dates(html: str, url: str) -> list:
+    """All event dates as 'M/D/YYYY', deduped & sorted. Pulls from three
+    encoding-proof sources — the visible day strip, explicit Date= params, and
+    (only if those look thin) the event's range header — plus the URL's own date."""
+    seen, yr = set(), None
+
+    # (B) explicit Date= params carry their own year
+    for m in _DATEPARAM_RE.finditer(html):
         try:
-            d = _dt.date(int(m.group(3)), int(m.group(1)), int(m.group(2)))
+            seen.add(_dt.date(int(m.group(3)), int(m.group(1)), int(m.group(2))))
+            yr = yr or int(m.group(3))
         except ValueError:
-            continue
-        if d not in seen:
-            seen.append(d)
-    seen.sort()
-    return [f"{d.month}/{d.day}/{d.year}" for d in seen]
+            pass
+
+    # the date already in the pasted URL (and a year hint)
+    ud = _url_date(url)
+    if ud:
+        d = _date_key(ud)
+        seen.add(d)
+        yr = yr or d.year
+    yr = yr or _dt.date.today().year
+
+    # (A) visible day strip "Tue Jun 23 183 Games"
+    for m in _DAYLABEL_RE.finditer(html):
+        try:
+            seen.add(_dt.date(yr, _MONTHS[m.group(1).lower()[:3]], int(m.group(2))))
+        except (ValueError, KeyError):
+            pass
+
+    # (C) range header "Jun 23-30" — only lean on it if we still look thin
+    if len(seen) <= 1:
+        rm = _RANGE_RE.search(html)
+        if rm:
+            try:
+                m1 = _MONTHS[rm.group(1).lower()[:3]]
+                m2 = _MONTHS[rm.group(3).lower()[:3]] if rm.group(3) else m1
+                start = _dt.date(yr, m1, int(rm.group(2)))
+                end = _dt.date(yr if m2 >= m1 else yr + 1, m2, int(rm.group(4)))
+                cur = start
+                while cur <= end:
+                    seen.add(cur)
+                    cur += _dt.timedelta(days=1)
+            except (ValueError, KeyError):
+                pass
+
+    return [f"{d.month}/{d.day}/{d.year}" for d in sorted(seen)]
 
 
 def _page_text(html: str) -> str:
@@ -183,21 +249,45 @@ def _parse_day(html: str, date_str: str) -> list:
     return rows
 
 
+def _probe_range(event_id: str, seed_str: str, cache: dict) -> list:
+    """Last-resort discovery: walk outward from the seed date, keeping days that
+    return at least one game. Bounded so it always terminates."""
+    seed = _date_key(seed_str)
+    found = []
+    for direction, limit in ((1, 21), (-1, 14)):       # forward incl. seed, then back
+        d = seed if direction == 1 else seed - _dt.timedelta(days=1)
+        for _ in range(limit):
+            ds = f"{d.month}/{d.day}/{d.year}"
+            if _parse_day(_get_html(_day_url(event_id, ds), cache), ds):
+                found.append(d)
+                d += _dt.timedelta(days=direction)
+            else:
+                break
+    return [f"{d.month}/{d.day}/{d.year}" for d in sorted(set(found))]
+
+
 def build_feed(url: str, progress=None) -> pd.DataFrame:
     """Fetch every day of the event in `url` and return the feed DataFrame."""
     event_id = _event_id(url)
-    first_html = _fetch(url)
-    dates = _discover_dates(first_html) or [
-        parse_qs(urlparse(url).query).get("Date", [""])[0]
-    ]
+    cache = {}
 
-    all_rows, html_by_date = [], {url: first_html}
-    for n, d in enumerate(dates):
+    seed_str = _url_date(url)
+    seed_url = _day_url(event_id, seed_str) if seed_str else url
+    seed_html = _get_html(seed_url, cache)
+
+    dates = _discover_dates(seed_html, url)
+    if len(dates) <= 1 and seed_str:                    # discovery came up thin
+        probed = _probe_range(event_id, seed_str, cache)
+        if len(probed) > len(dates):
+            dates = probed
+    if not dates and seed_str:
+        dates = [seed_str]
+
+    all_rows = []
+    for n, ds in enumerate(dates):
         if progress is not None:
-            progress(n / len(dates), f"Reading {_fmt_date(d)} ...")
-        u = _day_url(event_id, d)
-        html = html_by_date.get(u) or _fetch(u)
-        all_rows.extend(_parse_day(html, d))
+            progress(n / max(len(dates), 1), f"Reading {_fmt_date(ds)} ...")
+        all_rows.extend(_parse_day(_get_html(_day_url(event_id, ds), cache), ds))
     if progress is not None:
         progress(1.0, "Done")
 
@@ -261,9 +351,10 @@ def render():
                      "Send Claude this URL and we'll adjust the parser.")
             return
 
-        st.success(f"Parsed {len(df)} games across "
-                   f"{df['Date'].nunique()} day(s). "
-                   f"Game # {df['Game#'].min()}–{df['Game#'].max()}.")
+        days = list(dict.fromkeys(df["Date"].tolist()))
+        st.success(f"Parsed {len(df)} games across {len(days)} day(s)  ·  "
+                   f"Game # {int(df['Game#'].min())}–{int(df['Game#'].max())}")
+        st.caption("Days covered: " + "  ·  ".join(days))
         st.dataframe(df, use_container_width=True, hide_index=True)
 
         # paste-ready block (the 4 columns the Feed tab needs) — copy icon top-right
