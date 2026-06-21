@@ -1,0 +1,281 @@
+"""
+schedule_refresh.py
+-------------------
+Perfect Game schedule  ->  Feed builder for the Navy recruiting sheet.
+
+A coach pastes ANY one day's PG "TournamentSchedule" URL, e.g.
+    https://www.perfectgame.org/Events/TournamentSchedule.aspx?event=141563&Date=06/23/2026
+and this:
+  1. reads the event id from the URL,
+  2. discovers every day of that event from the date strip,
+  3. pulls each day server-side (no Chrome extension needed),
+  4. parses it into a clean feed: Game# | Date | Time | Location (+ GameID, Team1, Team2),
+  5. lets the coach download feed.csv and paste columns A-D into the sheet's `Feed` tab.
+
+Game number is unique across the whole event (Tue 1-186, Wed 187-..., etc.),
+so Game# alone is the join key the sheet's XLOOKUP formulas use.
+
+Integration (see notes at bottom):
+  - add `beautifulsoup4` to requirements.txt
+  - drop this file in the repo
+  - add a tab that calls schedule_refresh.render()
+"""
+
+import re
+import io
+import datetime as _dt
+from urllib.parse import urlparse, parse_qs
+
+import requests
+import pandas as pd
+import streamlit as st
+
+try:
+    from bs4 import BeautifulSoup
+    _HAVE_BS4 = True
+except ImportError:  # graceful fallback; bs4 strongly recommended
+    _HAVE_BS4 = False
+
+# --------------------------------------------------------------------------- #
+# constants / patterns
+# --------------------------------------------------------------------------- #
+PG_SCHEDULE = "https://www.perfectgame.org/Events/TournamentSchedule.aspx"
+_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/124.0 Safari/537.36"
+    ),
+    "Accept-Language": "en-US,en;q=0.9",
+}
+_GID_RE  = re.compile(r"GameID:\s*(\d+)", re.I)
+_TIME_RE = re.compile(r"(\d{1,2}:\d{2}\s*[AP]M)", re.I)
+_DATE_RE = re.compile(r"[?&]Date=(\d{1,2}/\d{1,2}/\d{4})", re.I)
+_TEAM_SEL = 'a[href*="Tournaments/Teams/Default.aspx?team="]'
+
+FEED_COLUMNS = ["Game#", "Date", "Time", "Location", "GameID", "Team1", "Team2"]
+
+
+# --------------------------------------------------------------------------- #
+# small helpers
+# --------------------------------------------------------------------------- #
+def _event_id(url: str) -> str:
+    ev = parse_qs(urlparse(url).query).get("event", [None])[0]
+    if not ev:
+        raise ValueError("That URL has no `event=` id. Paste a TournamentSchedule link.")
+    return ev
+
+
+def _fetch(url: str) -> str:
+    r = requests.get(url, headers=_HEADERS, timeout=25)
+    r.raise_for_status()
+    return r.text
+
+
+def _day_url(event_id: str, date_str: str) -> str:
+    return f"{PG_SCHEDULE}?event={event_id}&Date={date_str}"
+
+
+def _date_key(s: str) -> _dt.date:
+    mo, da, yr = (int(x) for x in s.split("/"))
+    return _dt.date(yr, mo, da)
+
+
+def _fmt_date(date_str: str) -> str:
+    """6/23/2026 -> 'Tuesday, 6/23' (matches the sheet's Date column)."""
+    d = _date_key(date_str)
+    return f"{d.strftime('%A')}, {d.month}/{d.day}"
+
+
+def _discover_dates(html: str) -> list:
+    """Return event dates as normalized 'M/D/YYYY' strings, deduped & sorted
+    (PG mixes padded '06/23/2026' and unpadded '6/23/2026' for the same day)."""
+    seen = []
+    for m in _DATE_RE.finditer(html):
+        d = _date_key(m.group(1))
+        if d not in seen:
+            seen.append(d)
+    seen.sort()
+    return [f"{d.month}/{d.day}/{d.year}" for d in seen]
+
+
+def _page_text(html: str) -> str:
+    if _HAVE_BS4:
+        return BeautifulSoup(html, "html.parser").get_text("\n")
+    # crude fallback if bs4 is unavailable
+    t = re.sub(r"(?is)<(script|style).*?</\1>", " ", html)
+    t = re.sub(r"(?s)<[^>]+>", "\n", t)
+    return t
+
+
+def _block_teams(block_html: str) -> tuple:
+    """Team names scoped to a single game's HTML block (handles a missing
+    'Home'/'Bye' placeholder that has no team link)."""
+    if not _HAVE_BS4:
+        return "", ""
+    names = [a.get_text(strip=True)
+             for a in BeautifulSoup(block_html, "html.parser").select(_TEAM_SEL)]
+    return (names[0] if names else ""), (names[1] if len(names) > 1 else "")
+
+
+def _location_from(lines_after_gid: list) -> str:
+    """Rebuild 'Field 1 @ East Cobb Complex' from the lines that follow the
+    GameID line. The ballpark is a maps <a>, so get_text() may split it onto
+    its own line; handle the common renderings."""
+    a = [ln for ln in lines_after_gid if ln]
+    if not a:
+        return ""
+    first = a[0]
+    # "X @ Y" already on one line
+    if "@" in first and not first.rstrip().endswith("@"):
+        right = first.split("@", 1)[1].strip()
+        if right:
+            return re.sub(r"\s*@\s*", " @ ", first).strip()
+    # "X @" then ballpark on next line
+    if first.rstrip().endswith("@"):
+        prefix = first.rstrip()[:-1].strip()
+        ballpark = a[1] if len(a) > 1 else ""
+        return f"{prefix} @ {ballpark}".strip()
+    # "X" / "@" / "Y" across three lines
+    if len(a) >= 3 and a[1].strip() == "@":
+        return f"{a[0].strip()} @ {a[2].strip()}".strip()
+    # fallback
+    return " ".join(a[:2]).strip()
+
+
+def _parse_day(html: str, date_str: str) -> list:
+    """Parse one day's schedule page. We split the RAW html on the 'Gm#'
+    marker so each block holds exactly one game; team links are then scoped
+    to that block. Core fields come from the block's text."""
+    label = _fmt_date(date_str)
+    blocks = re.split(r"Gm#\s*", html)[1:]      # drop the page preamble
+    rows = []
+    for blk in blocks:
+        btext = _page_text(blk)
+        gnum_m = re.match(r"\s*(\d+)", btext)
+        time_m = _TIME_RE.search(btext[:80])
+        if not (gnum_m and time_m):
+            continue
+        gid_m = _GID_RE.search(btext)
+
+        lines = [ln.strip() for ln in btext.splitlines()]
+        loc = ""
+        if gid_m:
+            for j, ln in enumerate(lines):
+                if "GameID:" in ln:
+                    loc = _location_from(lines[j + 1:])
+                    break
+
+        t1, t2 = _block_teams(blk)
+        rows.append({
+            "Game#": int(gnum_m.group(1)),
+            "Date": label,
+            "Time": re.sub(r"\s+", " ", time_m.group(1)).upper(),
+            "Location": loc,
+            "GameID": gid_m.group(1) if gid_m else "",
+            "Team1": t1,
+            "Team2": t2,
+        })
+    return rows
+
+
+def build_feed(url: str, progress=None) -> pd.DataFrame:
+    """Fetch every day of the event in `url` and return the feed DataFrame."""
+    event_id = _event_id(url)
+    first_html = _fetch(url)
+    dates = _discover_dates(first_html) or [
+        parse_qs(urlparse(url).query).get("Date", [""])[0]
+    ]
+
+    all_rows, html_by_date = [], {url: first_html}
+    for n, d in enumerate(dates):
+        if progress is not None:
+            progress(n / len(dates), f"Reading {_fmt_date(d)} ...")
+        u = _day_url(event_id, d)
+        html = html_by_date.get(u) or _fetch(u)
+        all_rows.extend(_parse_day(html, d))
+    if progress is not None:
+        progress(1.0, "Done")
+
+    df = pd.DataFrame(all_rows, columns=FEED_COLUMNS)
+    if not df.empty:
+        df = (df.drop_duplicates(subset=["Game#"])
+                .sort_values("Game#")
+                .reset_index(drop=True))
+    return df
+
+
+# --------------------------------------------------------------------------- #
+# Streamlit UI  --  call schedule_refresh.render() from a tab
+# --------------------------------------------------------------------------- #
+def render():
+    st.subheader("Schedule Refresh")
+    st.caption(
+        "Paste any one day's Perfect Game schedule link. This pulls every day "
+        "of the event and builds the Game# / Date / Time / Location feed. "
+        "Paste columns A-D into the **Feed** tab of the schedule sheet."
+    )
+
+    if not _HAVE_BS4:
+        st.warning("`beautifulsoup4` isn't installed — add it to requirements.txt "
+                   "for reliable parsing.")
+
+    with st.expander("First-time setup — connect this to the schedule sheet"):
+        st.markdown(
+            "**1.** In the schedule sheet, add a tab named **`Feed`** with row-1 "
+            "headers: `Game#`  `Date`  `Time`  `Location`.\n\n"
+            "**2.** Every refresh, paste columns **A–D** (below) into that `Feed` tab, "
+            "overwriting what's there.\n\n"
+            "**3.** *One time only* — on the main schedule tab, drop these into row 2 "
+            "and fill down. They pull Date / Time / Location live off the game number:"
+        )
+        st.code(
+            '=IFERROR(XLOOKUP($A2, Feed!$A:$A, Feed!$B:$B), "")    →  Date  (column B)\n'
+            '=IFERROR(XLOOKUP($A2, Feed!$A:$A, Feed!$C:$C), "")    →  Time  (column C)\n'
+            '=IFERROR(XLOOKUP($A2, Feed!$A:$A, Feed!$D:$D), "")    →  Location (column D)',
+            language="text",
+        )
+        st.caption("A row that goes blank later = PG moved or cancelled that game — a built-in flag.")
+
+    url = st.text_input(
+        "Perfect Game schedule URL",
+        placeholder="https://www.perfectgame.org/Events/TournamentSchedule.aspx?event=141563&Date=06/23/2026",
+    )
+
+    if st.button("Build schedule feed", type="primary", disabled=not url):
+        bar = st.progress(0.0, text="Starting ...")
+        try:
+            df = build_feed(url.strip(), progress=lambda p, t: bar.progress(p, text=t))
+        except Exception as e:  # noqa: BLE001
+            bar.empty()
+            st.error(f"Could not build the feed: {e}")
+            return
+        bar.empty()
+
+        if df.empty:
+            st.error("No games parsed — the page layout may have changed. "
+                     "Send Claude this URL and we'll adjust the parser.")
+            return
+
+        st.success(f"Parsed {len(df)} games across "
+                   f"{df['Date'].nunique()} day(s). "
+                   f"Game # {df['Game#'].min()}–{df['Game#'].max()}.")
+        st.dataframe(df, use_container_width=True, hide_index=True)
+
+        csv = df.to_csv(index=False).encode("utf-8")
+        st.download_button("Download feed.csv", data=csv,
+                           file_name="feed.csv", mime="text/csv")
+
+        # paste-ready block (just the 4 columns the Feed tab needs)
+        core = df[["Game#", "Date", "Time", "Location"]]
+        st.text_area(
+            "Or copy-paste these four columns straight into the Feed tab",
+            value=core.to_csv(index=False, sep="\t"),
+            height=200,
+        )
+        st.info("Paste columns **A–D** into the **Feed** tab to update the schedule. "
+                "First time wiring up the sheet? See **First-time setup** at the top.")
+
+
+# Allows: `streamlit run schedule_refresh.py` for a quick standalone test.
+if __name__ == "__main__":
+    render()

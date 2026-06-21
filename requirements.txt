@@ -5,3 +5,5 @@ reportlab>=4.0
 pypdf>=4.0
 Pillow>=10.0
 pillow-heif>=0.18
+beautifulsoup4>=4.12
+requests>=2.31

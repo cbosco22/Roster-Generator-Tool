@@ -45,6 +45,7 @@ from post_event_flow import (
     rows_to_csv, today_str,
 )
 import run_event
+import schedule_refresh
 
 
 # ---------------------- helpers ----------------------
@@ -217,8 +218,9 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-tab_field, tab_import, tab_tourney, tab_post, tab_admin = st.tabs(
-    ["🎯 Field Tool", "🧩 Importer", "🏟️ Tournament Builder", "📥 Post-Event", "⚙️  Admin"])
+tab_field, tab_import, tab_tourney, tab_sched, tab_post, tab_admin = st.tabs(
+    ["🎯 Field Tool", "🧩 Importer", "🏟️ Tournament Builder", "🔄 Schedule Refresh",
+     "📥 Post-Event", "⚙️  Admin"])
 
 
 # ---- Field Tool ----
@@ -613,6 +615,11 @@ with tab_tourney:
             st.download_button("⬇️  Schedule (CSV)", data=csv_text,
                                file_name=st.session_state["tb_csvname"],
                                mime="text/csv", use_container_width=True)
+
+
+# ---- Schedule Refresh ----
+with tab_sched:
+    schedule_refresh.render()
 
 
 # ---- Post-Event ----
