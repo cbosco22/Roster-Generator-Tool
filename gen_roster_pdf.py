@@ -738,6 +738,7 @@ def build_pdf(json_path, out_path, raw_sheet_text="", proof_only=False,
     def _abbrev(state_raw):
         s = (state_raw or '').strip()
         if len(s) == 2: return s.upper()
+        if s.lower() == 'new england': return 'NEng'
         return _STATE_ABV.get(s.lower(), s.upper())
 
     def _pbr_match(name, grad_year=None, state=None):
