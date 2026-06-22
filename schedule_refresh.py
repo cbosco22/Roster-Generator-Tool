@@ -23,6 +23,7 @@ Integration (see notes at bottom):
 
 import re
 import io
+import json
 import datetime as _dt
 from urllib.parse import urlparse, parse_qs
 
@@ -299,15 +300,111 @@ def build_feed(url: str, progress=None) -> pd.DataFrame:
     return df
 
 
-# --------------------------------------------------------------------------- #
-# Streamlit UI  --  call schedule_refresh.render() from a tab
-# --------------------------------------------------------------------------- #
+SCRAPE_COLUMNS = ["Game#", "Date", "Time", "Location", "Division", "Team1", "Team2"]
+
+
+def _norm_scrape_date(s: str) -> str:
+    """Extension dates look like 'THURSDAY - JUNE 05, 2025' -> 'Thursday, 6/5'.
+    Falls back to other common forms, then to the raw string."""
+    s = (s or "").strip()
+    m = re.search(r"([A-Za-z]{3,9})\s+(\d{1,2}),?\s+(\d{4})", s)   # 'JUNE 05, 2025'
+    if m:
+        mon = _MONTHS.get(m.group(1).lower()[:3])
+        if mon:
+            try:
+                return _fmt_date(f"{mon}/{int(m.group(2))}/{int(m.group(3))}")
+            except ValueError:
+                pass
+    m = re.search(r"(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})", s)        # '6/5/2025'
+    if m:
+        yr = int(m.group(3))
+        yr += 2000 if yr < 100 else 0
+        try:
+            return _fmt_date(f"{int(m.group(1))}/{int(m.group(2))}/{yr}")
+        except ValueError:
+            pass
+    return s
+
+
+def feed_from_scrape(text: str) -> pd.DataFrame:
+    """Reshape the extension's scraped schedule JSON (FiveTool / PBR / Prospect
+    Select) into the same Feed. Accepts the full {…, games:[…]} object or a bare
+    games list."""
+    data = json.loads(text)
+    games = data.get("games", []) if isinstance(data, dict) else data
+    if not isinstance(games, list):
+        raise ValueError("JSON has no 'games' list.")
+
+    rows = []
+    for g in games:
+        if not isinstance(g, dict):
+            continue
+        gid = str(g.get("game", "")).strip().lstrip("#").strip()
+        if not gid:
+            continue
+        rows.append({
+            "Game#": gid,
+            "Date": _norm_scrape_date(str(g.get("date", ""))),
+            "Time": re.sub(r"\s+", " ", str(g.get("time", ""))).strip().upper(),
+            "Location": str(g.get("location", "")).strip(),
+            "Division": str(g.get("division", "")).strip(),
+            "Team1": str(g.get("team1", "")).strip(),
+            "Team2": str(g.get("team2", "")).strip(),
+        })
+
+    df = pd.DataFrame(rows, columns=SCRAPE_COLUMNS)
+    # keep scraped (chronological) order; if game numbers are all integers, sort them
+    if not df.empty and df["Game#"].str.fullmatch(r"\d+").all():
+        df = (df.assign(_n=df["Game#"].astype(int))
+                .sort_values("_n").drop(columns="_n").reset_index(drop=True))
+    return df
+def _show_feed(df, *, empty_msg: str, collision_check: bool = False):
+    """Render results identically for both sources: summary, copy box, download."""
+    if df is None or df.empty:
+        st.error(empty_msg)
+        return
+
+    days = list(dict.fromkeys(df["Date"].tolist()))
+    numeric = df["Game#"].astype(str).str.fullmatch(r"\d+").all()
+    head = f"{len(df)} games across {len(days)} day(s)"
+    if numeric:
+        nums = df["Game#"].astype(int)
+        head += f"  ·  Game # {nums.min()}–{nums.max()}"
+    st.success(head)
+    st.caption("Days covered: " + "  ·  ".join(d for d in days if d))
+
+    if collision_check:
+        ser = df["Game#"].astype(str)
+        dups = ser[ser.duplicated(keep=False)]
+        if not dups.empty:
+            ex = ", ".join(sorted(set(dups))[:6])
+            st.warning(
+                f"Some game numbers repeat across the event ({ex} …). On this "
+                "platform the game number may not be unique event-wide, so the sheet "
+                "may need a Date+Game# key. Tell me and I'll wire that variant.")
+
+    st.dataframe(df, use_container_width=True, hide_index=True)
+
+    core = df[["Game#", "Date", "Time", "Location"]]
+    st.markdown("**Copy into the Feed tab**")
+    st.caption("Tap the copy icon (top-right of the box), then paste into cell "
+               "**A1** of the `Feed` tab — it overwrites the four columns and the "
+               "main schedule updates itself.")
+    st.code(core.to_csv(index=False, sep="\t"), language=None)
+    st.download_button("⬇️  Or download feed.csv",
+                       data=df.to_csv(index=False).encode("utf-8"),
+                       file_name="feed.csv", mime="text/csv",
+                       use_container_width=True)
+    st.info("First time wiring up the sheet? See **First-time setup** at the top.")
+
+
 def render():
     st.subheader("Schedule Refresh")
     st.caption(
-        "Paste any one day's Perfect Game schedule link. This pulls every day "
-        "of the event and builds the Game# / Date / Time / Location feed. "
-        "Paste columns A-D into the **Feed** tab of the schedule sheet."
+        "Build the **Feed** for the schedule sheet. For Perfect Game, paste any "
+        "one day's link and it pulls the whole event. For FiveTool / PBR / Prospect "
+        "Select, scrape with the extension and paste the JSON. Either way you get the "
+        "same Game# / Date / Time / Location feed — copy columns A–D into the **Feed** tab."
     )
 
     if not _HAVE_BS4:
@@ -331,45 +428,41 @@ def render():
         )
         st.caption("A row that goes blank later = PG moved or cancelled that game — a built-in flag.")
 
-    url = st.text_input(
-        "Perfect Game schedule URL",
-        placeholder="https://www.perfectgame.org/Events/TournamentSchedule.aspx?event=141563&Date=06/23/2026",
+    src = st.radio(
+        "Source",
+        ["Perfect Game (paste URL)",
+         "FiveTool / PBR / Prospect Select (paste scraped JSON)"],
     )
 
-    if st.button("Build schedule feed", type="primary", disabled=not url):
-        bar = st.progress(0.0, text="Starting ...")
-        try:
-            df = build_feed(url.strip(), progress=lambda p, t: bar.progress(p, text=t))
-        except Exception as e:  # noqa: BLE001
+    if src.startswith("Perfect Game"):
+        url = st.text_input(
+            "Perfect Game schedule URL",
+            placeholder="https://www.perfectgame.org/Events/TournamentSchedule.aspx?event=141563&Date=06/23/2026",
+        )
+        if st.button("Build schedule feed", type="primary", disabled=not url):
+            bar = st.progress(0.0, text="Starting ...")
+            try:
+                df = build_feed(url.strip(), progress=lambda p, t: bar.progress(p, text=t))
+            except Exception as e:  # noqa: BLE001
+                bar.empty()
+                st.error(f"Could not build the feed: {e}")
+                return
             bar.empty()
-            st.error(f"Could not build the feed: {e}")
-            return
-        bar.empty()
-
-        if df.empty:
-            st.error("No games parsed — the page layout may have changed. "
-                     "Send Claude this URL and we'll adjust the parser.")
-            return
-
-        days = list(dict.fromkeys(df["Date"].tolist()))
-        st.success(f"Parsed {len(df)} games across {len(days)} day(s)  ·  "
-                   f"Game # {int(df['Game#'].min())}–{int(df['Game#'].max())}")
-        st.caption("Days covered: " + "  ·  ".join(days))
-        st.dataframe(df, use_container_width=True, hide_index=True)
-
-        # paste-ready block (the 4 columns the Feed tab needs) — copy icon top-right
-        core = df[["Game#", "Date", "Time", "Location"]]
-        st.markdown("**Copy into the Feed tab**")
-        st.caption("Tap the copy icon (top-right of the box), then paste into cell "
-                   "**A1** of the `Feed` tab — it overwrites the four columns and the "
-                   "main schedule updates itself.")
-        st.code(core.to_csv(index=False, sep="\t"), language=None)
-
-        csv = df.to_csv(index=False).encode("utf-8")
-        st.download_button("⬇️  Or download feed.csv", data=csv,
-                           file_name="feed.csv", mime="text/csv",
-                           use_container_width=True)
-        st.info("First time wiring up the sheet? See **First-time setup** at the top.")
+            _show_feed(df, empty_msg="No games parsed — the page layout may have "
+                       "changed. Send Claude this URL and we'll adjust the parser.")
+    else:
+        st.caption("In the extension's **Schedule** tab, scrape the event, hit "
+                   "**Copy to Clipboard**, then paste here.")
+        raw = st.text_area("Scraped schedule JSON", height=160,
+                           placeholder='{ "event": "...", "games": [ ... ] }')
+        if st.button("Build schedule feed", type="primary", disabled=not raw.strip()):
+            try:
+                df = feed_from_scrape(raw.strip())
+            except Exception as e:  # noqa: BLE001
+                st.error(f"Couldn't read that JSON: {e}")
+                return
+            _show_feed(df, empty_msg="No games found in that JSON.",
+                       collision_check=True)
 
 
 # Allows: `streamlit run schedule_refresh.py` for a quick standalone test.
