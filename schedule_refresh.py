@@ -25,7 +25,7 @@ import re
 import io
 import json
 import datetime as _dt
-from urllib.parse import urlparse, parse_qs
+from urllib.parse import urlparse, parse_qs, unquote
 
 import requests
 import pandas as pd
@@ -358,6 +358,127 @@ def feed_from_scrape(text: str) -> pd.DataFrame:
         df = (df.assign(_n=df["Game#"].astype(int))
                 .sort_values("_n").drop(columns="_n").reset_index(drop=True))
     return df
+# --------------------------------------------------------------------------- #
+# FiveTool (Playbook365) — server-side fetch of the schedule_ajax API
+# --------------------------------------------------------------------------- #
+FT_AJAX = "https://events.fivetool.org/schedule_ajax"
+_FT_EVENTID_RES = [
+    re.compile(r'event_id["\']?\s*[:=]\s*["\']?(\d{2,})'),
+    re.compile(r'data-event-id=["\'](\d+)'),
+]
+
+
+def _ft_date(schedule_time: str) -> str:
+    """'2026-06-16 13:30:00' -> 'Tuesday, 6/16'."""
+    m = re.match(r"\s*(\d{4})-(\d{1,2})-(\d{1,2})", str(schedule_time))
+    if not m:
+        return ""
+    try:
+        return _fmt_date(f"{int(m.group(2))}/{int(m.group(3))}/{int(m.group(1))}")
+    except ValueError:
+        return ""
+
+
+def _looks_blocked(text: str, status: int) -> bool:
+    t = (text or "")[:4000].lower()
+    return (status in (403, 429, 503)
+            or "just a moment" in t
+            or "/cdn-cgi/challenge" in t
+            or "cf-chl" in t
+            or "attention required" in t)
+
+
+def _ft_event_id(html: str):
+    for rx in _FT_EVENTID_RES:
+        m = rx.search(html)
+        if m:
+            return m.group(1)
+    return None
+
+
+def _collect_games(node, out):
+    """Recursively gather every dict that looks like a game, regardless of how
+    the response nests them (by date / division / location)."""
+    if isinstance(node, dict):
+        if "game_number" in node and ("schedule_time" in node or "team_name_1" in node):
+            out.append(node)
+        else:
+            for v in node.values():
+                _collect_games(v, out)
+    elif isinstance(node, list):
+        for v in node:
+            _collect_games(v, out)
+
+
+def build_feed_fivetool(url: str, event_id: str = None) -> pd.DataFrame:
+    """Server-side pull of a FiveTool event schedule via its schedule_ajax API.
+    Bootstraps a session (cookies + CSRF), resolves the numeric event_id from the
+    page, then POSTs for the schedules."""
+    sess = requests.Session()
+    sess.headers.update(_HEADERS)
+
+    page = sess.get(url, timeout=25)
+    if _looks_blocked(page.text, page.status_code):
+        raise RuntimeError(
+            "FiveTool blocked the server-side request (Cloudflare). Use the "
+            "scraped-JSON option — the extension runs in your browser, which "
+            "clears Cloudflare automatically.")
+
+    eid = event_id or _ft_event_id(page.text)
+    if not eid:
+        raise RuntimeError(
+            "Couldn't find the event_id on the page. Use the scraped-JSON option.")
+
+    headers = {
+        "Accept": "application/json, text/plain, */*",
+        "Content-Type": "application/json;charset=UTF-8",
+        "Origin": "https://events.fivetool.org",
+        "Referer": url,
+        "X-Requested-With": "XMLHttpRequest",
+    }
+    xsrf = sess.cookies.get("XSRF-TOKEN")
+    if xsrf:
+        headers["X-XSRF-TOKEN"] = unquote(xsrf)
+
+    payload = {"event_id": str(eid), "event_price_id": "0",
+               "event_registration_item_id": "0", "schedule_id": 0,
+               "data_type": "schedules"}
+    r = sess.post(FT_AJAX, json=payload, headers=headers, timeout=25)
+    if r.status_code != 200 or _looks_blocked(r.text, r.status_code):
+        raise RuntimeError(
+            f"schedule_ajax returned {r.status_code} (likely Cloudflare or an "
+            "expired session). Use the scraped-JSON option for FiveTool.")
+    try:
+        data = r.json()
+    except ValueError:
+        raise RuntimeError("schedule_ajax didn't return JSON. Use the scraped-JSON option.")
+
+    games = []
+    _collect_games(data, games)
+    rows = []
+    for g in games:
+        gid = str(g.get("game_number", "")).strip()
+        if not gid:
+            continue
+        loc = str(g.get("field_name") or g.get("location") or "").strip()
+        loc = re.sub(r"\s*-\s*$", "", loc)            # FiveTool appends a stray ' -'
+        rows.append({
+            "Game#": gid,
+            "Date": _ft_date(g.get("schedule_time", "")),
+            "Time": str(g.get("start_time") or g.get("time") or "").strip().upper(),
+            "Location": loc,
+            "Division": str(g.get("division", "")).strip(),
+            "Team1": str(g.get("team_name_1", "")).strip(),
+            "Team2": str(g.get("team_name_2", "")).strip(),
+            "GameID": str(g.get("schedule_game_id", "")).strip(),
+            "_st": str(g.get("schedule_time", "")),
+        })
+    df = pd.DataFrame(rows, columns=SCRAPE_COLUMNS + ["GameID", "_st"])
+    if not df.empty:
+        df = df.sort_values("_st").reset_index(drop=True)
+    return df.drop(columns="_st", errors="ignore")
+
+
 def _show_feed(df, *, empty_msg: str, collision_check: bool = False):
     """Render results identically for both sources: summary, copy box, download."""
     if df is None or df.empty:
@@ -401,10 +522,11 @@ def _show_feed(df, *, empty_msg: str, collision_check: bool = False):
 def render():
     st.subheader("Schedule Refresh")
     st.caption(
-        "Build the **Feed** for the schedule sheet. For Perfect Game, paste any "
-        "one day's link and it pulls the whole event. For FiveTool / PBR / Prospect "
-        "Select, scrape with the extension and paste the JSON. Either way you get the "
-        "same Game# / Date / Time / Location feed — copy columns A–D into the **Feed** tab."
+        "Build the **Feed** for the schedule sheet. Paste a **Perfect Game** or "
+        "**FiveTool** event link and it pulls the whole event. For PBR / Prospect "
+        "Select (or FiveTool if Cloudflare blocks the server), scrape with the "
+        "extension and paste the JSON. Same Game# / Date / Time / Location feed either "
+        "way — copy columns A–D into the **Feed** tab."
     )
 
     if not _HAVE_BS4:
@@ -430,26 +552,32 @@ def render():
 
     src = st.radio(
         "Source",
-        ["Perfect Game (paste URL)",
-         "FiveTool / PBR / Prospect Select (paste scraped JSON)"],
+        ["Paste event link (Perfect Game / FiveTool)",
+         "Paste scraped JSON (PBR / Prospect Select / FiveTool fallback)"],
     )
 
-    if src.startswith("Perfect Game"):
+    if src.startswith("Paste event link"):
         url = st.text_input(
-            "Perfect Game schedule URL",
-            placeholder="https://www.perfectgame.org/Events/TournamentSchedule.aspx?event=141563&Date=06/23/2026",
+            "Event schedule URL",
+            placeholder="Perfect Game …/TournamentSchedule.aspx?…   or   "
+                        "events.fivetool.org/events/…/schedule/all",
         )
         if st.button("Build schedule feed", type="primary", disabled=not url):
-            bar = st.progress(0.0, text="Starting ...")
+            u = url.strip()
+            is_ft = "fivetool.org" in u.lower()
             try:
-                df = build_feed(url.strip(), progress=lambda p, t: bar.progress(p, text=t))
+                if is_ft:
+                    with st.spinner("Pulling FiveTool schedule …"):
+                        df = build_feed_fivetool(u)
+                else:
+                    bar = st.progress(0.0, text="Working …")
+                    df = build_feed(u, progress=lambda p, t: bar.progress(p, text=t))
+                    bar.empty()
             except Exception as e:  # noqa: BLE001
-                bar.empty()
                 st.error(f"Could not build the feed: {e}")
                 return
-            bar.empty()
-            _show_feed(df, empty_msg="No games parsed — the page layout may have "
-                       "changed. Send Claude this URL and we'll adjust the parser.")
+            _show_feed(df, empty_msg="No games parsed. Send Claude this URL and "
+                       "we'll adjust.", collision_check=is_ft)
     else:
         st.caption("In the extension's **Schedule** tab, scrape the event, hit "
                    "**Copy to Clipboard**, then paste here.")
