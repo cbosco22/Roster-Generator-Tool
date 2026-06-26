@@ -262,33 +262,35 @@ def build_feed(url, progress=None):
 
 
 # ---------------------------------------------------------------------------
-# PDF -> Claude Vision extractor (FiveTool, PBR, Prospect Select, etc.)
+# PDF -> Claude Vision extractor  (LINE-BASED, robust to truncation)
 # ---------------------------------------------------------------------------
+# We ask the model for one game per line in a fixed pipe-delimited format
+# instead of JSON. A cut-off response just loses the final partial line
+# rather than corrupting the whole parse — far more reliable for big events.
+
 _VISION_PROMPT = """\
 You are reading a printed tournament schedule PDF for a high school baseball event.
-Extract EVERY game listed. Return ONLY valid JSON, no explanation, no markdown fences.
+List EVERY game. Output ONE game per line, nothing else — no preamble, no JSON,
+no markdown, no header row.
 
-JSON structure:
-{
-  "event": "<tournament name>",
-  "games": [
-    {
-      "game_num":  "<game or pool number, e.g. G1, P3, or 1 — blank if not shown>",
-      "date":      "<day + date exactly as printed, e.g. Thursday, June 26>",
-      "time":      "<e.g. 8:00 AM>",
-      "location":  "<field or venue name>",
-      "team1":     "<first/home team name exactly as printed>",
-      "team2":     "<second/away team name exactly as printed>",
-      "division":  "<age division if shown, e.g. 17U — blank if not shown>"
-    }
-  ]
-}
+Each line MUST be exactly these 7 fields separated by a pipe (|) character:
 
-Rules:
-- Copy team names EXACTLY as printed. Do not abbreviate or expand.
-- If a team slot shows TBD, use "TBD".
-- Include ALL games: pool play, bracket play, seeding games, everything.
-- Return ONLY the JSON object. Start with { and end with }. No markdown.
+game_num|date|time|location|division|team1|team2
+
+Field rules:
+- game_num: the game number exactly as shown (e.g. 16, 142). Strip any leading #.
+- date: day and date exactly as printed (e.g. Thursday, June 25). Repeat the
+  current date on every game line under that day's header.
+- time: e.g. 8:00 AM
+- location: field or venue (e.g. LakePoint 10)
+- division: age division if shown (e.g. 16U), else leave empty
+- team1: first/home team EXACTLY as printed
+- team2: second/away team EXACTLY as printed
+- If a team slot is blank or shows TBD, write TBD.
+- Never put a pipe character inside a field.
+- Include ALL games: pool play, bracket play, seeding, placement, everything.
+
+Output only the game lines.
 """
 
 
@@ -328,25 +330,37 @@ def _pdf_text_fallback(pdf_bytes):
         return f"[text extraction failed: {e}]"
 
 
-def _call_vision(client, content):
-    """Single API call. Returns parsed dict."""
+def _call_vision_lines(client, content):
+    """Single API call. Returns list of parsed game dicts.
+    Parses line-by-line; a truncated final line is simply skipped."""
     resp = client.messages.create(
         model="claude-sonnet-4-6",
         max_tokens=8192,
         messages=[{"role": "user", "content": content}],
     )
-    raw = resp.content[0].text.strip()
-    raw = re.sub(r"^```(?:json)?\s*", "", raw, flags=re.MULTILINE)
-    raw = re.sub(r"```\s*$",          "", raw, flags=re.MULTILINE).strip()
-    start, end = raw.find("{"), raw.rfind("}") + 1
-    if start == -1 or end == 0:
-        raise ValueError(f"No JSON in vision response:\n{raw[:400]}")
-    return json.loads(raw[start:end])
+    raw = resp.content[0].text
+    games = []
+    for line in raw.splitlines():
+        line = line.strip()
+        if not line or "|" not in line:
+            continue
+        parts = line.split("|")
+        if len(parts) < 7:
+            # truncated / malformed line — skip it, don't crash
+            continue
+        gnum, date, time, loc, div, t1, t2 = [p.strip() for p in parts[:7]]
+        if not gnum or gnum.lower() in ("game_num", "game#", "game"):
+            continue  # header row or empty
+        games.append({
+            "game_num": gnum, "date": date, "time": time,
+            "location": loc, "division": div, "team1": t1, "team2": t2,
+        })
+    return games
 
 
 def _vision_extract(pdf_bytes, api_key):
-    """Send PDF pages to Claude Vision, return parsed schedule dict.
-    For large PDFs (>8 pages) chunks into batches to avoid token limits."""
+    """Send PDF pages to Claude Vision, return {'games': [...]}.
+    Chunks large PDFs (>5 pages) into batches so no single call overflows."""
     import anthropic
     client = anthropic.Anthropic(api_key=api_key)
     images = _pdf_to_images_b64(pdf_bytes)
@@ -367,23 +381,27 @@ def _vision_extract(pdf_bytes, api_key):
         content.append({"type": "text", "text": _VISION_PROMPT})
         return content
 
-    # Small PDF: one shot
-    CHUNK_SIZE = 8
+    CHUNK_SIZE = 5
+    all_games = []
+
     if len(images) <= CHUNK_SIZE:
         text_fallback = "" if images else _pdf_text_fallback(pdf_bytes)
-        return _call_vision(client, _make_content(images, text_fallback))
+        all_games = _call_vision_lines(client, _make_content(images, text_fallback))
+    else:
+        for i in range(0, len(images), CHUNK_SIZE):
+            chunk = images[i:i + CHUNK_SIZE]
+            all_games.extend(_call_vision_lines(client, _make_content(chunk)))
 
-    # Large PDF: chunk by pages, merge games lists
-    all_games = []
-    event_name = "Tournament"
-    for i in range(0, len(images), CHUNK_SIZE):
-        chunk = images[i:i + CHUNK_SIZE]
-        data = _call_vision(client, _make_content(chunk))
-        all_games.extend(data.get("games", []))
-        if i == 0:
-            event_name = data.get("event", event_name)
+    # De-dupe on game number (chunk overlap safety) keeping first occurrence
+    seen, deduped = set(), []
+    for g in all_games:
+        key = g["game_num"]
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(g)
 
-    return {"event": event_name, "games": all_games}
+    return {"event": "Tournament", "games": deduped}
 
 
 def _norm_vision_date(s):
@@ -404,7 +422,7 @@ def _norm_vision_date(s):
 
 
 def _feed_from_vision(data):
-    """Turn vision JSON into the standard Feed DataFrame."""
+    """Turn vision games into the standard Feed DataFrame."""
     rows = []
     for g in data.get("games", []):
         gnum = str(g.get("game_num", "")).strip().lstrip("#").strip()
