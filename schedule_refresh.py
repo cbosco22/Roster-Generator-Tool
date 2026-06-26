@@ -328,32 +328,11 @@ def _pdf_text_fallback(pdf_bytes):
         return f"[text extraction failed: {e}]"
 
 
-def _vision_extract(pdf_bytes, api_key):
-    """Send PDF pages to Claude Vision, return parsed schedule dict."""
-    import anthropic
-    client  = anthropic.Anthropic(api_key=api_key)
-    images  = _pdf_to_images_b64(pdf_bytes)
-    content = []
-
-    if images:
-        for i, b64 in enumerate(images):
-            if len(images) > 1:
-                content.append({"type": "text", "text": f"Page {i+1}:"})
-            content.append({
-                "type": "image",
-                "source": {"type": "base64", "media_type": "image/jpeg", "data": b64},
-            })
-    else:
-        # Text-layer fallback — still works for most print PDFs
-        text = _pdf_text_fallback(pdf_bytes)
-        content.append({"type": "text",
-                         "text": f"Schedule PDF text:\n\n{text}"})
-
-    content.append({"type": "text", "text": _VISION_PROMPT})
-
+def _call_vision(client, content):
+    """Single API call. Returns parsed dict."""
     resp = client.messages.create(
         model="claude-sonnet-4-6",
-        max_tokens=4096,
+        max_tokens=8192,
         messages=[{"role": "user", "content": content}],
     )
     raw = resp.content[0].text.strip()
@@ -363,6 +342,48 @@ def _vision_extract(pdf_bytes, api_key):
     if start == -1 or end == 0:
         raise ValueError(f"No JSON in vision response:\n{raw[:400]}")
     return json.loads(raw[start:end])
+
+
+def _vision_extract(pdf_bytes, api_key):
+    """Send PDF pages to Claude Vision, return parsed schedule dict.
+    For large PDFs (>8 pages) chunks into batches to avoid token limits."""
+    import anthropic
+    client = anthropic.Anthropic(api_key=api_key)
+    images = _pdf_to_images_b64(pdf_bytes)
+
+    def _make_content(imgs_b64, text_fallback=""):
+        content = []
+        if imgs_b64:
+            for i, b64 in enumerate(imgs_b64):
+                if len(imgs_b64) > 1:
+                    content.append({"type": "text", "text": f"Page {i+1}:"})
+                content.append({
+                    "type": "image",
+                    "source": {"type": "base64", "media_type": "image/jpeg", "data": b64},
+                })
+        else:
+            content.append({"type": "text",
+                             "text": f"Schedule PDF text:\n\n{text_fallback}"})
+        content.append({"type": "text", "text": _VISION_PROMPT})
+        return content
+
+    # Small PDF: one shot
+    CHUNK_SIZE = 8
+    if len(images) <= CHUNK_SIZE:
+        text_fallback = "" if images else _pdf_text_fallback(pdf_bytes)
+        return _call_vision(client, _make_content(images, text_fallback))
+
+    # Large PDF: chunk by pages, merge games lists
+    all_games = []
+    event_name = "Tournament"
+    for i in range(0, len(images), CHUNK_SIZE):
+        chunk = images[i:i + CHUNK_SIZE]
+        data = _call_vision(client, _make_content(chunk))
+        all_games.extend(data.get("games", []))
+        if i == 0:
+            event_name = data.get("event", event_name)
+
+    return {"event": event_name, "games": all_games}
 
 
 def _norm_vision_date(s):
