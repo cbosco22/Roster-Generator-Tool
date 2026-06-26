@@ -1,29 +1,23 @@
 """
 schedule_refresh.py
 -------------------
-Perfect Game schedule  ->  Feed builder for the Navy recruiting sheet.
+Unified schedule feed builder. One flow for all sites:
 
-A coach pastes ANY one day's PG "TournamentSchedule" URL, e.g.
-    https://www.perfectgame.org/Events/TournamentSchedule.aspx?event=141563&Date=06/23/2026
-and this:
-  1. reads the event id from the URL,
-  2. discovers every day of that event from the date strip,
-  3. pulls each day server-side (no Chrome extension needed),
-  4. parses it into a clean feed: Game# | Date | Time | Location (+ GameID, Team1, Team2),
-  5. lets the coach download feed.csv and paste columns A-D into the sheet's `Feed` tab.
+  1. Paste any tournament URL
+  2. If Perfect Game  -> scrapes automatically (server-side, no friction)
+  3. If anything else -> shows "Print to PDF" instructions + opens the URL
+                         User saves PDF, uploads it here
+                         Claude Vision extracts every game
+  4. Output is the same Feed CSV either way:
+     Game# | Date | Time | Location  ->  paste into Feed tab, sheet updates
 
-Game number is unique across the whole event (Tue 1-186, Wed 187-..., etc.),
-so Game# alone is the join key the sheet's XLOOKUP formulas use.
-
-Integration (see notes at bottom):
-  - add `beautifulsoup4` to requirements.txt
-  - drop this file in the repo
-  - add a tab that calls schedule_refresh.render()
+Supports: Perfect Game, FiveTool, PBR, Prospect Select, any other site.
 """
 
 import re
 import io
 import json
+import base64
 import datetime as _dt
 from urllib.parse import urlparse, parse_qs, unquote
 
@@ -34,12 +28,12 @@ import streamlit as st
 try:
     from bs4 import BeautifulSoup
     _HAVE_BS4 = True
-except ImportError:  # graceful fallback; bs4 strongly recommended
+except ImportError:
     _HAVE_BS4 = False
 
-# --------------------------------------------------------------------------- #
-# constants / patterns
-# --------------------------------------------------------------------------- #
+# ---------------------------------------------------------------------------
+# Constants
+# ---------------------------------------------------------------------------
 PG_SCHEDULE = "https://www.perfectgame.org/Events/TournamentSchedule.aspx"
 _HEADERS = {
     "User-Agent": (
@@ -51,58 +45,69 @@ _HEADERS = {
 _GID_RE  = re.compile(r"GameID:\s*(\d+)", re.I)
 _TIME_RE = re.compile(r"(\d{1,2}:\d{2}\s*[AP]M)", re.I)
 _TEAM_SEL = 'a[href*="Tournaments/Teams/Default.aspx?team="]'
-
 _MONTHS = {m: i for i, m in enumerate(
     ["jan", "feb", "mar", "apr", "may", "jun",
      "jul", "aug", "sep", "oct", "nov", "dec"], 1)}
 
-# Date discovery — three independent, encoding-proof sources:
-# (A) the visible day strip "Tue Jun 23 183 Games" (primary; plain text)
 _DAYLABEL_RE = re.compile(
     r"(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)[a-z]*\.?\s+"
     r"(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s+"
     r"(\d{1,2})\s+\d+\s+Games?", re.I)
-# (B) explicit Date= params, tolerant of &amp;(-> ;), %2F, padding, param order
 _DATEPARAM_RE = re.compile(
     r"(?<![A-Za-z])Date=\s*(\d{1,2})(?:/|%2[Ff])(\d{1,2})(?:/|%2[Ff])(\d{4})", re.I)
-# (C) event range header "Jun 23-30" / "Jun 28-Jul 2" (fallback enumeration)
 _RANGE_RE = re.compile(
     r"\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s+(\d{1,2})\s*"
     r"(?:-|\u2013|\u2014|to)\s*"
     r"(?:(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s+)?(\d{1,2})\b",
     re.I)
 
-FEED_COLUMNS = ["Game#", "Date", "Time", "Location", "GameID", "Team1", "Team2"]
+FEED_COLUMNS   = ["Game#", "Date", "Time", "Location", "GameID", "Team1", "Team2"]
+SCRAPE_COLUMNS = ["Game#", "Date", "Time", "Location", "Division", "Team1", "Team2"]
+
+# ---------------------------------------------------------------------------
+# Site detection
+# ---------------------------------------------------------------------------
+def _detect_site(url):
+    host = urlparse(url.lower()).netloc
+    if "perfectgame" in host:
+        return "pg"
+    if "fivetool" in host:
+        return "fivetool"
+    if "prepbaseballreport" in host or ("pbr" in host and "baseball" in host):
+        return "pbr"
+    if "prospectselect" in host or "pros-select" in host:
+        return "ps"
+    return "other"
 
 
-# --------------------------------------------------------------------------- #
-# small helpers
-# --------------------------------------------------------------------------- #
-def _event_id(url: str) -> str:
+def _site_label(site):
+    return {"pg": "Perfect Game", "fivetool": "FiveTool",
+            "pbr": "PBR", "ps": "Prospect Select"}.get(site, "this site")
+
+
+# ---------------------------------------------------------------------------
+# Perfect Game scraper (unchanged from original)
+# ---------------------------------------------------------------------------
+def _event_id(url):
     ev = parse_qs(urlparse(url).query).get("event", [None])[0]
     if not ev:
         raise ValueError("That URL has no `event=` id. Paste a TournamentSchedule link.")
     return ev
 
-
-def _fetch(url: str) -> str:
+def _fetch(url):
     r = requests.get(url, headers=_HEADERS, timeout=25)
     r.raise_for_status()
     return r.text
 
-
-def _day_url(event_id: str, date_str: str) -> str:
+def _day_url(event_id, date_str):
     return f"{PG_SCHEDULE}?event={event_id}&Date={date_str}"
 
-
-def _get_html(url: str, cache: dict) -> str:
+def _get_html(url, cache):
     if url not in cache:
         cache[url] = _fetch(url)
     return cache[url]
 
-
-def _url_date(url: str):
-    """The Date= already in the pasted URL, normalized to 'M/D/YYYY' (or None)."""
+def _url_date(url):
     q = parse_qs(urlparse(url).query)
     raw = (q.get("Date") or q.get("date") or [None])[0]
     if not raw:
@@ -110,48 +115,33 @@ def _url_date(url: str):
     m = re.match(r"(\d{1,2})\D(\d{1,2})\D(\d{4})", raw)
     return f"{int(m.group(1))}/{int(m.group(2))}/{int(m.group(3))}" if m else None
 
-
-def _date_key(s: str) -> _dt.date:
+def _date_key(s):
     mo, da, yr = (int(x) for x in s.split("/"))
     return _dt.date(yr, mo, da)
 
-
-def _fmt_date(date_str: str) -> str:
-    """6/23/2026 -> 'Tuesday, 6/23' (matches the sheet's Date column)."""
+def _fmt_date(date_str):
     d = _date_key(date_str)
     return f"{d.strftime('%A')}, {d.month}/{d.day}"
 
-
-def _discover_dates(html: str, url: str) -> list:
-    """All event dates as 'M/D/YYYY', deduped & sorted. Pulls from three
-    encoding-proof sources — the visible day strip, explicit Date= params, and
-    (only if those look thin) the event's range header — plus the URL's own date."""
+def _discover_dates(html, url):
     seen, yr = set(), None
-
-    # (B) explicit Date= params carry their own year
     for m in _DATEPARAM_RE.finditer(html):
         try:
             seen.add(_dt.date(int(m.group(3)), int(m.group(1)), int(m.group(2))))
             yr = yr or int(m.group(3))
         except ValueError:
             pass
-
-    # the date already in the pasted URL (and a year hint)
     ud = _url_date(url)
     if ud:
         d = _date_key(ud)
         seen.add(d)
         yr = yr or d.year
     yr = yr or _dt.date.today().year
-
-    # (A) visible day strip "Tue Jun 23 183 Games"
     for m in _DAYLABEL_RE.finditer(html):
         try:
             seen.add(_dt.date(yr, _MONTHS[m.group(1).lower()[:3]], int(m.group(2))))
         except (ValueError, KeyError):
             pass
-
-    # (C) range header "Jun 23-30" — only lean on it if we still look thin
     if len(seen) <= 1:
         rm = _RANGE_RE.search(html)
         if rm:
@@ -159,76 +149,57 @@ def _discover_dates(html: str, url: str) -> list:
                 m1 = _MONTHS[rm.group(1).lower()[:3]]
                 m2 = _MONTHS[rm.group(3).lower()[:3]] if rm.group(3) else m1
                 start = _dt.date(yr, m1, int(rm.group(2)))
-                end = _dt.date(yr if m2 >= m1 else yr + 1, m2, int(rm.group(4)))
+                end   = _dt.date(yr if m2 >= m1 else yr + 1, m2, int(rm.group(4)))
                 cur = start
                 while cur <= end:
                     seen.add(cur)
                     cur += _dt.timedelta(days=1)
             except (ValueError, KeyError):
                 pass
-
     return [f"{d.month}/{d.day}/{d.year}" for d in sorted(seen)]
 
-
-def _page_text(html: str) -> str:
+def _page_text(html):
     if _HAVE_BS4:
         return BeautifulSoup(html, "html.parser").get_text("\n")
-    # crude fallback if bs4 is unavailable
     t = re.sub(r"(?is)<(script|style).*?</\1>", " ", html)
     t = re.sub(r"(?s)<[^>]+>", "\n", t)
     return t
 
-
-def _block_teams(block_html: str) -> tuple:
-    """Team names scoped to a single game's HTML block (handles a missing
-    'Home'/'Bye' placeholder that has no team link)."""
+def _block_teams(block_html):
     if not _HAVE_BS4:
         return "", ""
     names = [a.get_text(strip=True)
              for a in BeautifulSoup(block_html, "html.parser").select(_TEAM_SEL)]
     return (names[0] if names else ""), (names[1] if len(names) > 1 else "")
 
-
-def _location_from(lines_after_gid: list) -> str:
-    """Rebuild 'Field 1 @ East Cobb Complex' from the lines that follow the
-    GameID line. The ballpark is a maps <a>, so get_text() may split it onto
-    its own line; handle the common renderings."""
+def _location_from(lines_after_gid):
     a = [ln for ln in lines_after_gid if ln]
     if not a:
         return ""
     first = a[0]
-    # "X @ Y" already on one line
     if "@" in first and not first.rstrip().endswith("@"):
         right = first.split("@", 1)[1].strip()
         if right:
             return re.sub(r"\s*@\s*", " @ ", first).strip()
-    # "X @" then ballpark on next line
     if first.rstrip().endswith("@"):
-        prefix = first.rstrip()[:-1].strip()
+        prefix   = first.rstrip()[:-1].strip()
         ballpark = a[1] if len(a) > 1 else ""
         return f"{prefix} @ {ballpark}".strip()
-    # "X" / "@" / "Y" across three lines
     if len(a) >= 3 and a[1].strip() == "@":
         return f"{a[0].strip()} @ {a[2].strip()}".strip()
-    # fallback
     return " ".join(a[:2]).strip()
 
-
-def _parse_day(html: str, date_str: str) -> list:
-    """Parse one day's schedule page. We split the RAW html on the 'Gm#'
-    marker so each block holds exactly one game; team links are then scoped
-    to that block. Core fields come from the block's text."""
-    label = _fmt_date(date_str)
-    blocks = re.split(r"Gm#\s*", html)[1:]      # drop the page preamble
-    rows = []
+def _parse_day(html, date_str):
+    label  = _fmt_date(date_str)
+    blocks = re.split(r"Gm#\s*", html)[1:]
+    rows   = []
     for blk in blocks:
-        btext = _page_text(blk)
+        btext  = _page_text(blk)
         gnum_m = re.match(r"\s*(\d+)", btext)
         time_m = _TIME_RE.search(btext[:80])
         if not (gnum_m and time_m):
             continue
         gid_m = _GID_RE.search(btext)
-
         lines = [ln.strip() for ln in btext.splitlines()]
         loc = ""
         if gid_m:
@@ -236,26 +207,22 @@ def _parse_day(html: str, date_str: str) -> list:
                 if "GameID:" in ln:
                     loc = _location_from(lines[j + 1:])
                     break
-
         t1, t2 = _block_teams(blk)
         rows.append({
-            "Game#": int(gnum_m.group(1)),
-            "Date": label,
-            "Time": re.sub(r"\s+", " ", time_m.group(1)).upper(),
+            "Game#":    int(gnum_m.group(1)),
+            "Date":     label,
+            "Time":     re.sub(r"\s+", " ", time_m.group(1)).upper(),
             "Location": loc,
-            "GameID": gid_m.group(1) if gid_m else "",
-            "Team1": t1,
-            "Team2": t2,
+            "GameID":   gid_m.group(1) if gid_m else "",
+            "Team1":    t1,
+            "Team2":    t2,
         })
     return rows
 
-
-def _probe_range(event_id: str, seed_str: str, cache: dict) -> list:
-    """Last-resort discovery: walk outward from the seed date, keeping days that
-    return at least one game. Bounded so it always terminates."""
-    seed = _date_key(seed_str)
+def _probe_range(event_id, seed_str, cache):
+    seed  = _date_key(seed_str)
     found = []
-    for direction, limit in ((1, 21), (-1, 14)):       # forward incl. seed, then back
+    for direction, limit in ((1, 21), (-1, 14)):
         d = seed if direction == 1 else seed - _dt.timedelta(days=1)
         for _ in range(limit):
             ds = f"{d.month}/{d.day}/{d.year}"
@@ -266,24 +233,19 @@ def _probe_range(event_id: str, seed_str: str, cache: dict) -> list:
                 break
     return [f"{d.month}/{d.day}/{d.year}" for d in sorted(set(found))]
 
-
-def build_feed(url: str, progress=None) -> pd.DataFrame:
-    """Fetch every day of the event in `url` and return the feed DataFrame."""
-    event_id = _event_id(url)
-    cache = {}
-
-    seed_str = _url_date(url)
-    seed_url = _day_url(event_id, seed_str) if seed_str else url
+def build_feed(url, progress=None):
+    event_id  = _event_id(url)
+    cache     = {}
+    seed_str  = _url_date(url)
+    seed_url  = _day_url(event_id, seed_str) if seed_str else url
     seed_html = _get_html(seed_url, cache)
-
     dates = _discover_dates(seed_html, url)
-    if len(dates) <= 1 and seed_str:                    # discovery came up thin
+    if len(dates) <= 1 and seed_str:
         probed = _probe_range(event_id, seed_str, cache)
         if len(probed) > len(dates):
             dates = probed
     if not dates and seed_str:
         dates = [seed_str]
-
     all_rows = []
     for n, ds in enumerate(dates):
         if progress is not None:
@@ -291,7 +253,6 @@ def build_feed(url: str, progress=None) -> pd.DataFrame:
         all_rows.extend(_parse_day(_get_html(_day_url(event_id, ds), cache), ds))
     if progress is not None:
         progress(1.0, "Done")
-
     df = pd.DataFrame(all_rows, columns=FEED_COLUMNS)
     if not df.empty:
         df = (df.drop_duplicates(subset=["Game#"])
@@ -300,299 +261,312 @@ def build_feed(url: str, progress=None) -> pd.DataFrame:
     return df
 
 
-SCRAPE_COLUMNS = ["Game#", "Date", "Time", "Location", "Division", "Team1", "Team2"]
+# ---------------------------------------------------------------------------
+# PDF -> Claude Vision extractor (FiveTool, PBR, Prospect Select, etc.)
+# ---------------------------------------------------------------------------
+_VISION_PROMPT = """\
+You are reading a printed tournament schedule PDF for a high school baseball event.
+Extract EVERY game listed. Return ONLY valid JSON, no explanation, no markdown fences.
+
+JSON structure:
+{
+  "event": "<tournament name>",
+  "games": [
+    {
+      "game_num":  "<game or pool number, e.g. G1, P3, or 1 — blank if not shown>",
+      "date":      "<day + date exactly as printed, e.g. Thursday, June 26>",
+      "time":      "<e.g. 8:00 AM>",
+      "location":  "<field or venue name>",
+      "team1":     "<first/home team name exactly as printed>",
+      "team2":     "<second/away team name exactly as printed>",
+      "division":  "<age division if shown, e.g. 17U — blank if not shown>"
+    }
+  ]
+}
+
+Rules:
+- Copy team names EXACTLY as printed. Do not abbreviate or expand.
+- If a team slot shows TBD, use "TBD".
+- Include ALL games: pool play, bracket play, seeding games, everything.
+- Return ONLY the JSON object. Start with { and end with }. No markdown.
+"""
 
 
-def _norm_scrape_date(s: str) -> str:
-    """Extension dates look like 'THURSDAY - JUNE 05, 2025' -> 'Thursday, 6/5'.
-    Falls back to other common forms, then to the raw string."""
+def _pdf_to_images_b64(pdf_bytes):
+    """Render each PDF page to base64 JPEG. Returns [] if no renderer available."""
+    try:
+        import pypdfium2 as pdfium
+        doc = pdfium.PdfDocument(pdf_bytes)
+        out = []
+        for i in range(len(doc)):
+            bmp = doc[i].render(scale=2.0)
+            buf = io.BytesIO()
+            bmp.to_pil().save(buf, format="JPEG", quality=90)
+            out.append(base64.b64encode(buf.getvalue()).decode())
+        return out
+    except Exception:
+        pass
+    try:
+        from pdf2image import convert_from_bytes
+        out = []
+        for img in convert_from_bytes(pdf_bytes, dpi=144):
+            buf = io.BytesIO()
+            img.save(buf, format="JPEG", quality=90)
+            out.append(base64.b64encode(buf.getvalue()).decode())
+        return out
+    except Exception:
+        pass
+    return []
+
+
+def _pdf_text_fallback(pdf_bytes):
+    try:
+        import pypdf
+        reader = pypdf.PdfReader(io.BytesIO(pdf_bytes))
+        return "\n".join(p.extract_text() or "" for p in reader.pages)
+    except Exception as e:
+        return f"[text extraction failed: {e}]"
+
+
+def _vision_extract(pdf_bytes, api_key):
+    """Send PDF pages to Claude Vision, return parsed schedule dict."""
+    import anthropic
+    client  = anthropic.Anthropic(api_key=api_key)
+    images  = _pdf_to_images_b64(pdf_bytes)
+    content = []
+
+    if images:
+        for i, b64 in enumerate(images):
+            if len(images) > 1:
+                content.append({"type": "text", "text": f"Page {i+1}:"})
+            content.append({
+                "type": "image",
+                "source": {"type": "base64", "media_type": "image/jpeg", "data": b64},
+            })
+    else:
+        # Text-layer fallback — still works for most print PDFs
+        text = _pdf_text_fallback(pdf_bytes)
+        content.append({"type": "text",
+                         "text": f"Schedule PDF text:\n\n{text}"})
+
+    content.append({"type": "text", "text": _VISION_PROMPT})
+
+    resp = client.messages.create(
+        model="claude-sonnet-4-6",
+        max_tokens=4096,
+        messages=[{"role": "user", "content": content}],
+    )
+    raw = resp.content[0].text.strip()
+    raw = re.sub(r"^```(?:json)?\s*", "", raw, flags=re.MULTILINE)
+    raw = re.sub(r"```\s*$",          "", raw, flags=re.MULTILINE).strip()
+    start, end = raw.find("{"), raw.rfind("}") + 1
+    if start == -1 or end == 0:
+        raise ValueError(f"No JSON in vision response:\n{raw[:400]}")
+    return json.loads(raw[start:end])
+
+
+def _norm_vision_date(s):
+    """'Thursday, June 26' or 'June 26, 2026' -> 'Thursday, 6/26'."""
     s = (s or "").strip()
-    m = re.search(r"([A-Za-z]{3,9})\s+(\d{1,2}),?\s+(\d{4})", s)   # 'JUNE 05, 2025'
+    if re.match(r"\w+,\s+\d{1,2}/\d{1,2}", s):
+        return s
+    m = re.search(r"([A-Za-z]{3,9})\s+(\d{1,2}),?\s*(\d{4})?", s)
     if m:
         mon = _MONTHS.get(m.group(1).lower()[:3])
         if mon:
+            yr = int(m.group(3)) if m.group(3) else _dt.date.today().year
             try:
-                return _fmt_date(f"{mon}/{int(m.group(2))}/{int(m.group(3))}")
+                return _fmt_date(f"{mon}/{int(m.group(2))}/{yr}")
             except ValueError:
                 pass
-    m = re.search(r"(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})", s)        # '6/5/2025'
-    if m:
-        yr = int(m.group(3))
-        yr += 2000 if yr < 100 else 0
-        try:
-            return _fmt_date(f"{int(m.group(1))}/{int(m.group(2))}/{yr}")
-        except ValueError:
-            pass
     return s
 
 
-def feed_from_scrape(text: str) -> pd.DataFrame:
-    """Reshape the extension's scraped schedule JSON (FiveTool / PBR / Prospect
-    Select) into the same Feed. Accepts the full {…, games:[…]} object or a bare
-    games list."""
-    data = json.loads(text)
-    games = data.get("games", []) if isinstance(data, dict) else data
-    if not isinstance(games, list):
-        raise ValueError("JSON has no 'games' list.")
-
+def _feed_from_vision(data):
+    """Turn vision JSON into the standard Feed DataFrame."""
     rows = []
-    for g in games:
-        if not isinstance(g, dict):
-            continue
-        gid = str(g.get("game", "")).strip().lstrip("#").strip()
-        if not gid:
+    for g in data.get("games", []):
+        gnum = str(g.get("game_num", "")).strip().lstrip("#").strip()
+        if not gnum:
             continue
         rows.append({
-            "Game#": gid,
-            "Date": _norm_scrape_date(str(g.get("date", ""))),
-            "Time": re.sub(r"\s+", " ", str(g.get("time", ""))).strip().upper(),
+            "Game#":    gnum,
+            "Date":     _norm_vision_date(str(g.get("date", ""))),
+            "Time":     str(g.get("time", "")).strip().upper(),
             "Location": str(g.get("location", "")).strip(),
             "Division": str(g.get("division", "")).strip(),
-            "Team1": str(g.get("team1", "")).strip(),
-            "Team2": str(g.get("team2", "")).strip(),
+            "Team1":    str(g.get("team1", "")).strip(),
+            "Team2":    str(g.get("team2", "")).strip(),
         })
-
-    df = pd.DataFrame(rows, columns=SCRAPE_COLUMNS)
-    # keep scraped (chronological) order; if game numbers are all integers, sort them
+    cols = ["Game#", "Date", "Time", "Location", "Division", "Team1", "Team2"]
+    df = pd.DataFrame(rows, columns=cols)
     if not df.empty and df["Game#"].str.fullmatch(r"\d+").all():
         df = (df.assign(_n=df["Game#"].astype(int))
-                .sort_values("_n").drop(columns="_n").reset_index(drop=True))
+                .sort_values("_n").drop(columns="_n")
+                .reset_index(drop=True))
     return df
-# --------------------------------------------------------------------------- #
-# FiveTool (Playbook365) — server-side fetch of the schedule_ajax API
-# --------------------------------------------------------------------------- #
-FT_AJAX = "https://events.fivetool.org/schedule_ajax"
-_FT_EVENTID_RES = [
-    re.compile(r'event_id["\']?\s*[:=]\s*["\']?(\d{2,})'),
-    re.compile(r'data-event-id=["\'](\d+)'),
-]
 
 
-def _ft_date(schedule_time: str) -> str:
-    """'2026-06-16 13:30:00' -> 'Tuesday, 6/16'."""
-    m = re.match(r"\s*(\d{4})-(\d{1,2})-(\d{1,2})", str(schedule_time))
-    if not m:
-        return ""
-    try:
-        return _fmt_date(f"{int(m.group(2))}/{int(m.group(3))}/{int(m.group(1))}")
-    except ValueError:
-        return ""
-
-
-def _looks_blocked(text: str, status: int) -> bool:
-    t = (text or "")[:4000].lower()
-    return (status in (403, 429, 503)
-            or "just a moment" in t
-            or "/cdn-cgi/challenge" in t
-            or "cf-chl" in t
-            or "attention required" in t)
-
-
-def _ft_event_id(html: str):
-    for rx in _FT_EVENTID_RES:
-        m = rx.search(html)
-        if m:
-            return m.group(1)
-    return None
-
-
-def _collect_games(node, out):
-    """Recursively gather every dict that looks like a game, regardless of how
-    the response nests them (by date / division / location)."""
-    if isinstance(node, dict):
-        if "game_number" in node and ("schedule_time" in node or "team_name_1" in node):
-            out.append(node)
-        else:
-            for v in node.values():
-                _collect_games(v, out)
-    elif isinstance(node, list):
-        for v in node:
-            _collect_games(v, out)
-
-
-def build_feed_fivetool(url: str, event_id: str = None) -> pd.DataFrame:
-    """Server-side pull of a FiveTool event schedule via its schedule_ajax API.
-    Bootstraps a session (cookies + CSRF), resolves the numeric event_id from the
-    page, then POSTs for the schedules."""
-    sess = requests.Session()
-    sess.headers.update(_HEADERS)
-
-    page = sess.get(url, timeout=25)
-    if _looks_blocked(page.text, page.status_code):
-        raise RuntimeError(
-            "FiveTool blocked the server-side request (Cloudflare). Use the "
-            "scraped-JSON option — the extension runs in your browser, which "
-            "clears Cloudflare automatically.")
-
-    eid = event_id or _ft_event_id(page.text)
-    if not eid:
-        raise RuntimeError(
-            "Couldn't find the event_id on the page. Use the scraped-JSON option.")
-
-    headers = {
-        "Accept": "application/json, text/plain, */*",
-        "Content-Type": "application/json;charset=UTF-8",
-        "Origin": "https://events.fivetool.org",
-        "Referer": url,
-        "X-Requested-With": "XMLHttpRequest",
-    }
-    xsrf = sess.cookies.get("XSRF-TOKEN")
-    if xsrf:
-        headers["X-XSRF-TOKEN"] = unquote(xsrf)
-
-    payload = {"event_id": str(eid), "event_price_id": "0",
-               "event_registration_item_id": "0", "schedule_id": 0,
-               "data_type": "schedules"}
-    r = sess.post(FT_AJAX, json=payload, headers=headers, timeout=25)
-    if r.status_code != 200 or _looks_blocked(r.text, r.status_code):
-        raise RuntimeError(
-            f"schedule_ajax returned {r.status_code} (likely Cloudflare or an "
-            "expired session). Use the scraped-JSON option for FiveTool.")
-    try:
-        data = r.json()
-    except ValueError:
-        raise RuntimeError("schedule_ajax didn't return JSON. Use the scraped-JSON option.")
-
-    games = []
-    _collect_games(data, games)
-    rows = []
-    for g in games:
-        gid = str(g.get("game_number", "")).strip()
-        if not gid:
-            continue
-        loc = str(g.get("field_name") or g.get("location") or "").strip()
-        loc = re.sub(r"\s*-\s*$", "", loc)            # FiveTool appends a stray ' -'
-        rows.append({
-            "Game#": gid,
-            "Date": _ft_date(g.get("schedule_time", "")),
-            "Time": str(g.get("start_time") or g.get("time") or "").strip().upper(),
-            "Location": loc,
-            "Division": str(g.get("division", "")).strip(),
-            "Team1": str(g.get("team_name_1", "")).strip(),
-            "Team2": str(g.get("team_name_2", "")).strip(),
-            "GameID": str(g.get("schedule_game_id", "")).strip(),
-            "_st": str(g.get("schedule_time", "")),
-        })
-    df = pd.DataFrame(rows, columns=SCRAPE_COLUMNS + ["GameID", "_st"])
-    if not df.empty:
-        df = df.sort_values("_st").reset_index(drop=True)
-    return df.drop(columns="_st", errors="ignore")
-
-
-def _show_feed(df, *, empty_msg: str, collision_check: bool = False):
-    """Render results identically for both sources: summary, copy box, download."""
+# ---------------------------------------------------------------------------
+# Shared output renderer
+# ---------------------------------------------------------------------------
+def _show_feed(df, source_label="", collision_check=False):
     if df is None or df.empty:
-        st.error(empty_msg)
+        st.error("No games found. Make sure the PDF has the full schedule printed.")
         return
 
-    days = list(dict.fromkeys(df["Date"].tolist()))
+    days    = list(dict.fromkeys(df["Date"].tolist()))
     numeric = df["Game#"].astype(str).str.fullmatch(r"\d+").all()
-    head = f"{len(df)} games across {len(days)} day(s)"
+    head    = f"{len(df)} games across {len(days)} day(s)"
     if numeric:
         nums = df["Game#"].astype(int)
-        head += f"  ·  Game # {nums.min()}–{nums.max()}"
+        head += f"  |  Game #{nums.min()}-{nums.max()}"
     st.success(head)
-    st.caption("Days covered: " + "  ·  ".join(d for d in days if d))
+    if source_label:
+        st.caption(f"Source: {source_label}")
+    st.caption("Days: " + "  |  ".join(d for d in days if d))
 
     if collision_check:
-        ser = df["Game#"].astype(str)
+        ser  = df["Game#"].astype(str)
         dups = ser[ser.duplicated(keep=False)]
         if not dups.empty:
             ex = ", ".join(sorted(set(dups))[:6])
             st.warning(
-                f"Some game numbers repeat across the event ({ex} …). On this "
-                "platform the game number may not be unique event-wide, so the sheet "
-                "may need a Date+Game# key. Tell me and I'll wire that variant.")
+                f"Some game numbers repeat ({ex} ...). The sheet may need a "
+                "Date+Game# key. Let me know and I'll wire that variant.")
 
     st.dataframe(df, use_container_width=True, hide_index=True)
 
     core = df[["Game#", "Date", "Time", "Location"]]
     st.markdown("**Copy into the Feed tab**")
-    st.caption("Tap the copy icon (top-right of the box), then paste into cell "
-               "**A1** of the `Feed` tab — it overwrites the four columns and the "
-               "main schedule updates itself.")
+    st.caption(
+        "Tap the copy icon (top-right), then paste into cell **A1** of the "
+        "`Feed` tab — overwrites the four columns and the schedule updates.")
     st.code(core.to_csv(index=False, sep="\t"), language=None)
-    st.download_button("⬇️  Or download feed.csv",
+    st.download_button("Download feed.csv",
                        data=df.to_csv(index=False).encode("utf-8"),
                        file_name="feed.csv", mime="text/csv",
                        use_container_width=True)
-    st.info("First time wiring up the sheet? See **First-time setup** at the top.")
 
 
+# ---------------------------------------------------------------------------
+# API key helper
+# ---------------------------------------------------------------------------
+def _get_api_key():
+    try:
+        return st.secrets["ANTHROPIC_API_KEY"]
+    except Exception:
+        import os
+        return os.environ.get("ANTHROPIC_API_KEY")
+
+
+# ---------------------------------------------------------------------------
+# Main render — called by app.py as schedule_refresh.render()
+# ---------------------------------------------------------------------------
 def render():
     st.subheader("Schedule Refresh")
     st.caption(
-        "Build the **Feed** for the schedule sheet. Paste a **Perfect Game** or "
-        "**FiveTool** event link and it pulls the whole event. For PBR / Prospect "
-        "Select (or FiveTool if Cloudflare blocks the server), scrape with the "
-        "extension and paste the JSON. Same Game# / Date / Time / Location feed either "
-        "way — copy columns A–D into the **Feed** tab."
+        "Paste any tournament link. Perfect Game pulls automatically. "
+        "For FiveTool, PBR, and Prospect Select you'll save a quick print PDF "
+        "and upload it here."
     )
 
     if not _HAVE_BS4:
-        st.warning("`beautifulsoup4` isn't installed — add it to requirements.txt "
-                   "for reliable parsing.")
+        st.warning("`beautifulsoup4` not installed — add it to requirements.txt.")
 
-    with st.expander("First-time setup — connect this to the schedule sheet"):
+    # Step 1: URL input — always visible
+    url  = st.text_input(
+        "Tournament schedule URL",
+        placeholder="Paste any schedule link — PG, FiveTool, PBR, Prospect Select ...",
+        key="sr_url",
+    )
+    site = _detect_site(url.strip()) if url.strip() else None
+
+    # ── Perfect Game: one button, done ─────────────────────────────────────
+    if site == "pg":
+        if st.button("Build schedule feed", type="primary",
+                     use_container_width=True, key="sr_pg_btn"):
+            try:
+                bar = st.progress(0.0, text="Working...")
+                df  = build_feed(url.strip(),
+                                 progress=lambda p, t: bar.progress(p, text=t))
+                bar.empty()
+            except Exception as e:
+                st.error(f"Could not build the feed: {e}")
+                st.stop()
+            _show_feed(df, source_label="Perfect Game (direct)")
+
+    # ── FiveTool / PBR / Prospect Select / other: print-to-PDF flow ────────
+    elif site is not None:
+        label = _site_label(site)
+        st.info(
+            f"**{label}** blocks direct scraping — but the print PDF works great.\n\n"
+            "**5 taps on iPhone:**\n"
+            "1. Tap **Open schedule page** below\n"
+            "2. Share button → **Print**\n"
+            "3. Pinch-zoom out on the preview to get the PDF view\n"
+            "4. Share button again → **Save to Files**\n"
+            "5. Come back here and upload it below"
+        )
+        st.link_button(f"Open {label} schedule page",
+                       url.strip(), use_container_width=True)
+
+        st.divider()
+
+        pdf_file = st.file_uploader(
+            "Upload the saved schedule PDF",
+            type=["pdf"],
+            key="sr_pdf",
+        )
+
+        if pdf_file:
+            if st.button("Extract schedule", type="primary",
+                         use_container_width=True, key="sr_pdf_btn"):
+                api_key = _get_api_key()
+                if not api_key:
+                    st.error("Anthropic API key missing — set `ANTHROPIC_API_KEY` "
+                             "in Streamlit secrets.")
+                    st.stop()
+                with st.spinner(f"Reading {label} schedule..."):
+                    try:
+                        data = _vision_extract(pdf_file.read(), api_key)
+                        df   = _feed_from_vision(data)
+                    except Exception as e:
+                        st.error(f"Extraction failed: {e}")
+                        st.stop()
+                _show_feed(df,
+                           source_label=f"{label} (PDF)",
+                           collision_check=(site == "fivetool"))
+
+    # ── No URL yet: show the simple routing table ───────────────────────────
+    else:
+        st.markdown(
+            "| Site | How |\n"
+            "|---|---|\n"
+            "| Perfect Game | Paste URL → pulls automatically |\n"
+            "| FiveTool | Paste URL → print to PDF → upload |\n"
+            "| PBR | Paste URL → print to PDF → upload |\n"
+            "| Prospect Select | Paste URL → print to PDF → upload |"
+        )
+
+    # ── First-time setup (collapsed) ────────────────────────────────────────
+    with st.expander("First-time setup — connect to the schedule sheet"):
         st.markdown(
             "**1.** In the schedule sheet, add a tab named **`Feed`** with row-1 "
             "headers: `Game#`  `Date`  `Time`  `Location`.\n\n"
-            "**2.** Every refresh, paste columns **A–D** (below) into that `Feed` tab, "
+            "**2.** Every refresh, paste columns **A-D** (above) into that `Feed` tab, "
             "overwriting what's there.\n\n"
-            "**3.** *One time only* — on the main schedule tab, drop these into row 2 "
-            "and fill down. They pull Date / Time / Location live off the game number:"
+            "**3.** One time only — on the main schedule tab, drop these into row 2 "
+            "and fill down:"
         )
         st.code(
-            '=IFERROR(XLOOKUP($A2, Feed!$A:$A, Feed!$B:$B), "")    →  Date  (column B)\n'
-            '=IFERROR(XLOOKUP($A2, Feed!$A:$A, Feed!$C:$C), "")    →  Time  (column C)\n'
-            '=IFERROR(XLOOKUP($A2, Feed!$A:$A, Feed!$D:$D), "")    →  Location (column D)',
+            '=IFERROR(XLOOKUP($A2, Feed!$A:$A, Feed!$B:$B), "")    ->  Date\n'
+            '=IFERROR(XLOOKUP($A2, Feed!$A:$A, Feed!$C:$C), "")    ->  Time\n'
+            '=IFERROR(XLOOKUP($A2, Feed!$A:$A, Feed!$D:$D), "")    ->  Location',
             language="text",
         )
-        st.caption("A row that goes blank later = PG moved or cancelled that game — a built-in flag.")
-
-    src = st.radio(
-        "Source",
-        ["Paste event link (Perfect Game / FiveTool)",
-         "Paste scraped JSON (PBR / Prospect Select / FiveTool fallback)"],
-    )
-
-    if src.startswith("Paste event link"):
-        url = st.text_input(
-            "Event schedule URL",
-            placeholder="Perfect Game …/TournamentSchedule.aspx?…   or   "
-                        "events.fivetool.org/events/…/schedule/all",
-        )
-        if st.button("Build schedule feed", type="primary", disabled=not url):
-            u = url.strip()
-            is_ft = "fivetool.org" in u.lower()
-            try:
-                if is_ft:
-                    with st.spinner("Pulling FiveTool schedule …"):
-                        df = build_feed_fivetool(u)
-                else:
-                    bar = st.progress(0.0, text="Working …")
-                    df = build_feed(u, progress=lambda p, t: bar.progress(p, text=t))
-                    bar.empty()
-            except Exception as e:  # noqa: BLE001
-                st.error(f"Could not build the feed: {e}")
-                return
-            _show_feed(df, empty_msg="No games parsed. Send Claude this URL and "
-                       "we'll adjust.", collision_check=is_ft)
-    else:
-        st.caption("In the extension's **Schedule** tab, scrape the event, hit "
-                   "**Copy to Clipboard**, then paste here.")
-        raw = st.text_area("Scraped schedule JSON", height=160,
-                           placeholder='{ "event": "...", "games": [ ... ] }')
-        if st.button("Build schedule feed", type="primary", disabled=not raw.strip()):
-            try:
-                df = feed_from_scrape(raw.strip())
-            except Exception as e:  # noqa: BLE001
-                st.error(f"Couldn't read that JSON: {e}")
-                return
-            _show_feed(df, empty_msg="No games found in that JSON.",
-                       collision_check=True)
+        st.caption("A row that goes blank = game was moved or cancelled.")
 
 
-# Allows: `streamlit run schedule_refresh.py` for a quick standalone test.
 if __name__ == "__main__":
     render()
