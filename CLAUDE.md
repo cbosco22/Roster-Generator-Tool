@@ -1,0 +1,362 @@
+# CLAUDE.md — Roster-Generator-Tool
+> Drop this file at the root of cbosco22/Roster-Generator-Tool. Claude Code reads it automatically at session start.
+
+## What This App Is
+Navy Baseball recruiting operations toolkit. A Streamlit app that generates roster PDFs,
+schedule CSVs, and supports post-event processing for high school baseball recruiting events.
+Used by coaches AP, CB, TR, CR, AM on iPads (GoodNotes) and iPhones.
+
+---
+
+## Repo & Deploy Info
+- **GitHub:** cbosco22/Roster-Generator-Tool
+- **Deploy:** Streamlit Cloud — push to `main` → reboot Streamlit app → hard refresh browser
+- **Python path:** Scripts expect `/home/claude/` in sys.path (for pbr_rankings.pkl etc.)
+- **PBR rankings pickle:** `pbr_rankings.pkl` at `/home/claude/` and `data/` — 799 national + ~12,341 state rankings, classes 2027-2028, May 2026 vintage
+
+---
+
+## App Tabs (Current)
+1. **Field Tool** — at-event use, live tagging interface
+2. **Tournament Builder** — pre-event PDF generation
+3. **Post-Event** — processes annotated GoodNotes JPGs into DB updates
+4. **Admin** — config and maintenance
+5. ~~**Importer**~~ — **REMOVE THIS TAB. It is unused and useless.**
+
+---
+
+## Key Files
+| File | Purpose |
+|------|---------|
+| `gen_roster_pdf.py` | PDF generator — LOCKED FORMAT |
+| `db_loader.py` | Parses recruiting xlsx — LOCKED column map |
+| `fetch_db.py` | Builds DB from raw sheet text |
+| `org_tier.py` | Looks up travel program tier from team name |
+| `travel_programs.json` | Program tier definitions (Tier 1–4) |
+| `build_rankings.py` | Builds pbr_rankings.pkl from JSON files |
+| `gen_schedule_csv.py` | Generates schedule CSV from event JSON |
+| `run_event.py` | Single entry point for full event prep workflow |
+
+---
+
+## Google Drive Resources
+- **Main folder:** `1ChVwd0-0NIS6GCDWXkVA6Az91Cg6stfl`
+- **Scripts folder:** `1qMDLz_8cAho3jU4JPim1gla1Tmmh1GmQ`
+- **2026 Event Work folder:** `1aHhnwXtIeQaZxzcOQ1C82vIRA9_XGadH`
+- **Schedule template sheet:** `1yR5e6ldN-32AnVYulcJNKOYumnBTEGsOth2nIgZfEF4`
+- **Recruiting Google Sheet:** `1ecpbBbWaVaSlmz4qmHUWJw9Esj6P0x5R4y81QQYhMzE`
+  - NOT owned by Chris's org — no direct API write access yet
+  - Chris is duplicating to a sheet he owns — board write-back will be enabled then
+
+---
+
+## LOCKED: PDF Format (DO NOT CHANGE WITHOUT EXPLICIT INSTRUCTION)
+
+### Page Layout
+- Portrait, letter size
+- Margins: 0.30" L/R, 0.50" top, 0.30" bottom
+- Running header: "NAVY BASEBALL RECRUITING" left | event name center | "Page N" right
+- Header underline at 0.36" from top
+
+### Roster Table — 13 Columns (LOCKED)
+```
+Index:  0    1      2     3    4   5   6      7       8      9      10        11      12
+Col:    #  First  Last   Pos  Ht  Wt  Class  School  Cur★  New★  PBR Rank  Commit  NOTES
+```
+
+### Column Widths (LOCKED)
+| Column | Width | Notes |
+|--------|-------|-------|
+| NOTES (idx 12) | 2.50" | FIXED — never changes |
+| Commit (idx 11) | 0.70" | |
+| PBR Rank (idx 10) | 0.48" | |
+| St / state | 0.30" | 2-letter abbreviation |
+| School (idx 7) | remainder | whatever's left after all fixed cols |
+
+### Fonts (LOCKED)
+| Element | Font | Size | Color |
+|---------|------|------|-------|
+| Header row | Helvetica-Bold | 6.5pt | White on `#1A1A1A` |
+| Jersey # | Helvetica-Bold | 7.5pt | |
+| First + Last name | Helvetica-Bold | 8.5pt | centered |
+| Stats / School / St | Helvetica | 6pt | centered |
+| Cur★ | Helvetica-Bold | 7pt | |
+| NOTES label | Helvetica | 5.5pt | `#BBBBBB`, top-left, 3pt top, 4pt left |
+
+### Row Heights (LOCKED)
+- Data row: 0.46"
+- Header row: 0.26"
+- Alternating row colors: `#F2F2F2` / white
+
+### Cell Styling (LOCKED)
+- Cur★ cell (idx 8): yellow `#FFF176` background for players found in DB
+- Heavy border (0.7pt) after Last (idx 2) and before NOTES (after idx 11)
+- Internal borders: 0.4pt `#CCCCCC`
+- Box border: 0.7pt
+
+### NOTES Cell Label Format (LOCKED)
+```
+#[jersey] First Last
+```
+In 5.5pt `#BBBBBB`, top-left corner, 3pt from top, 4pt from left.
+
+---
+
+## LOCKED: PBR Rank Column Format
+Line 1: `#N ST` (state rank + 2-letter state abbreviation)
+Line 2: `#N Nat'l` (if nationally ranked)
+Line 3: `#N PG` (if `pg_rank` field is purely numeric)
+Blank if completely unranked.
+
+Cross-validate: grad year + state must match PBR data to prevent false matches (John Smith problem).
+New England states (MA/CT/RI/NH/VT/ME) are treated as equivalent region.
+National rankings with "- select state -" pass the state check.
+
+---
+
+## LOCKED: Commit Priority
+PG roster packet → DB (recruiting sheet) → PBR rankings
+Never show a commit value of "None" or blank string — show empty.
+
+---
+
+## LOCKED: Cover Page
+- Title ALL CAPS, 28pt
+- Event dates below title
+- Teams listed alphabetically within age group / division
+- RIGHT side: colored dots showing Navy targets per team (C→1→2→3→4)
+- LEFT side: team name + "— Tier N" (org tier, 7.5pt `#AAAAAA`) + PBR count
+- Legend at bottom: Committed / Offer / High Follow / Follow / Rec
+- NEVER remove or replace the dots
+- Cover auto-expands to multiple pages if needed; legend always on last cover page
+
+### Cover Dot Colors (LOCKED)
+| Tier | Label | Dot Color | Text Color |
+|------|-------|-----------|------------|
+| 0.1 | C | `#1A3A6B` | white |
+| 1 | 1 | `#2E7D32` | white |
+| 2 | 2 | `#F9A825` | dark |
+| 3 | 3 | purple | white |
+| 4 | 4 | `#90CAF9` | navy |
+| XX | — | never shown | — |
+
+---
+
+## LOCKED: Player Rating Tiers (CRITICAL)
+Tier 3 (Follow) is NOW equal in importance to ALL other tiers.
+- Counted in schedule CSV
+- Shown on cover page
+- Only XX (off list) is filtered out
+This supersedes any old rule that said "Tier 3 filtered" or "Tier 3 never shown."
+
+### Tier Labels (Jun 2026 update)
+| Tier | Label |
+|------|-------|
+| 0.1 | Committed |
+| 1 | Offer |
+| 2 | High Follow |
+| 3 | Follow |
+| 4 | Rec (Recruiting Board) |
+| XX | Off List (filtered) |
+
+---
+
+## LOCKED: Schedule CSV Format
+Built by `gen_schedule_csv.py`.
+Columns: `Game#, Date, Time, Location, Attend, Division, Team1, Team1★, Team1 Navy Players, Team2, Team2★, Team2 Navy Players, Total★`
+
+- `_COUNTED_TIERS = {'0.1','1','2','3','4'}` — tier 3 included, only XX filtered
+- Team★ = count of Navy-listed players on that team
+- Navy Players cell format: `"Name (Tier) 'YY POS STATE"` joined by `"; "`
+- Tier 0.1 displayed as `C` in this cell
+- Upload to Drive as `text/csv`
+
+---
+
+## LOCKED: DB Loader — xlsx Column Map
+File: `db_loader.py`, function: `parse_xlsx(path)`
+Sheet: "High School Players" tab only
+Skip first 3 header rows.
+
+```
+xlsx col index → field
+[7]  → First name
+[8]  → Last name
+[9]  → Class (grad year)
+[10] → Tier / ★
+[11] → Commit
+[12] → Pos
+```
+
+Float suffixes stripped (e.g., `2027.0` → `2027`), EXCEPT `0.1` is preserved exactly.
+ALWAYS use `parse_xlsx()` on the uploaded file — NEVER use Drive text connector (truncates large sheets).
+
+---
+
+## LOCKED: Name Matching Logic
+1. `strip_suffix()` — removes Jr., III, etc.
+2. Nickname table — 45+ pairs (e.g., jake↔jacob, zach↔zachary)
+3. `_fuzzy_lookup()` — exact last name required, first name SequenceMatcher ≥ 0.82
+4. `_pbr_match()` — cross-validates grad year + state to prevent false PBR rank matches
+Do NOT weaken the 0.82 fuzzy threshold. Do NOT skip the state/grad year cross-check.
+
+---
+
+## LOCKED: run_event.py CLI
+Single entry point for full event prep:
+```bash
+python run_event.py \
+  --xlsx path/to/recruiting.xlsx \
+  --roster path/to/roster.json \
+  [--schedule path/to/schedule.json] \
+  [--pbr json1 json2 ...] \
+  [--event "Event Name"] \
+  [--division "17U/18U"] \
+  [--outdir output/]
+```
+Builds pkl if missing, loads DB, patches event name, stamps divisions, writes PDF + CSV.
+
+---
+
+## LOCKED: Post-Event Flow
+Input: Annotated GoodNotes JPGs (coaches annotate printed PDFs with star ratings)
+Output: Two files
+1. **UPDATES** — 4-col TSV: `Name, Team, Cur★, New★` — name-keyed for XLOOKUP in recruiting sheet
+2. **NEW players** — 22-col CSV for blank-Cur★ rows (players not in DB); never DB-searched
+
+Rules:
+- Split by Cur★ presence
+- No New★ written = row skipped
+- Pos field: splits on "/" into Pos + POS2
+- NEW players: never run through DB lookup
+
+---
+
+## LOCKED: Division Detection
+`parse_divisions_pdf()` — extracts from age-groups PDF (Teams tab screenshots)
+`_stamp_divisions_from_resets()` — detects alphabetical resets, maps groups 1:1 to division name list
+Plain-list JSONs auto-wrapped as `{"teams":[...]}`
+
+---
+
+## LOCKED: JSON Schema (Chrome Extension Output)
+```json
+{
+  "event": "Event Name",
+  "dates": "July 7-12, 2026",
+  "source": "pg | fivetool | eventbeacon | prospectselect",
+  "scrapedAt": "ISO timestamp",
+  "schedule_team_divs": { "Team Name": "17U" },
+  "teams": [
+    {
+      "name": "Team Name",
+      "players": [
+        {
+          "jersey": "12",
+          "name": "First Last",
+          "pos": "RHP",
+          "grad": "2027",
+          "hs": "School Name",
+          "state": "GA",
+          "commit": "Vanderbilt",
+          "ht": "6-2",
+          "wt": "185",
+          "pg_rank": "142",
+          "academic": ""
+        }
+      ]
+    }
+  ],
+  "schedule": [
+    {
+      "game": "1",
+      "date": "7/7/2026",
+      "time": "9:00 AM",
+      "location": "Field 1",
+      "division": "17U",
+      "team1": "Team Name",
+      "team2": "Team Name",
+      "score": ""
+    }
+  ]
+}
+```
+
+**CRITICAL:** Team name byte-identity between roster and schedule JSON is required for Navy player count joins. Pool-prefix team names must match exactly.
+
+---
+
+## Org Tier System
+`org_tier.py` + `travel_programs.json`
+- Cover page: "— Tier N" shown after team name (7.5pt `#AAAAAA`)
+- Roster page: "Tier N" small gray label below team name
+- No label if team not in programs list — that's acceptable, not a bug
+
+---
+
+## Chrome Extension (LOCKED — v2.9.7)
+**NEVER modify without a DevTools screenshot from Chris first.**
+- PBR/FT/PS scrapers unchanged from v2.9.2
+- PG roster: header-driven column mapping
+- v2.9.7 fixes: jersey# glitch (numeric only), PG commit scraping
+- Locked at v2.9.7 — no changes without explicit instruction + screenshot
+
+---
+
+## PBR Rankings
+- File: `pbr_rankings.pkl` at `/home/claude/` and `data/`
+- Current data: 799 national + ~12,341 state rankings, classes 2027–2028, May 2026 vintage
+- To rebuild: Chris drops new JSON files → run `build_rankings.py` → new pkl
+- Mid-summer 2026 rebuild planned from new JSON files
+
+---
+
+## Backlog (Prioritized)
+Build these in order:
+
+### IN PROGRESS / NEXT
+1. **PBR player profile crawler** (`pbr_crawler.js` — Node.js, same-origin fetch, ~2s throttle)
+   - Broad shallow scrape for Tier 1/Tier 2 enrichment
+   - Event-triggered: runs night before each event, ~30–45 min unattended
+   - Player DB stored as `players.parquet` with `profile_path` join key
+   - "DB Builder" Streamlit tab to ingest crawler JSON with field provenance
+
+2. **PDF visual redesign** — Chris has a sketch of the new layout
+   - Will incorporate richer scraped data (velocity, stats, etc.)
+   - Wait for sketch before building
+
+3. **Roster preview + column presets**
+   - In-app table preview before PDF generation
+   - User-selectable columns with width/font controls
+   - Saved as presets per event type
+   - Incremental Streamlit feature
+
+### QUEUED
+4. **Remove Importer tab** — it's unused, delete it
+5. **Copy recruiting sheet** Chris owns → post-event becomes automatic (no manual xlsx drop)
+6. **Player add from Twitter/X** — housed directly in app
+7. **Recruiting Tools page redesign** — retitle to match Event Day app naming convention
+8. **Google Sheet write-back** — gated on Chris owning a writable sheet copy
+9. **Extension download + scrape-instructions page** — inside the existing app
+10. **Capabilities one-pager PDF** — for sharing with other programs
+
+---
+
+## Important Engineering Rules
+- **No guessing.** Flag anomalies; don't fabricate field names or infer structure without source confirmation.
+- **Surgical edits only.** Only modify files/functions directly involved in the current fix.
+- **Backward compatibility required.** Don't break existing workflows.
+- **Large file writes:** Use chunked `cat >> file << 'EOF'` bash heredoc appends (~400–500 lines per chunk) with line count verification after each chunk. `create_file` with large payloads silently truncates.
+- **Drive text connector truncates** large sheets. Always use `parse_xlsx()` on uploaded file directly via openpyxl.
+- **PBR "Printable Roster" exports** sometimes scramble Twitter/Instagram/Academic columns. Use "Contact Information" export as authoritative source for those fields.
+- **PG event name** often scrapes as "Event" — patch from filename automatically.
+
+---
+
+## Libraries In Use
+- **ReportLab** — PDF generation (direct `canvas` for cover, Platypus `BaseDocTemplate` for roster tables)
+- **pypdf** — PDF merging, outline/bookmark writing
+- **openpyxl** — xlsx parsing
+- **pdfplumber** — coordinate-based extraction for scrambled column PDFs
+- **matplotlib** — map rendering (Agg backend, manual coordinate plotting)
+- **Anthropic Claude API** — vision extraction for Field Tool / Post-Event; PDF Importer tab
