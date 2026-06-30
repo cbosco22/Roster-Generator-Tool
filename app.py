@@ -46,6 +46,11 @@ from post_event_flow import (
 )
 import run_event
 import schedule_refresh
+try:
+    from push_event import push_event as _push_event
+    _HAVE_PUSH = True
+except ImportError:
+    _HAVE_PUSH = False
 
 
 # ---------------------- helpers ----------------------
@@ -522,7 +527,9 @@ with tab_tourney:
     with c1:
         tb_event = st.text_input("Event name (optional)",
                                  placeholder="e.g. National Program Invitational (NPI)",
-                                 key="tb_event")
+                                 key="tb_event",
+                                 help="Used to push the schedule to the Event Day app. "
+                                      "Use the same name every time to update in place.")
     with c2:
         tb_division = st.text_input("Division label (single-division events)",
                                     value="17U/18U", key="tb_division",
@@ -588,6 +595,22 @@ with tab_tourney:
                 st.session_state["tb_csvname"] = (os.path.basename(csv_path)
                                                   if csv_path else None)
                 tstatus.update(label="Done", state="complete")
+                # Auto-push schedule to Event Day app
+                if _HAVE_PUSH and (tb_event or "").strip() and st.session_state.get("tb_csv"):
+                    try:
+                        _r = _push_event(
+                            (tb_event or "").strip(),
+                            st.session_state["tb_csv"],
+                        )
+                        st.session_state["tb_push_status"] = (
+                            "✅ Pushed to Event Day",
+                            f"**{_r['name']}** — {_r['action']} live for all coaches.",
+                        )
+                    except Exception as _pe:
+                        st.session_state["tb_push_status"] = (
+                            "⚠️ Event Day push failed",
+                            str(_pe),
+                        )
             except Exception as e:
                 tstatus.update(label="Error", state="error")
                 st.exception(e)
@@ -615,6 +638,15 @@ with tab_tourney:
             st.download_button("⬇️  Schedule (CSV)", data=csv_text,
                                file_name=st.session_state["tb_csvname"],
                                mime="text/csv", use_container_width=True)
+            if st.session_state.get("tb_push_status"):
+                icon, msg = st.session_state["tb_push_status"]
+                if icon.startswith("✅"):
+                    st.success(f"{icon} — {msg}")
+                else:
+                    st.warning(f"{icon} — {msg}")
+            elif _HAVE_PUSH and not (st.session_state.get("tb_event") or "").strip():
+                st.caption("💡 Add an event name above to auto-push this schedule "
+                           "to the Event Day app.")
 
 
 # ---- Schedule Refresh ----

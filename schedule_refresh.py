@@ -26,6 +26,12 @@ import pandas as pd
 import streamlit as st
 
 try:
+    from push_event import push_schedule_update as _push_update
+    _HAVE_PUSH = True
+except ImportError:
+    _HAVE_PUSH = False
+
+try:
     from bs4 import BeautifulSoup
     _HAVE_BS4 = True
 except ImportError:
@@ -447,6 +453,49 @@ def _feed_from_vision(data):
 
 
 # ---------------------------------------------------------------------------
+# Event Day push helper
+# ---------------------------------------------------------------------------
+def _push_section(df, event_name):
+    """Show a push-to-Event-Day button beneath a schedule feed."""
+    if not _HAVE_PUSH:
+        return
+    if not event_name or not event_name.strip():
+        st.caption("💡 Enter the event name above to push this schedule "
+                   "live to the Event Day app.")
+        return
+
+    if st.button("📲 Push to Event Day", type="primary",
+                 use_container_width=True, key="sr_push_btn"):
+        games = []
+        for _, row in df.iterrows():
+            games.append({
+                "game":     str(row.get("Game#", "")),
+                "date":     str(row.get("Date", "")),
+                "time":     str(row.get("Time", "")),
+                "location": str(row.get("Location", "")),
+                "division": str(row.get("Division", "")) if "Division" in df.columns else "",
+                "team1":    str(row.get("Team1", "")),
+                "team2":    str(row.get("Team2", "")),
+            })
+        try:
+            result = _push_update(event_name.strip(), {"games": games})
+            unmatched = result.get("unmatched_teams", [])
+            st.success(
+                f"✅ Schedule updated live — **{result['name']}** "
+                f"({len(games)} games pushed)."
+            )
+            if unmatched:
+                st.warning(
+                    f"⚠️ {len(unmatched)} team(s) not found in the existing event "
+                    f"(blank Navy data until next full build): "
+                    + ", ".join(unmatched[:8])
+                    + (" …" if len(unmatched) > 8 else "")
+                )
+        except Exception as e:
+            st.error(f"Push failed: {e}")
+
+
+# ---------------------------------------------------------------------------
 # Shared output renderer
 # ---------------------------------------------------------------------------
 def _show_feed(df, source_label="", collision_check=False):
@@ -521,6 +570,14 @@ def render():
     )
     site = _detect_site(url.strip()) if url.strip() else None
 
+    sr_event_name = st.text_input(
+        "Event Day app name",
+        placeholder="e.g. PBR 16U Nat'l Champ 2026 — must match the name used in Tournament Builder",
+        key="sr_event_name",
+        help="The schedule will push live to the Event Day app under this name. "
+             "Use the same name as the full tournament build to update in place.",
+    )
+
     # ── Perfect Game: one button, done ─────────────────────────────────────
     if site == "pg":
         if st.button("Build schedule feed", type="primary",
@@ -534,6 +591,7 @@ def render():
                 st.error(f"Could not build the feed: {e}")
                 st.stop()
             _show_feed(df, source_label="Perfect Game (direct)")
+            _push_section(df, sr_event_name)
 
     # ── FiveTool / PBR / Prospect Select / other: print-to-PDF flow ────────
     elif site is not None:
@@ -576,6 +634,7 @@ def render():
                 _show_feed(df,
                            source_label=f"{label} (PDF)",
                            collision_check=(site == "fivetool"))
+                _push_section(df, sr_event_name)
 
     # ── No URL yet: show the simple routing table ───────────────────────────
     else:
