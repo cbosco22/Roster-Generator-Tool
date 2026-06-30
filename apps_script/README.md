@@ -32,6 +32,19 @@ Apps Script lives inside the Google Sheet itself).
 
 That's it — no GCP project, no service account, no OAuth consent screen.
 
+## One-time fix: extend the Filter range
+
+The High School Players tab's native Filter is currently hardcoded to
+`$A$3:$AK$1980` — confirmed 2026-06-30 that this already excludes the very
+last real player row (1981), and every future appended row makes it worse.
+This is exactly why rows added via AppSheet "fall out of the filter."
+
+Before relying on the new write path: open High School Players → click the
+filter icon → **Data → Filters → adjust range** → extend it generously past
+current data (e.g. to row 5000) so new rows land inside it automatically.
+This is a one-time manual fix, not something Code.gs manages dynamically
+(safer — it won't fight with a filter you have open or have customized).
+
 ## Re-deploying after editing Code.gs
 
 If `Code.gs` changes in this repo in the future, the live script needs the

@@ -22,15 +22,35 @@ For no match: a brand-new row is appended with whatever was captured,
 including a generated "Name" summary label matching the sheet's existing
 convention (e.g. "Noah Stead (0.1) - '25 MINF CA").
 
+"Pos Group" (e.g. RHP/INF/OF) is also a spilling array formula on the live
+sheet, not real data — every write here computes and stores it as a plain
+value instead, mirroring the sheet's own IFS() mapping exactly (copied from
+the live formula 2026-06-30, not guessed), so new/updated rows are fully
+self-consistent without depending on that formula at all.
+
 Column map (1-indexed, matches Apps Script's getRange(row, col)) — keep in
 sync with apps_script/Code.gs and db_loader.py's column comment.
 """
 import requests
 
 COL = {
-    'name': 4, 'first': 8, 'last': 9, 'class': 10, 'tier': 11,
+    'name': 4, 'pos_group': 5, 'first': 8, 'last': 9, 'class': 10, 'tier': 11,
     'commit': 12, 'pos': 13, 'state': 17, 'hs': 18, 'team': 19, 'seen': 23,
 }
+
+# Mirrors the live sheet's E1 formula exactly:
+# =iferror(IFS(M1="RHP","RHP",M1="LHP","LHP",M1="C","C",M1="CINF","INF",
+#   M1="MINF","INF",M1="COF","OF",M1="CF","OF",M1="1B","INF",M1="2B","INF",
+#   M1="3B","INF",M1="OF","OF",M1="INF","INF",M1="SS","INF"),"")
+_POS_GROUP_MAP = {
+    'RHP': 'RHP', 'LHP': 'LHP', 'C': 'C', 'CINF': 'INF', 'MINF': 'INF',
+    'COF': 'OF', 'CF': 'OF', '1B': 'INF', '2B': 'INF', '3B': 'INF',
+    'OF': 'OF', 'INF': 'INF', 'SS': 'INF',
+}
+
+
+def _pos_group(pos):
+    return _POS_GROUP_MAP.get((pos or '').strip(), '')
 
 
 def _name_label(first, last, tier, class_year, pos, state):
@@ -66,6 +86,8 @@ def build_upsert_op(current_db, *, first, last, event_name, new_tier=None,
                           ('pos', pos), ('commit', commit), ('class', class_year)):
             if val and val != existing.get(key):
                 fields[COL[key]] = val
+                if key == 'pos':
+                    fields[COL['pos_group']] = _pos_group(val)
         return {'action': 'update', 'row': existing['_row'], 'fields': fields,
                 'player': existing['canonical_name']}
 
@@ -78,6 +100,7 @@ def build_upsert_op(current_db, *, first, last, event_name, new_tier=None,
     if hs: fields[COL['hs']] = hs
     if team: fields[COL['team']] = team
     fields[COL['name']] = _name_label(first, last, new_tier, class_year, pos, state)
+    fields[COL['pos_group']] = _pos_group(pos)
     return {'action': 'append', 'fields': fields, 'player': f"{first} {last}"}
 
 
