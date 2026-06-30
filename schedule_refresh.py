@@ -9,7 +9,7 @@ Unified schedule feed builder. One flow for all sites:
                          User saves PDF, uploads it here
                          Claude Vision extracts every game
   4. Output is the same Feed CSV either way:
-     Game# | Date | Time | Location  ->  paste into Feed tab, sheet updates
+     Game# | Date | Time | Location — pushed live to the Event Day app
 
 Supports: Perfect Game, FiveTool, PBR, Prospect Select, any other site.
 """
@@ -526,11 +526,6 @@ def _show_feed(df, source_label="", collision_check=False):
     st.dataframe(df, use_container_width=True, hide_index=True)
 
     core = df[["Game#", "Date", "Time", "Location"]]
-    st.markdown("**Copy into the Feed tab**")
-    st.caption(
-        "Tap the copy icon (top-right), then paste into cell **A1** of the "
-        "`Feed` tab — overwrites the four columns and the schedule updates.")
-    st.code(core.to_csv(index=False, sep="\t"), language=None)
     st.download_button("Download feed.csv",
                        data=df.to_csv(index=False).encode("utf-8"),
                        file_name="feed.csv", mime="text/csv",
@@ -554,9 +549,8 @@ def _get_api_key():
 def render():
     st.subheader("Schedule Refresh")
     st.caption(
-        "Paste any tournament link. Perfect Game pulls automatically. "
-        "For FiveTool, PBR, and Prospect Select you'll save a quick print PDF "
-        "and upload it here."
+        "Paste the tournament URL. Perfect Game pulls automatically and pushes live to the Event Day app. "
+        "For FiveTool, PBR, and Prospect Select, save a print PDF, upload it, and push."
     )
 
     if not _HAVE_BS4:
@@ -646,24 +640,6 @@ def render():
             "| PBR | Paste URL → print to PDF → upload |\n"
             "| Prospect Select | Paste URL → print to PDF → upload |"
         )
-
-    # ── First-time setup (collapsed) ────────────────────────────────────────
-    with st.expander("First-time setup — connect to the schedule sheet"):
-        st.markdown(
-            "**1.** In the schedule sheet, add a tab named **`Feed`** with row-1 "
-            "headers: `Game#`  `Date`  `Time`  `Location`.\n\n"
-            "**2.** Every refresh, paste columns **A-D** (above) into that `Feed` tab, "
-            "overwriting what's there.\n\n"
-            "**3.** One time only — on the main schedule tab, drop these into row 2 "
-            "and fill down:"
-        )
-        st.code(
-            '=IFERROR(XLOOKUP($A2, Feed!$A:$A, Feed!$B:$B), "")    ->  Date\n'
-            '=IFERROR(XLOOKUP($A2, Feed!$A:$A, Feed!$C:$C), "")    ->  Time\n'
-            '=IFERROR(XLOOKUP($A2, Feed!$A:$A, Feed!$D:$D), "")    ->  Location',
-            language="text",
-        )
-        st.caption("A row that goes blank = game was moved or cancelled.")
 
 
 if __name__ == "__main__":
