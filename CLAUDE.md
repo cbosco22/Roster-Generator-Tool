@@ -38,7 +38,7 @@ Importer tab was removed 2026-06-30 (was unused).
 | `build_rankings.py` | Builds pbr_rankings.pkl from JSON files |
 | `gen_schedule_csv.py` | Generates schedule CSV from event JSON |
 | `run_event.py` | Single entry point for full event prep workflow |
-| `sheet_sync.py` | Pulls Recruiting Sheet 2.0 as xlsx via Drive API export (service account) |
+| `sheet_sync.py` | Pulls Recruiting Sheet 2.0 as xlsx via Drive's public export endpoint (no auth — see file docstring for why) |
 
 ---
 
@@ -52,8 +52,10 @@ Importer tab was removed 2026-06-30 (was unused).
   - Sheet now carries a banner pointing to 2.0; keep it read-only, don't delete it (has years of extra notes/tabs not yet migrated)
 - **Recruiting Sheet 2.0 (CURRENT source of truth):** `15XDpXkOLtGqyZaEVq3OvbugnB2e1XPbEzWJowPJCVfs`
   - Cloned from the old sheet, owned by Chris (bosco.chris01@gmail.com) — same "High School Players" tab/column layout, so `db_loader.parse_xlsx()` works against it unchanged
-  - Auto-synced into `data/recruiting.xlsx` by `sheet_sync.py` (see below) — no more manual xlsx export/upload or git-commit needed for routine board updates
-  - **Known gap:** the extended player-submitted columns (Baseball Statistics, GPA, Test Scores, Injury History, allergies, academic accommodations — "AUTO PULL FROM RECRUITING FORM" per the sheet header) are empty for at least some players in 2.0 even though populated on the old sheet. Likely cause: the Google Form behind those fields still targets the old sheet as its destination — cloning a sheet doesn't re-point a linked Form. Needs Chris to check the Form's response destination before 2.0 is treated as 100% complete for those fields.
+  - Shared as "anyone with the link can view" — **intentional, confirmed with Chris 2026-06-30** (the sheet has sensitive player data including minors' info, so don't change this sharing setting without checking with him first)
+  - Auto-synced into `data/recruiting.xlsx` by `sheet_sync.py` via Drive's public export endpoint — no auth, no GCP project, no secrets needed, because of the sharing setting above. No more manual xlsx export/upload or git-commit needed for routine board updates.
+  - **Read-only.** Writing back to the sheet (e.g. for the post-event auto-rating idea, backlog item 12) needs real authentication, which hit a wall 2026-06-30: Chris's GCP org enforces `iam.disableServiceAccountKeyCreation` (a Google "Secure by Default" policy), blocking service-account key downloads. Fix when write-back is actually built: either someone with the Organization Policy Administrator role grants a project-level exception, or build an OAuth flow instead — don't assume a service-account key will just work.
+  - **Form-destination gap: FIXED 2026-06-30.** Extended player-submitted columns (GPA, Test Scores, Injury History, etc. — "AUTO PULL FROM RECRUITING FORM" per the sheet header) were empty in 2.0 because the linked Google Form still targeted the old sheet; Chris fixed the Form's destination and confirmed those fields are populating now.
 
 ---
 
@@ -340,7 +342,7 @@ Build these in order:
 
 ### QUEUED
 4. ~~Remove Importer tab~~ — done 2026-06-30
-5. ~~Copy recruiting sheet Chris owns → automatic DB pull~~ — done 2026-06-30: `sheet_sync.py` + Admin tab auto-sync from Sheet 2.0 (10-min cache, re-pulls on every container boot). Needs a real GCP service account + Streamlit secret to go live — see `.streamlit/secrets.toml.example`. Manual-upload fallback still works if unconfigured.
+5. ~~Copy recruiting sheet Chris owns → automatic DB pull~~ — done and LIVE 2026-06-30: `sheet_sync.py` + Admin tab auto-sync from Sheet 2.0 (10-min cache, re-pulls on every container boot), no secrets/credentials needed — see Google Drive Resources above for why. Verified end-to-end against the real production sheet (1,710 players). Manual-upload fallback still works as an override.
 6. **Player add from Twitter/X** — housed directly in app. Chris already does this manually via a Claude Project; port that prompt/extraction logic in next, similar pattern to `photo_to_roster.py`
 7. ~~Recruiting Tools page redesign~~ — done 2026-06-30 (Event Day brand lockup)
 8. **Google Sheet write-back** — now unblocked (Chris owns Sheet 2.0), not yet built

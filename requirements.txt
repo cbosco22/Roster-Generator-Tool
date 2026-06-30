@@ -7,4 +7,3 @@ Pillow>=10.0
 pillow-heif>=0.18
 beautifulsoup4>=4.12
 requests>=2.31
-google-auth>=2.30

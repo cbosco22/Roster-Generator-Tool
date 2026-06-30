@@ -65,20 +65,18 @@ def _get_api_key():
 
 @st.cache_data(ttl=600, show_spinner="Syncing recruiting sheet…")
 def _sync_recruiting_sheet():
-    """Treat Recruiting Sheet 2.0 as the source of truth when a service
-    account is configured: re-pull it into data/recruiting.xlsx. Cached for
-    10 min per running container, so this also re-syncs automatically on
-    every fresh container boot/deploy — no more manual xlsx upload or
-    git-commit needed for routine board updates. Silently no-ops (keeps
-    whatever xlsx is already on disk) if no credentials are configured, so
-    the Admin tab's manual upload still works as a fallback/override."""
-    try:
-        service_account_info = dict(st.secrets["gcp_service_account"])
-    except Exception:
-        return {"ok": False, "reason": "no_credentials"}
+    """Treat Recruiting Sheet 2.0 as the source of truth: re-pull it into
+    data/recruiting.xlsx via Drive's public export endpoint (the sheet is
+    link-shared — see sheet_sync.py for why no auth is needed, and why
+    that's intentional). Cached for 10 min per running container, so this
+    also re-syncs automatically on every fresh container boot/deploy — no
+    more manual xlsx upload or git-commit needed for routine board updates.
+    Falls back to whatever xlsx is already on disk if the fetch fails for
+    any reason (network blip, sheet sharing changed, etc.) — the Admin
+    tab's manual upload still works as an override either way."""
     try:
         import sheet_sync
-        sheet_sync.fetch_recruiting_xlsx(service_account_info, str(XLSX_PATH))
+        sheet_sync.fetch_recruiting_xlsx(str(XLSX_PATH))
         return {"ok": True}
     except Exception as e:
         return {"ok": False, "reason": str(e)}
@@ -795,14 +793,10 @@ with tab_admin:
     if _sheet_sync_result.get("ok"):
         st.success("✓ Synced from Recruiting Sheet 2.0 (re-checks every 10 min, "
                    "and on every fresh deploy/reboot — no manual upload needed).")
-    elif _sheet_sync_result.get("reason") == "no_credentials":
-        st.warning("Not configured — using whatever xlsx was last uploaded below. "
-                   "Add a `[gcp_service_account]` block to Streamlit secrets to "
-                   "pull live from Sheet 2.0 automatically (see "
-                   "`.streamlit/secrets.toml.example`).")
     else:
         st.error(f"✗ Sheet sync failed: {_sheet_sync_result.get('reason')} — "
-                "falling back to whatever xlsx is already on disk.")
+                "falling back to whatever xlsx is already on disk. (Check the "
+                "sheet is still shared as \"anyone with the link can view.\")")
     if st.button("🔄 Sync now"):
         _sync_recruiting_sheet.clear()
         st.rerun()
