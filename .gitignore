@@ -15,6 +15,13 @@ venv/
 .vscode/
 *.swp
 
-# Local working files (keep data/ tracked — it holds the production xlsx and pkl)
+# Local working files
 *.log
 *.tmp
+
+# Recruiting xlsx is now auto-synced live from Sheet 2.0 at runtime
+# (sheet_sync.py) — no longer needs to be committed, and shouldn't be:
+# it's real player PII (contact info, medical/academic data), and every
+# commit was a permanent snapshot in git history. Keep data/pbr_rankings.pkl
+# tracked (public ranking data, lower sensitivity, no live-sync source yet).
+data/recruiting.xlsx
