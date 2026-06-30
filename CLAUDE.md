@@ -347,6 +347,9 @@ Build these in order:
 9. **Extension download + scrape-instructions page** — inside the existing app
 10. **Capabilities one-pager PDF** — for sharing with other programs
 11. **App consolidation** — Chris wants one umbrella app: Big Board view, full player list, schedule, instead of 3 separate apps (this Streamlit tool, navy-event-day, and a legacy AppSheet recruiting-board app). Lean toward expanding this app with Big Board/Player List tabs and retiring AppSheet; keep navy-event-day separate (built for one-handed mobile use at a tournament, which Streamlit doesn't do well). Not started — needs a real design pass, not a quick add.
+   - 2026-06-30 update: Chris is now thinking even bigger than this — one site for the *whole* coaching staff (recruiting + visit scheduling + budget + full depth chart, which currently all live as different tabs in the recruiting spreadsheet), plus folding in a separate player-analysis website he built independently. This item may get superseded by that larger scope — ask Chris before assuming which version is current.
+12. **Post-event: write ratings straight to DB after review** — replace the current UPDATES-TSV-for-manual-XLOOKUP flow with a direct write into Sheet 2.0, gated on a human review/confirm step. Depends on real Sheets-API write access (item 8) being live, not just the read-only sync in `sheet_sync.py`. Brain-dumped 2026-06-30, not scoped yet.
+13. **"Seen" column becomes an append-only history** — today it looks like a single value reflecting when a player was added; Chris wants every future re-rating at a new event to append a new entry instead of overwriting, so the board can show full evaluation history over time, not just a snapshot. Needs a schema decision (new column per event vs. delimited list in one cell vs. separate log tab) before building — don't assume, ask Chris. Brain-dumped 2026-06-30 alongside item 12, same review-gated write path.
 
 ---
 
