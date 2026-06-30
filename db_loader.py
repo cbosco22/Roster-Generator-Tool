@@ -5,8 +5,13 @@ CRITICAL: Always use parse_xlsx() with the xlsx file. Never rely on Drive text.
 parse_xlsx(path) reads all 1000+ rows directly from Excel with full fidelity.
 parse_sheet_content(text) is a fallback for Drive markdown only.
 
-Column map (0-indexed from xlsx):
+Column map (0-indexed from xlsx, LOCKED — verified against the real header
+row 2026-06-30, do not guess, re-verify against row 3 of the live sheet if
+this ever looks wrong):
   [7]=First [8]=Last [9]=Class [10]=★/tier [11]=Commit [12]=Pos
+  [16]=State [17]=High School [18]=Summer Team [22]=Seen
+Row numbers (1-indexed, matching openpyxl/Sheets) are tracked per entry as
+'_row' — needed by sheet_write.py to target updates at the right row.
 """
 
 NICKNAMES = {
@@ -88,13 +93,18 @@ def parse_xlsx(path, sheet_name='High School Players'):
         tier   = str(row[10]).strip() if row[10] is not None else ''
         commit = str(row[11]).strip() if row[11] is not None else ''
         pos    = str(row[12]).strip() if row[12] is not None else ''
+        state  = str(row[16]).strip() if len(row) > 16 and row[16] is not None else ''
+        hs     = str(row[17]).strip() if len(row) > 17 and row[17] is not None else ''
+        team   = str(row[18]).strip() if len(row) > 18 and row[18] is not None else ''
+        seen   = str(row[22]).strip() if len(row) > 22 and row[22] is not None else ''
         if yr.endswith('.0'): yr = yr[:-2]
         if tier.endswith('.0') and tier != '0.1': tier = tier[:-2]
         if not first or not last: skipped += 1; continue
         if first in ('First Name','First',':-:','By:','NAME'): skipped += 1; continue
         if not yr or not yr.startswith('20'): skipped += 1; continue
         entry = {'tier':tier,'pos':pos,'class':yr,'commit':commit,
-                 'first':first,'last':last,'canonical_name':f"{first} {last}"}
+                 'first':first,'last':last,'canonical_name':f"{first} {last}",
+                 'state':state,'hs':hs,'team':team,'seen':seen,'_row':i}
         for v in _variants(first, last):
             db[v] = entry
     wb.close()
