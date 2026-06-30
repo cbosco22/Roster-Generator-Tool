@@ -32,7 +32,7 @@ import requests
 
 # Your project URL is pre-filled. Paste your anon public key here, or set env vars.
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "https://bcdoidnfbrsfeulyhwhi.supabase.co")
-SUPABASE_ANON_KEY = os.environ.get("SUPABASE_ANON_KEY", "")  # <-- paste anon public key
+SUPABASE_ANON_KEY = os.environ.get("SUPABASE_ANON_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJjZG9pZG5mYnJzZmV1bHlod2hpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI3NzM2OTEsImV4cCI6MjA5ODM0OTY5MX0.aXLapvAxINhebAjiKY9wTYka9XxoJn827T5-CaiBPbc")  # <-- paste anon public key
 
 
 def push_event(name, csv_text, supabase_url=None, anon_key=None, timeout=30):
