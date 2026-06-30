@@ -40,8 +40,8 @@ _STATE_ABV = {
     'washington dc':'DC','district of columbia':'DC',
 }
 
-# Only these tiers count on the schedule. XX, 3, and anything else are ignored.
-_COUNTED_TIERS = {'0.1', '1', '2', '4'}
+# Tiers that appear (and count) on the schedule. XX and anything else are ignored.
+_COUNTED_TIERS = {'0.1', '1', '2', '3', '4'}
 
 # Tier display: only 0.1 is remapped to C; the rest shown verbatim
 _TIER_LABEL = {'0.1': 'C'}

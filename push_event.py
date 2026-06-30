@@ -1,0 +1,256 @@
+"""
+push_event.py — push a schedule straight into the Navy Event Day app (Supabase).
+
+WHY: replaces the copy/paste step. Call this right after you build the schedule CSV
+in your Roster tool, and the event shows up (and updates) live for every coach.
+
+HOW IT BEHAVES:
+  - First push with a given name  -> CREATES the event.
+  - Pushing again with the SAME name -> UPDATES that event's schedule in place.
+    Because it's the same event row, coaches' tags and notes stay attached
+    to their games (anything unchanged keeps its marks).
+
+SETUP (once):
+  1. Supabase -> Settings -> API Keys -> copy the `anon` `public` key.
+  2. Either set env vars  SUPABASE_URL  and  SUPABASE_ANON_KEY,
+     or paste them into the two constants below.
+
+USAGE in your Roster tool, after building the CSV:
+    from push_event import push_event
+    csv_text = build_schedule_csv(...)          # your existing call
+    result = push_event("PBR 16U Nat'l Champ 2026", csv_text)
+    print(result)   # {'action': 'created' or 'updated', 'id': '...', 'name': '...'}
+
+CLI test:
+    python push_event.py "PBR 16U Nat'l Champ 2026" schedule.csv
+"""
+import os
+import sys
+import csv
+import io
+import requests
+
+# Your project URL is pre-filled. Paste your anon public key here, or set env vars.
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "https://bcdoidnfbrsfeulyhwhi.supabase.co")
+SUPABASE_ANON_KEY = os.environ.get("SUPABASE_ANON_KEY", "")  # <-- paste anon public key
+
+
+def push_event(name, csv_text, supabase_url=None, anon_key=None, timeout=30):
+    """Create or update an event by name. Returns {'action','id','name'}."""
+    url = (supabase_url or SUPABASE_URL).rstrip("/")
+    key = anon_key or SUPABASE_ANON_KEY
+    if not key:
+        raise RuntimeError(
+            "Missing Supabase anon key. Set SUPABASE_ANON_KEY env var "
+            "or paste it into push_event.py."
+        )
+    if not name or not str(name).strip():
+        raise ValueError("Event name is required.")
+
+    headers = {
+        "apikey": key,
+        "Authorization": f"Bearer {key}",
+        "Content-Type": "application/json",
+    }
+    endpoint = f"{url}/rest/v1/events"
+
+    # 1) Look for an existing event with this exact name.
+    #    Quoting the value keeps names with spaces/commas/apostrophes safe.
+    r = requests.get(
+        endpoint,
+        headers=headers,
+        params={"name": f'eq."{name}"', "select": "id"},
+        timeout=timeout,
+    )
+    if not r.ok:
+        raise RuntimeError(f"Lookup failed ({r.status_code}): {r.text}")
+    existing = r.json()
+
+    write_headers = {**headers, "Prefer": "return=representation"}
+
+    # 2) Update in place if it exists, otherwise create it.
+    if existing:
+        event_id = existing[0]["id"]
+        r = requests.patch(
+            endpoint,
+            headers=write_headers,
+            params={"id": f"eq.{event_id}"},
+            json={"csv": csv_text},
+            timeout=timeout,
+        )
+        action = "updated"
+    else:
+        r = requests.post(
+            endpoint,
+            headers=write_headers,
+            json={"name": name, "csv": csv_text},
+            timeout=timeout,
+        )
+        action = "created"
+
+    if not r.ok:
+        raise RuntimeError(f"Push failed ({r.status_code}): {r.text}")
+
+    row = r.json()
+    if isinstance(row, list):
+        row = row[0] if row else {}
+    return {"action": action, "id": row.get("id"), "name": name}
+
+
+def fetch_event_csv(name, supabase_url=None, anon_key=None, timeout=30):
+    """Return (event_id, csv_text) for the event with this exact name, or (None, None)."""
+    url = (supabase_url or SUPABASE_URL).rstrip("/")
+    key = anon_key or SUPABASE_ANON_KEY
+    if not key:
+        raise RuntimeError("Missing Supabase anon key. Set SUPABASE_ANON_KEY or paste it in.")
+    headers = {"apikey": key, "Authorization": f"Bearer {key}"}
+    r = requests.get(
+        f"{url}/rest/v1/events",
+        headers=headers,
+        params={"name": f'eq."{name}"', "select": "id,csv"},
+        timeout=timeout,
+    )
+    if not r.ok:
+        raise RuntimeError(f"Lookup failed ({r.status_code}): {r.text}")
+    rows = r.json()
+    if not rows:
+        return None, None
+    return rows[0]["id"], rows[0]["csv"]
+
+
+def _carry_forward_team_data(existing_csv):
+    """Parse the live event CSV and return {team_name: {tier, stars, pbr, navy}}."""
+    teams = {}
+    if not existing_csv:
+        return teams
+    reader = csv.DictReader(io.StringIO(existing_csv))
+    for row in reader:
+        for side in ("1", "2"):
+            tname = (row.get(f"Team{side}") or "").strip()
+            if not tname or tname in teams:
+                continue
+            teams[tname] = {
+                "tier": row.get(f"Team{side}Tier", "") or "",
+                "stars": row.get(f"Team{side}★", "") or "",
+                "pbr": row.get(f"Team{side}PBR", "") or "",
+                "navy": row.get(f"Team{side} Navy Players", "") or "",
+            }
+    return teams
+
+
+def _games_from_schedule_json(schedule_json):
+    if isinstance(schedule_json, dict):
+        return schedule_json.get("games", []) or []
+    if isinstance(schedule_json, list):
+        return schedule_json
+    raise TypeError("schedule_json must be a dict with 'games' or a list of games.")
+
+
+def push_schedule_update(name, schedule_json, supabase_url=None, anon_key=None, timeout=30):
+    """
+    Update an event using ONLY a new schedule (no roster). Carries each team's
+    Navy data (tier, ★, PBR count, Navy Players string) forward from whatever
+    is already live for that event, matched by exact team name, and rebuilds
+    the schedule rows (game#/date/time/location/division/team1/team2) fresh.
+
+    Use this for the "schedule update" tab -- when the link just shows a new
+    time/field/game layout and you don't want to reload the roster.
+
+    Returns {'action': 'updated', 'id': ..., 'name': ..., 'unmatched_teams': [...]}.
+    'unmatched_teams' lists any team in the new schedule that wasn't found in
+    the currently-live event -- those rows will have blank Navy data until a
+    full tournament generation (with the roster) is run for them.
+    """
+    if not name or not str(name).strip():
+        raise ValueError("Event name is required.")
+
+    event_id, existing_csv = fetch_event_csv(name, supabase_url, anon_key, timeout)
+    if event_id is None:
+        raise RuntimeError(
+            f'No live event named "{name}" found. Schedule-only updates need an '
+            "existing event to carry Navy data forward from -- run a full "
+            "tournament generation (push_event) first to create it."
+        )
+
+    team_data = _carry_forward_team_data(existing_csv)
+    games = _games_from_schedule_json(schedule_json)
+
+    unmatched = set()
+    rows = []
+    for g in games:
+        t1 = (g.get("team1", "") or "").strip()
+        t2 = (g.get("team2", "") or "").strip()
+        d1 = team_data.get(t1)
+        d2 = team_data.get(t2)
+        if t1 and d1 is None:
+            unmatched.add(t1)
+        if t2 and d2 is None:
+            unmatched.add(t2)
+        d1 = d1 or {"tier": "", "stars": "", "pbr": "", "navy": ""}
+        d2 = d2 or {"tier": "", "stars": "", "pbr": "", "navy": ""}
+
+        def _to_int(s):
+            try:
+                return int(s)
+            except (TypeError, ValueError):
+                return 0
+
+        total_stars = _to_int(d1["stars"]) + _to_int(d2["stars"])
+        total_pbr = _to_int(d1["pbr"]) + _to_int(d2["pbr"])
+
+        rows.append({
+            "Game#": g.get("game", ""),
+            "Date": g.get("date", ""),
+            "Time": g.get("time", ""),
+            "Location": g.get("location", ""),
+            "Attend": "",
+            "Notes": "",
+            "Division": g.get("division", ""),
+            "Team1": t1,
+            "Team1Tier": d1["tier"],
+            "Team1★": d1["stars"],
+            "Team1PBR": d1["pbr"],
+            "Team1 Navy Players": d1["navy"],
+            "Team2": t2,
+            "Team2Tier": d2["tier"],
+            "Team2★": d2["stars"],
+            "Team2PBR": d2["pbr"],
+            "Team2 Navy Players": d2["navy"],
+            "Total★": str(total_stars) if total_stars else "",
+            "TotalPBR": str(total_pbr) if total_pbr else "",
+        })
+
+    cols = ['Game#','Date','Time','Location','Attend','Notes','Division',
+            'Team1','Team1Tier','Team1★','Team1PBR','Team1 Navy Players',
+            'Team2','Team2Tier','Team2★','Team2PBR','Team2 Navy Players',
+            'Total★','TotalPBR']
+    out = io.StringIO()
+    w = csv.DictWriter(out, fieldnames=cols)
+    w.writeheader()
+    w.writerows(rows)
+    new_csv = out.getvalue()
+
+    url = (supabase_url or SUPABASE_URL).rstrip("/")
+    key = anon_key or SUPABASE_ANON_KEY
+    headers = {
+        "apikey": key, "Authorization": f"Bearer {key}",
+        "Content-Type": "application/json", "Prefer": "return=representation",
+    }
+    r = requests.patch(
+        f"{url}/rest/v1/events", headers=headers,
+        params={"id": f"eq.{event_id}"}, json={"csv": new_csv}, timeout=timeout,
+    )
+    if not r.ok:
+        raise RuntimeError(f"Push failed ({r.status_code}): {r.text}")
+
+    return {"action": "updated", "id": event_id, "name": name, "unmatched_teams": sorted(unmatched)}
+
+
+if __name__ == "__main__":
+    if len(sys.argv) != 3:
+        print('Usage: python push_event.py "Event Name" path/to/schedule.csv')
+        sys.exit(1)
+    event_name = sys.argv[1]
+    with open(sys.argv[2], "r", encoding="utf-8") as f:
+        text = f.read()
+    print(push_event(event_name, text))
