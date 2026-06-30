@@ -19,9 +19,11 @@ Used by coaches AP, CB, TR, CR, AM on iPads (GoodNotes) and iPhones.
 ## App Tabs (Current)
 1. **Field Tool** — at-event use, live tagging interface
 2. **Tournament Builder** — pre-event PDF generation
-3. **Post-Event** — processes annotated GoodNotes JPGs into DB updates
-4. **Admin** — config and maintenance
-5. ~~**Importer**~~ — **REMOVE THIS TAB. It is unused and useless.**
+3. **Schedule Refresh** — pulls updated tournament schedule
+4. **Post-Event** — processes annotated GoodNotes JPGs into DB updates
+5. **Admin** — config, recruiting-sheet sync status, PBR rankings rebuild
+
+Importer tab was removed 2026-06-30 (was unused).
 
 ---
 
@@ -36,6 +38,7 @@ Used by coaches AP, CB, TR, CR, AM on iPads (GoodNotes) and iPhones.
 | `build_rankings.py` | Builds pbr_rankings.pkl from JSON files |
 | `gen_schedule_csv.py` | Generates schedule CSV from event JSON |
 | `run_event.py` | Single entry point for full event prep workflow |
+| `sheet_sync.py` | Pulls Recruiting Sheet 2.0 as xlsx via Drive API export (service account) |
 
 ---
 
@@ -44,9 +47,13 @@ Used by coaches AP, CB, TR, CR, AM on iPads (GoodNotes) and iPhones.
 - **Scripts folder:** `1qMDLz_8cAho3jU4JPim1gla1Tmmh1GmQ`
 - **2026 Event Work folder:** `1aHhnwXtIeQaZxzcOQ1C82vIRA9_XGadH`
 - **Schedule template sheet:** `1yR5e6ldN-32AnVYulcJNKOYumnBTEGsOth2nIgZfEF4`
-- **Recruiting Google Sheet:** `1ecpbBbWaVaSlmz4qmHUWJw9Esj6P0x5R4y81QQYhMzE`
-  - NOT owned by Chris's org — no direct API write access yet
-  - Chris is duplicating to a sheet he owns — board write-back will be enabled then
+- **Recruiting Google Sheet (OLD, retired 2026-06-30):** `1ecpbBbWaVaSlmz4qmHUWJw9Esj6P0x5R4y81QQYhMzE`
+  - Owned by USNA staff (treilly@usna.edu), not Chris — was never API-writable
+  - Sheet now carries a banner pointing to 2.0; keep it read-only, don't delete it (has years of extra notes/tabs not yet migrated)
+- **Recruiting Sheet 2.0 (CURRENT source of truth):** `15XDpXkOLtGqyZaEVq3OvbugnB2e1XPbEzWJowPJCVfs`
+  - Cloned from the old sheet, owned by Chris (bosco.chris01@gmail.com) — same "High School Players" tab/column layout, so `db_loader.parse_xlsx()` works against it unchanged
+  - Auto-synced into `data/recruiting.xlsx` by `sheet_sync.py` (see below) — no more manual xlsx export/upload or git-commit needed for routine board updates
+  - **Known gap:** the extended player-submitted columns (Baseball Statistics, GPA, Test Scores, Injury History, allergies, academic accommodations — "AUTO PULL FROM RECRUITING FORM" per the sheet header) are empty for at least some players in 2.0 even though populated on the old sheet. Likely cause: the Google Form behind those fields still targets the old sheet as its destination — cloning a sheet doesn't re-point a linked Form. Needs Chris to check the Form's response destination before 2.0 is treated as 100% complete for those fields.
 
 ---
 
@@ -332,13 +339,14 @@ Build these in order:
    - Incremental Streamlit feature
 
 ### QUEUED
-4. **Remove Importer tab** — it's unused, delete it
-5. **Copy recruiting sheet** Chris owns → post-event becomes automatic (no manual xlsx drop)
-6. **Player add from Twitter/X** — housed directly in app
-7. **Recruiting Tools page redesign** — retitle to match Event Day app naming convention
-8. **Google Sheet write-back** — gated on Chris owning a writable sheet copy
+4. ~~Remove Importer tab~~ — done 2026-06-30
+5. ~~Copy recruiting sheet Chris owns → automatic DB pull~~ — done 2026-06-30: `sheet_sync.py` + Admin tab auto-sync from Sheet 2.0 (10-min cache, re-pulls on every container boot). Needs a real GCP service account + Streamlit secret to go live — see `.streamlit/secrets.toml.example`. Manual-upload fallback still works if unconfigured.
+6. **Player add from Twitter/X** — housed directly in app. Chris already does this manually via a Claude Project; port that prompt/extraction logic in next, similar pattern to `photo_to_roster.py`
+7. ~~Recruiting Tools page redesign~~ — done 2026-06-30 (Event Day brand lockup)
+8. **Google Sheet write-back** — now unblocked (Chris owns Sheet 2.0), not yet built
 9. **Extension download + scrape-instructions page** — inside the existing app
 10. **Capabilities one-pager PDF** — for sharing with other programs
+11. **App consolidation** — Chris wants one umbrella app: Big Board view, full player list, schedule, instead of 3 separate apps (this Streamlit tool, navy-event-day, and a legacy AppSheet recruiting-board app). Lean toward expanding this app with Big Board/Player List tabs and retiring AppSheet; keep navy-event-day separate (built for one-handed mobile use at a tournament, which Streamlit doesn't do well). Not started — needs a real design pass, not a quick add.
 
 ---
 

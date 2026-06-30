@@ -63,6 +63,27 @@ def _get_api_key():
         return os.environ.get("ANTHROPIC_API_KEY")
 
 
+@st.cache_data(ttl=600, show_spinner="Syncing recruiting sheet…")
+def _sync_recruiting_sheet():
+    """Treat Recruiting Sheet 2.0 as the source of truth when a service
+    account is configured: re-pull it into data/recruiting.xlsx. Cached for
+    10 min per running container, so this also re-syncs automatically on
+    every fresh container boot/deploy — no more manual xlsx upload or
+    git-commit needed for routine board updates. Silently no-ops (keeps
+    whatever xlsx is already on disk) if no credentials are configured, so
+    the Admin tab's manual upload still works as a fallback/override."""
+    try:
+        service_account_info = dict(st.secrets["gcp_service_account"])
+    except Exception:
+        return {"ok": False, "reason": "no_credentials"}
+    try:
+        import sheet_sync
+        sheet_sync.fetch_recruiting_xlsx(service_account_info, str(XLSX_PATH))
+        return {"ok": True}
+    except Exception as e:
+        return {"ok": False, "reason": str(e)}
+
+
 def _load_raw_sheet_text_from_xlsx(xlsx_path: Path) -> str:
     """
     The locked build_pdf signature takes raw sheet text.
@@ -216,6 +237,8 @@ st.set_page_config(
     page_icon="⚓",
     layout="centered",
 )
+
+_sheet_sync_result = _sync_recruiting_sheet()
 
 # Brand lockup — mirrors the Event Day app (navy header, gold eyebrow).
 st.markdown(
@@ -768,7 +791,26 @@ with tab_admin:
                  "(`ANTHROPIC_API_KEY`)")
 
     st.divider()
-    st.subheader("Update recruiting xlsx")
+    st.subheader("Recruiting Sheet 2.0 sync")
+    if _sheet_sync_result.get("ok"):
+        st.success("✓ Synced from Recruiting Sheet 2.0 (re-checks every 10 min, "
+                   "and on every fresh deploy/reboot — no manual upload needed).")
+    elif _sheet_sync_result.get("reason") == "no_credentials":
+        st.warning("Not configured — using whatever xlsx was last uploaded below. "
+                   "Add a `[gcp_service_account]` block to Streamlit secrets to "
+                   "pull live from Sheet 2.0 automatically (see "
+                   "`.streamlit/secrets.toml.example`).")
+    else:
+        st.error(f"✗ Sheet sync failed: {_sheet_sync_result.get('reason')} — "
+                "falling back to whatever xlsx is already on disk.")
+    if st.button("🔄 Sync now"):
+        _sync_recruiting_sheet.clear()
+        st.rerun()
+
+    st.divider()
+    st.subheader("Update recruiting xlsx (manual override)")
+    st.caption("Only needed if Sheet 2.0 sync above isn't configured, or you "
+              "need to load a one-off xlsx that isn't in the live sheet yet.")
     new_xlsx = st.file_uploader("Upload Navy_Recruiting_Sheet.xlsx",
                                 type=["xlsx"], key="admin_xlsx")
     if new_xlsx and st.button("Save xlsx", type="primary"):
@@ -778,8 +820,8 @@ with tab_admin:
             n = len(set(e["canonical_name"] for e in db.values()))
             st.success(f"Saved. {n} players loaded.")
             st.info("⚠️  On Streamlit Cloud this update only sticks for the "
-                    "current container. For a permanent update, also commit "
-                    "the new xlsx to the GitHub repo's `data/` folder.")
+                    "current container, and the next sheet sync (10 min, or "
+                    "next deploy) will overwrite it with Sheet 2.0's data again.")
         except Exception as e:
             st.exception(e)
 
