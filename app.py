@@ -212,19 +212,34 @@ def _pdf_open_link(pdf_bytes: bytes, filename: str,
 # ---------------------- UI ----------------------
 
 st.set_page_config(
-    page_title="Navy Field Tool",
+    page_title="Navy Baseball — Recruiting Tools",
     page_icon="⚓",
     layout="centered",
 )
 
+# Brand lockup — mirrors the Event Day app (navy header, gold eyebrow).
 st.markdown(
-    "<h2 style='margin-bottom:0'>⚓ Navy Recruiting Tools</h2>"
-    "<p style='color:#666;margin-top:0.2em'>Generate PDF Rosters, CSV Schedules, and Post Event Summaries",
+    """
+    <div style="background:#14233B;border:1px solid #1F3357;border-radius:14px;
+                padding:18px 20px;margin-bottom:14px;">
+      <div style="color:#C8A24B;letter-spacing:.18em;font-size:11px;font-weight:700;
+                  font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">
+        NAVY BASEBALL · RECRUITING
+      </div>
+      <div style="color:#FFFFFF;font-size:26px;font-weight:800;line-height:1.15;margin-top:4px;">
+        ⚓ Recruiting Tools
+      </div>
+      <div style="color:#A9B4C6;font-size:13px;margin-top:5px;
+                  font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">
+        PDF rosters · CSV schedules · post-event summaries
+      </div>
+    </div>
+    """,
     unsafe_allow_html=True,
 )
 
-tab_field, tab_import, tab_tourney, tab_sched, tab_post, tab_admin = st.tabs(
-    ["🎯 Field Tool", "🧩 Importer", "🏟️ Tournament Builder", "🔄 Schedule Refresh",
+tab_field, tab_tourney, tab_sched, tab_post, tab_admin = st.tabs(
+    ["🎯 Field Tool", "🏟️ Tournament Builder", "🔄 Schedule Refresh",
      "📥 Post-Event", "⚙️  Admin"])
 
 
@@ -389,77 +404,6 @@ with tab_field:
         st.caption("On phone and the download opens full-screen with no way back? "
                    "Use the link above — or open this app from Safari instead of a "
                    "home-screen shortcut.")
-
-
-# ---- Importer ----
-with tab_import:
-    st.subheader("PDF Importer")
-    st.caption("Drop an event PDF — a showcase roster or a tournament export — and "
-               "turn it into the roster JSON the Tournament Builder uses.")
-
-    imp_api_key = _get_api_key()
-    if not imp_api_key:
-        st.warning("Anthropic API key missing — set `ANTHROPIC_API_KEY` in Streamlit secrets.")
-
-    imp_pdf = st.file_uploader("Event PDF", type=["pdf"], key="imp_pdf")
-    imp_name = st.text_input("Event / list name",
-                             placeholder="e.g. 2026 PA State Games Session 1",
-                             key="imp_name")
-    imp_mode = st.radio(
-        "How is this PDF organized?",
-        ["Split into teams (multiple squads in the file)",
-         "One big list (single showcase roster)"],
-        key="imp_mode",
-    )
-    imp_instr = st.text_area(
-        "Anything I should know? (optional)",
-        placeholder="e.g. 'split by the Team/Color column', or "
-                    "'ignore the Travel Team column — that's their club, not the squad'",
-        key="imp_instr", height=80,
-    )
-
-    imp_go = st.button("🧩 Generate JSON", type="primary",
-                       use_container_width=True,
-                       disabled=not (imp_pdf and imp_api_key))
-
-    if imp_go:
-        import pdf_to_roster
-        mode = "split" if imp_mode.startswith("Split") else "one_list"
-        with st.status("Reading the PDF…", expanded=True) as istatus:
-            try:
-                result = pdf_to_roster.extract_roster_from_pdf(
-                    imp_pdf.read(), mode=mode,
-                    list_name=(imp_name or "Event"),
-                    instructions=imp_instr, api_key=imp_api_key,
-                )
-                istatus.update(label="Done", state="complete")
-            except Exception as e:
-                istatus.update(label="Error", state="error")
-                st.exception(e)
-                st.stop()
-        st.session_state["imp_result"] = result
-
-    if "imp_result" in st.session_state:
-        res = st.session_state["imp_result"]
-        nteams = len(res["teams"])
-        nplayers = sum(len(t["players"]) for t in res["teams"])
-        st.divider()
-        c1, c2 = st.columns(2)
-        c1.metric("Teams", nteams)
-        c2.metric("Players", nplayers)
-        with st.expander("Team breakdown", expanded=(nteams > 1)):
-            for t in res["teams"]:
-                st.write(f"- **{t['name']}** — {len(t['players'])} players")
-
-        js = json.dumps(res, indent=2)
-        st.download_button("⬇️  roster JSON",
-                           data=js,
-                           file_name=(imp_name or "rosters").replace(" ", "_") + ".json",
-                           mime="application/json",
-                           use_container_width=True, type="primary")
-        st.caption("Split look wrong? Adjust the note above and Generate again. When "
-                   "it's right, download and load it in the Tournament Builder tab.")
-        st.code(js, language="json")
 
 
 # ---- Tournament Builder ----
