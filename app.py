@@ -261,8 +261,7 @@ st.markdown(
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&display=swap');
 
-    html, body, [data-testid="stAppViewContainer"], [data-testid="stApp"],
-    .stMarkdown, .stText, p, span, label, div {
+    html, body, [data-testid="stAppViewContainer"], [data-testid="stApp"] {
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif !important;
     }
 
