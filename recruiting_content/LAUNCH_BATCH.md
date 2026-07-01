@@ -25,13 +25,13 @@ Order below is a suggested posting sequence, not fixed — post in whatever orde
 > Sea. Air. Undersea. Ground. Cyber. Special ops. No academy in America gives you more ways to serve. Choose your path. ⚓ #NavyBaseball
 
 **7. Program History — "Annapolis To The Show"** — `exports/Navy_Baseball_Program_History.png` *(rebuilt around Chris's reference graphic)*
-> Annapolis to the Show. Eleven Midshipmen have heard their name called in the MLB Draft since 2003 — Navy Baseball's pipeline to professional ball, pick by pick. Featuring Noah Song, now pitching for Team USA at the AAA level. ⚓ #NavyBaseball
+> Annapolis to the Show. Eleven Midshipmen have heard their name called in the MLB Draft since 2003 — Navy Baseball's pipeline to professional ball, pick by pick. Featuring Noah Song, now pitching at the AAA level. ⚓ #NavyBaseball
 
 **8. Annapolis** — `exports/Navy_Baseball_Annapolis.png` *(new)*
 > Welcome to Annapolis. Founded in 1649, the "Sailing Capital of the World" has been Navy Baseball's home port for over a century — 33 miles from D.C., 26 from Baltimore, and unlike anywhere else you'll play. ⚓ #NavyBaseball
 
 **Bonus 9. Noah Song — Alumni Spotlight** — `exports/Navy_Baseball_Alumni_Noah_Song.png` *(new — first real Alumni Spotlight, not part of the original 8 but ready to post)*
-> The highest pick ever. Noah Song is Navy Baseball's highest-ever MLB Draft pick (Red Sox, 4th round, No. 137 overall, 2019) and a 2019 Golden Spikes Award finalist. After his service commitment, he's now pitching at the Triple-A level and representing Team USA. ⚓ #NavyBaseball
+> The highest pick ever. Noah Song is Navy Baseball's highest-ever MLB Draft pick (Red Sox, 4th round, No. 137 overall, 2019) and a 2019 Golden Spikes Award finalist. After his service commitment, he's now pitching at the Triple-A level. ⚓ #NavyBaseball
 
 ---
 
