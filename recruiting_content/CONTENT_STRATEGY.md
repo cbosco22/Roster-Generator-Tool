@@ -12,7 +12,7 @@ Weekends are not scheduled — treat them as **opportunistic**: if coaches are a
 
 | Day | Stream | Purpose |
 |-----|--------|---------|
-| Monday | **The Pitch: Value Props** | Rotates through an 18-item bank spanning Academics, Money/Degree Value, Baseball culture, and Life After Service — the 5 original overview graphics plus their broken-down sub-topics (a major group, a single stat, a career path). Service's overview runs here too; deeper service-community breakdowns are a separate bank, ready to slot into a second weekly value-prop post once wired in. |
+| Monday | **The Pitch: Value Props** | Rotates through a 25-item bank spanning Academics, Money/Degree Value, Service (overview + 7 community deep-dives), Baseball culture, and Life After Service — the 5 original overview graphics plus their broken-down sub-topics (a major group, a single stat, a career path, a service community). |
 | Tuesday | **People** | Rotates Player Spotlight → Alumni Spotlight → Coach Bio, one per week. |
 | Wednesday | **USNA Life** | "A day in the Yard" — candid, human content and explainers (company system, plebe year, daily schedule). Lower-production, phone-photo-friendly. |
 | Thursday | **Facility & Program** | Rotates through individual facility pieces (field, cage, weight room, nutrition, tech, renovation) — swapped for live behind-the-scenes content on any week coaches are actually at an event. |
@@ -24,15 +24,14 @@ This is a 5-post/week cadence, not literal daily — sustainable and realistic g
 
 ## 2. Streams in more detail
 
-1. **The Pitch: Value Props** — the 5 pillar graphics (`source/`, `exports/`) plus their broken-down sub-topics in `TOPIC_BANK.md`. Fully evergreen, can rotate indefinitely.
-2. **Service Communities** — a dedicated deep-dive bank (Aviation, Surface Warfare, Submarines, Marine Corps, Special Warfare, Cyber & Intel, plus others) — job day-to-day, minimum-commitment path, 20-year career path, pay/lifestyle per community. Not yet wired into the weekly rotation; ready to become a second Monday-adjacent slot.
-3. **Commits & Signings** — reactive news content, one post per real commit or signing.
-4. **Game Highlights / Recaps** — in-season only (Feb–June); dormant during summer travel-ball season.
-5. **Player & Alumni Spotlights + Coach Bios** — recruit features, alumni in the pro pipeline or notable post-service careers, and coaching staff backgrounds.
-6. **USNA Life** — culture/lifestyle content and explainers, humanizes the program beyond the recruiting pitch.
-7. **Facility & Program** — the $5M facility renovation, individual facility spaces, tech (TrackMan/TruMedia/Aware), program culture.
-8. **Player Development (video)** — hitting/pitching/defense-by-position breakdowns with real footage. New track, needs its own production pipeline (see §3).
-9. **Draft / Cape Cod / Pro-Pipeline Milestones** — draft day, summer-league placements, pro call-ups.
+1. **The Pitch: Value Props** — the 5 pillar graphics (`source/`, `exports/`) plus their broken-down sub-topics in `TOPIC_BANK.md`, including the Service community deep-dives (Aviation, Surface Warfare, Submarines, Marine Corps, Special Warfare, Cyber & Intel, plus others) — job day-to-day, minimum-commitment path, 20-year career path, pay/lifestyle per community. Fully evergreen, can rotate indefinitely.
+2. **Commits & Signings** — reactive news content, one post per real commit or signing.
+3. **Game Highlights / Recaps** — in-season only (Feb–June); dormant during summer travel-ball season.
+4. **Player & Alumni Spotlights + Coach Bios** — recruit features, alumni in the pro pipeline or notable post-service careers, and coaching staff backgrounds.
+5. **USNA Life** — culture/lifestyle content and explainers, humanizes the program beyond the recruiting pitch.
+6. **Facility & Program** — the $5M facility renovation, individual facility spaces, tech (TrackMan/TruMedia/Aware), program culture.
+7. **Player Development (video)** — hitting/pitching/defense-by-position breakdowns with real footage. New track, needs its own production pipeline (see §3).
+8. **Draft / Cape Cod / Pro-Pipeline Milestones** — draft day, summer-league placements, pro call-ups.
 
 Most streams beyond #1 are **input-dependent** — they need real names, photos, footage, or news from Chris/the program. Nothing in this plan fabricates a commit, a player name, a stat, or a claim about how USNA itself works. Anywhere the bank can't be filled with sourced material, it's flagged, not guessed (per the accuracy rule below).
 

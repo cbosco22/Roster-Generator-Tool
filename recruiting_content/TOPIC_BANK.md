@@ -8,9 +8,11 @@ Status: ✅ Ready to post · 🟡 Needs design (facts already sourced, just need
 
 ---
 
-## Monday — "The Pitch: Value Props" (18-item bank, ~4.5 month cycle)
+## Monday — "The Pitch: Value Props" (25-item bank, ~6 month cycle)
 
-Rotates evenly across Academics, Money/Degree Value, Baseball culture, and Life After Service so no single pillar dominates a stretch of weeks. Service's overview graphic runs once here as one of the 5 originals; deeper service-community breakdowns live in a bank of their own below, for whenever a second weekly "value prop" slot opens up.
+Interleaved round-robin across Academics (6), Money/Degree Value (5), Service (8 — overview + 7 community deep-dives), Baseball (2), and Life After Service (4), so no single pillar dominates a stretch of weeks. Service, being the largest list, runs out last and ends up 3-in-a-row at the very tail of the cycle (weeks 23–25) — acceptable since that's ~6 months out and the bank will likely grow before then.
+
+Each Service community deep-dive is broken into: what the job is day-to-day, the minimum-commitment path, the 20-year career path, and pay/where-you'd-live/lifestyle. These are all 🔴 — need input to confirm current, defensible specifics per community (career pipeline details, pay figures, typical duty stations) before publishing, same accuracy bar as the rest of the kit.
 
 | # | Pillar | Concept | Status |
 |---|--------|---------|--------|
@@ -21,33 +23,24 @@ Rotates evenly across Academics, Money/Degree Value, Baseball culture, and Life 
 | 5 | Life After Service | Overview — "Five Years In. Set For Life." | ✅ |
 | 6 | Academics | G1 deep-dive: Engineering & Weapons majors | 🟡 |
 | 7 | Money/Degree Value | $350K → $0 stat post | 🟡 |
-| 8 | Life After Service | Retire-by-42 path breakdown | 🟡 |
+| 8 | Service | Community deep-dive: Aviation | 🔴 |
 | 9 | Baseball | Program culture/history: no scholarships, no NIL, no portal | 🟡 |
-| 10 | Academics | G2 deep-dive: Math & Science / Quant Econ | 🟡 |
-| 11 | Money/Degree Value | "Paid every month" mechanic post | 🟡 |
-| 12 | Life After Service | Branch-out path breakdown (CEOs, airline captains, politics) | 🟡 |
-| 13 | Academics | G3 deep-dive: Humanities & Social Sciences | 🟡 |
-| 14 | Money/Degree Value | Career-starter loan post ($36K @ 0.75% APR) | 🟡 |
-| 15 | Life After Service | Navy alumni superlatives (President, Congress, astronauts, Nobel) | 🟡 |
-| 16 | Academics | "Where it leads — in uniform" career path post | 🟡 |
-| 17 | Money/Degree Value | Mid-career alumni salary stat post ($131K) | 🟡 |
-| 18 | Academics | "...and after service" career path post | 🟡 |
-
----
-
-## Service Communities (deep-dive bank — not yet wired into the weekly rotation, ready to slot in as a second value-prop stream)
-
-Each community gets its own post broken into: what the job is day-to-day, the minimum-commitment path, the 20-year career path, and pay/where-you'd-live/lifestyle. All 🔴 — needs input to confirm current, defensible specifics per community (career pipeline details, pay figures, typical duty stations) before publishing, same accuracy bar as the rest of the kit.
-
-| # | Community | Status |
-|---|-----------|--------|
-| 1 | Aviation | 🔴 |
-| 2 | Surface Warfare | 🔴 |
-| 3 | Submarines | 🔴 |
-| 4 | Marine Corps | 🔴 |
-| 5 | Special Warfare | 🔴 |
-| 6 | Cyber & Intel | 🔴 |
-| 7 | Naval Aviation NFO / Nuclear Power / Medicine / Civil Engineering / Supply ("Plus" communities) | 🔴 |
+| 10 | Life After Service | Retire-by-42 path breakdown | 🟡 |
+| 11 | Academics | G2 deep-dive: Math & Science / Quant Econ | 🟡 |
+| 12 | Money/Degree Value | "Paid every month" mechanic post | 🟡 |
+| 13 | Service | Community deep-dive: Surface Warfare | 🔴 |
+| 14 | Life After Service | Branch-out path breakdown (CEOs, airline captains, politics) | 🟡 |
+| 15 | Academics | G3 deep-dive: Humanities & Social Sciences | 🟡 |
+| 16 | Money/Degree Value | Career-starter loan post ($36K @ 0.75% APR) | 🟡 |
+| 17 | Service | Community deep-dive: Submarines | 🔴 |
+| 18 | Life After Service | Navy alumni superlatives (President, Congress, astronauts, Nobel) | 🟡 |
+| 19 | Academics | "Where it leads — in uniform" career path post | 🟡 |
+| 20 | Money/Degree Value | Mid-career alumni salary stat post ($131K) | 🟡 |
+| 21 | Service | Community deep-dive: Marine Corps | 🔴 |
+| 22 | Academics | "...and after service" career path post | 🟡 |
+| 23 | Service | Community deep-dive: Special Warfare | 🔴 |
+| 24 | Service | Community deep-dive: Cyber & Intel | 🔴 |
+| 25 | Service | "Plus" communities: NFO, Nuclear Power, Medicine, Civil Eng, Supply | 🔴 |
 
 ---
 
