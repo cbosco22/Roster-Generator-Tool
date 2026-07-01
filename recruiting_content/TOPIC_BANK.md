@@ -82,14 +82,14 @@ Player and Alumni stay generic placeholder slots (new real content needed every 
 | # | Concept | Status |
 |---|---------|--------|
 | 1 | Day in the Yard — morning formation | 🔴 |
-| 2 | How the company system works — 36 companies (6 battalions × 6), ~4,400 midshipmen brigade-wide, ~150/company, 4 platoons × 3 squads (10–14 each) | 🟡 |
+| 2 | How the company system works — 36 companies (6 battalions × 6), ~4,400 midshipmen brigade-wide, ~150/company, 4 platoons × 3 squads (10–14 each) | ✅ (built — `Navy_Baseball_USNA_Companies.png`) |
 | 3 | Plebe year overview | 🔴 |
 | 4 | A day in the life — schedule walkthrough | 🔴 |
 | 5 | Bancroft Hall / dorm life | 🔴 |
 | 6 | Team downtime / study hours | 🔴 |
-| 7 | Leadership structure: Brigade Commander (top 1/c midshipman) + company/battalion student leadership | 🟡 |
+| 7 | Leadership structure: Brigade Commander (top 1/c midshipman) + company/battalion student leadership | ✅ (built — `Navy_Baseball_USNA_Leadership.png`) |
 
-Items 2 and 7 are now sourced (usna.edu, see `RESEARCH_FINDINGS.md` §4) — upgraded from Needs Input to Needs Design. Items 1, 3, 4, 5, 6 still need real photos/schedule specifics.
+Items 1, 3, 4, 5, 6 still need real photos/schedule specifics.
 
 ---
 
@@ -98,17 +98,17 @@ Items 2 and 7 are now sourced (usna.edu, see `RESEARCH_FINDINGS.md` §4) — upg
 | # | Concept | Status |
 |---|---------|--------|
 | 1 | The field — **Terwilliger Brothers Field at Max Bishop Stadium** | 🟡 (photo already in kit: `source/bb_field.jpg`) |
-| 2 | Weight room | 🟡 (photo already in kit: `source/bb_weight.jpg` — confirm Halsey Field House vs. Ricketts Hall) |
-| 3 | Coaches/team at work | 🟡 (possible photo in kit: `source/bb_huddle.jpg` — confirm before use) |
+| 2 | Weight room | ✅ (built — `Navy_Baseball_Weight_Room.png`, deliberately doesn't name a specific building since Halsey Field House vs. Ricketts Hall is unconfirmed) |
+| 3 | Coaches/team at work | ✅ (built — `Navy_Baseball_Coaches_Work.png`, using `bb_huddle.jpg`) |
 | 4 | **Joe Duff Indoor Batting Facility** | 🔴 (name confirmed, photo needed) |
 | 5 | Nutrition station | 🔴 |
-| 6 | Tech spotlight: TrackMan | 🟡 |
-| 7 | Tech spotlight: TruMedia | 🟡 |
-| 8 | Tech spotlight: Aware | 🟡 |
-| 9 | $5M renovation — groundbreaking (new locker room, expanded training room, wardroom, nutrition center, coaches' offices, 2 fan suites, press box; targets 2027 home opener) | 🟡 |
+| 6 | Tech spotlight: TrackMan | ✅ (built — `Navy_Baseball_Tech_TrackMan.png`) |
+| 7 | Tech spotlight: TruMedia | ✅ (built — `Navy_Baseball_Tech_TruMedia.png`) |
+| 8 | Tech spotlight: Aware | 🔴 (could not verify what "Aware" tech actually is — no matching Navy baseball tool found; skipped rather than guess) |
+| 9 | $5M renovation — groundbreaking (new locker room, expanded training room, wardroom, nutrition center, coaches' offices, 2 fan suites, press box; targets 2027 home opener) | ✅ (built — `Navy_Baseball_Renovation.png`, no photo per Chris's instruction) |
 | 10 | $5M renovation — progress update | 🔴 |
-| 11 | Program History: 1893–2026, 131 seasons, 11 NCAA Tournament bids, 2 Elite Eight runs (1954, 1986), 2016's 43-win program record | 🟡 |
-| 12 | Program History: Patriot League — 11 titles in the last 16 years, reigning 2024–25 champs, 13 All-America selections | 🟡 |
+| 11 | Program History: 1893–2026, 131 seasons, 11 NCAA Tournament bids, 2 Elite Eight runs (1954, 1986), 2016's 43-win program record | ✅ (built — `Navy_Baseball_History_1893.png`) |
+| 12 | Program History: Patriot League — 11 titles in the last 16 years, reigning 2024–25 champs, 13 All-America selections | ✅ (built — `Navy_Baseball_Patriot_League.png`) |
 | 13 | Program History: **"Annapolis to the Show"** — full 11-pick MLB Draft list (2003–2021) with Noah Song hero photo | ✅ (built — `Navy_Baseball_Program_History.png`, rebuilt around Chris's reference graphic, replaces the earlier placeholder "94-year gap" framing) |
 | 14 | Program History: the "94-year gap" — Nemo Gaines (1921), Navy's first Midshipman in MLB (pre-draft era), to Mitch Harris (2015) | 🟡 |
 
