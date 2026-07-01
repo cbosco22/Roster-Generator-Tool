@@ -112,6 +112,12 @@
   .perk .t{font-family:'Oswald',sans-serif;font-weight:500;font-size:18.5px;line-height:1.12;letter-spacing:.02em;text-transform:uppercase;color:#E7EDF6;}
   .perk .t span{display:block;font-weight:300;font-size:15px;letter-spacing:.03em;color:var(--steel);text-transform:none;margin-top:2px;}
 
+  .mapbox{
+    margin-top:32px;border:1px solid rgba(201,168,92,0.30);border-radius:6px;
+    background:linear-gradient(180deg, rgba(22,55,101,0.40), rgba(9,26,52,0.25));
+    padding:14px 26px 2px;
+  }
+
   /* financial bullets */
   .fin{margin-top:24px;display:flex;flex-direction:column;gap:15px;}
   .fin .row{display:flex;align-items:flex-start;gap:15px;}
@@ -151,22 +157,23 @@
         <p class="sub">Founded in 1649, the <b>"Sailing Capital of the World"</b> has been Navy Baseball's home port for over a century — and it's <b>unlike anywhere else you'll play.</b></p>
       </div>
 
-      <div class="stats">
-        <div class="stat">
-          <div class="n">1649</div>
-          <div class="d">Founded — one of the oldest cities in America</div>
-          <div class="src">City of Annapolis</div>
-        </div>
-        <div class="stat">
-          <div class="n">33 <small>MI</small></div>
-          <div class="d">To Washington, D.C.</div>
-          <div class="src">USNA Campus</div>
-        </div>
-        <div class="stat">
-          <div class="n">26 <small>MI</small></div>
-          <div class="d">To Baltimore</div>
-          <div class="src">USNA Campus</div>
-        </div>
+      <div class="mapbox">
+        <svg viewBox="0 0 900 220" width="100%" height="220">
+          <line x1="452" y1="150" x2="686" y2="46" stroke="#C9A85C" stroke-width="2" stroke-dasharray="3 7" opacity=".7"/>
+          <line x1="452" y1="150" x2="150" y2="196" stroke="#C9A85C" stroke-width="2" stroke-dasharray="3 7" opacity=".7"/>
+          <text x="600" y="88" font-family="Oswald" font-weight="500" font-size="19" letter-spacing="1" fill="#E6CF8B">26 MI</text>
+          <text x="270" y="162" font-family="Oswald" font-weight="500" font-size="19" letter-spacing="1" fill="#E6CF8B">33 MI</text>
+
+          <circle cx="686" cy="46" r="9" fill="#90A6C6"/>
+          <text x="686" y="26" text-anchor="middle" font-family="Oswald" font-weight="600" font-size="22" letter-spacing="1" fill="#DCE4F0">BALTIMORE</text>
+
+          <circle cx="150" cy="196" r="9" fill="#90A6C6"/>
+          <text x="150" y="216" text-anchor="middle" font-family="Oswald" font-weight="600" font-size="22" letter-spacing="1" fill="#DCE4F0">WASHINGTON, D.C.</text>
+
+          <circle cx="452" cy="150" r="13" fill="#C9A85C"/>
+          <circle cx="452" cy="150" r="21" fill="none" stroke="#C9A85C" stroke-width="1.5" opacity=".55"/>
+          <text x="452" y="130" text-anchor="middle" font-family="Anton" font-size="28" letter-spacing="1" fill="#F5F2EA">ANNAPOLIS</text>
+        </svg>
       </div>
 
       <div class="fin">
