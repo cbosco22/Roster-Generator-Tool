@@ -61,80 +61,65 @@
   .wing i:nth-child(3){top:10px;right:14px;}
 
   /* headline */
-  .toprow{margin-top:34px;display:flex;align-items:flex-start;gap:36px;}
-  .head{flex:1;min-width:0;}
   .head h1{
     font-family:'Anton',sans-serif;font-weight:400;text-transform:uppercase;
     line-height:.86;letter-spacing:.005em;transform:skewX(-7deg);transform-origin:left;
   }
-  .head .l1{font-size:74px;color:var(--cream);}
-  .head .l2{font-size:74px;color:var(--gold);}
-  .head .l2 .dot{color:var(--cream);}
+  .head .l1{font-size:66px;color:var(--cream);}
+  .head .l2{font-size:66px;color:var(--gold);}
   .sub{
-    margin-top:16px;font-family:'Oswald',sans-serif;font-weight:300;
-    font-size:24px;line-height:1.32;color:#D7E0EE;
+    margin-top:14px;font-family:'Oswald',sans-serif;font-weight:300;
+    font-size:21px;line-height:1.32;color:#D7E0EE;
   }
   .sub b{font-weight:600;color:#fff;}
-  .namebar{margin-top:18px;display:flex;flex-direction:column;gap:2px;}
-  .namebar .nm{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:50px;line-height:1;color:var(--gold-br);letter-spacing:.01em;}
-  .namebar .rl{font-family:'Oswald',sans-serif;font-weight:500;font-size:18px;letter-spacing:.14em;text-transform:uppercase;color:var(--steel);}
-  .portrait{
-    flex:0 0 300px;width:300px;height:390px;margin-top:66px;border-radius:6px;overflow:hidden;position:relative;
-    border:1px solid rgba(201,168,92,0.40);background-size:cover;background-position:50% 22%;
-    box-shadow:0 10px 30px rgba(0,0,0,0.35);
-  }
-  .portrait::after{content:"";position:absolute;inset:0;background:linear-gradient(0deg,rgba(6,18,38,0.55) 0%,rgba(6,18,38,0) 30%);}
-  .portrait .cap{position:absolute;left:0;right:0;bottom:0;padding:12px 14px;font-family:'Oswald';font-weight:500;font-size:14px;letter-spacing:.12em;text-transform:uppercase;color:var(--gold-br);}
 
-  /* signature comparison */
-  .compare{
-    margin-top:40px;display:grid;grid-template-columns:1fr 78px 1fr;align-items:center;
-    background:linear-gradient(180deg, rgba(22,55,101,0.55), rgba(9,26,52,0.35));
-    border:1px solid rgba(201,168,92,0.30);border-radius:6px;padding:26px 30px;
+  /* split layout — photo stretches to match the text column's full height */
+  .split{flex:1;display:flex;gap:34px;margin-top:26px;min-height:0;}
+  .left{flex:1;min-width:0;display:flex;flex-direction:column;}
+  .photocol{
+    flex:0 0 380px;width:380px;border-radius:8px;overflow:hidden;position:relative;
+    border:1px solid rgba(201,168,92,0.40);background-size:cover;background-position:50% 18%;
+    box-shadow:0 16px 40px rgba(0,0,0,0.45);
   }
-  .compare .cell .k{
-    font-family:'Oswald',sans-serif;font-weight:500;font-size:19px;letter-spacing:.16em;
-    text-transform:uppercase;color:var(--steel);
-  }
-  .compare .cell .v{
-    font-family:'Barlow Condensed',sans-serif;font-weight:700;line-height:.95;margin-top:4px;
-  }
-  .compare .left .v{font-size:88px;color:#9FB1CC;text-decoration:line-through;text-decoration-thickness:4px;text-decoration-color:rgba(201,168,92,.85);}
-  .compare .right .v{font-size:88px;color:var(--gold-br);}
-  .compare .right .plus{font-family:'Oswald',sans-serif;font-weight:500;font-size:22px;color:var(--cream);letter-spacing:.02em;}
-  .arrow{display:flex;align-items:center;justify-content:center;color:var(--gold);font-size:46px;font-family:'Barlow Condensed';font-weight:700;}
+  .photocol::after{content:"";position:absolute;inset:0;background:linear-gradient(0deg,rgba(6,18,38,0.82) 0%,rgba(6,18,38,0.15) 26%,rgba(6,18,38,0) 46%);}
+  .photocol .cap{position:absolute;left:0;right:0;bottom:0;padding:22px 24px;}
+  .photocol .cap .nm{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:44px;line-height:1;color:var(--gold-br);letter-spacing:.01em;}
+  .photocol .cap .rl{margin-top:4px;font-family:'Oswald',sans-serif;font-weight:500;font-size:16px;letter-spacing:.14em;text-transform:uppercase;color:#DCE4F0;}
 
   /* stat chips */
-  .stats{margin-top:34px;display:grid;grid-template-columns:repeat(3,1fr);gap:22px;}
-  .stat{border-top:3px solid var(--gold);padding-top:16px;}
-  .stat .n{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:96px;line-height:.86;color:#fff;}
-  .stat .n small{font-size:48px;color:var(--gold-br);font-weight:700;vertical-align:top;}
-  .stat .d{margin-top:10px;min-height:92px;font-family:'Oswald',sans-serif;font-weight:400;font-size:25px;line-height:1.22;color:#DCE4F0;}
-  .stat .src{margin-top:8px;font-family:'Oswald',sans-serif;font-weight:500;font-size:15px;letter-spacing:.14em;text-transform:uppercase;color:var(--gold-br);}
+  .stats{margin-top:28px;display:grid;grid-template-columns:repeat(3,1fr);gap:16px;}
+  .stat{border-top:3px solid var(--gold);padding-top:14px;}
+  .stat .n{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:66px;line-height:.86;color:#fff;}
+  .stat .d{margin-top:8px;font-family:'Oswald',sans-serif;font-weight:400;font-size:18px;line-height:1.22;color:#DCE4F0;}
+  .stat .badge{
+    display:inline-block;margin-top:10px;padding:4px 10px;border:1px solid rgba(201,168,92,0.5);
+    border-radius:3px;font-family:'Oswald',sans-serif;font-weight:600;font-size:12px;
+    letter-spacing:.1em;color:var(--gold-br);text-transform:uppercase;
+  }
 
-  /* perks strip */
-  .perks{margin-top:30px;display:flex;gap:16px;}
+  /* perks list — stacked for the narrower text column */
+  .perks{margin-top:22px;display:flex;flex-direction:column;gap:10px;}
   .perk{
-    flex:1;display:flex;align-items:center;gap:14px;
+    display:flex;align-items:center;gap:14px;
     border:1px solid rgba(201,168,92,0.34);border-radius:5px;
-    background:rgba(22,55,101,0.28);padding:16px 18px;
+    background:rgba(22,55,101,0.28);padding:12px 16px;
   }
   .perk .ic{flex:0 0 auto;color:var(--gold);}
-  .perk .t{font-family:'Oswald',sans-serif;font-weight:500;font-size:18.5px;line-height:1.12;letter-spacing:.02em;text-transform:uppercase;color:#E7EDF6;}
-  .perk .t span{display:block;font-weight:300;font-size:15px;letter-spacing:.03em;color:var(--steel);text-transform:none;margin-top:2px;}
+  .perk .t{font-family:'Oswald',sans-serif;font-weight:500;font-size:17px;line-height:1.1;letter-spacing:.02em;text-transform:uppercase;color:#E7EDF6;}
+  .perk .t span{display:block;font-weight:300;font-size:14px;letter-spacing:.03em;color:var(--steel);text-transform:none;margin-top:2px;}
 
   /* financial bullets */
-  .fin{margin-top:24px;display:flex;flex-direction:column;gap:15px;}
-  .fin .row{display:flex;align-items:flex-start;gap:15px;}
-  .fin .mk{flex:0 0 auto;margin-top:7px;}
-  .fin .tx{font-family:'Oswald',sans-serif;font-weight:300;font-size:23.5px;line-height:1.24;color:#DCE4F0;}
+  .fin{margin-top:20px;display:flex;flex-direction:column;gap:12px;}
+  .fin .row{display:flex;align-items:flex-start;gap:13px;}
+  .fin .mk{flex:0 0 auto;margin-top:5px;}
+  .fin .tx{font-family:'Oswald',sans-serif;font-weight:300;font-size:18.5px;line-height:1.24;color:#DCE4F0;}
   .fin .tx b{font-weight:600;color:#fff;}
   .fin .tx em{font-style:normal;font-weight:600;color:var(--gold-br);}
 
-  .spacer{flex:1;}
+  .leftspacer{flex:1;}
 
   /* footer */
-  .foot{display:flex;align-items:flex-end;justify-content:space-between;border-top:1px solid rgba(201,168,92,0.28);padding-top:24px;}
+  .foot{display:flex;align-items:flex-end;justify-content:space-between;border-top:1px solid rgba(201,168,92,0.28);padding-top:24px;margin-top:20px;}
   .foot .mark{font-family:'Anton',sans-serif;font-size:42px;letter-spacing:.01em;text-transform:uppercase;color:var(--cream);transform:skewX(-7deg);}
   .foot .mark span{color:var(--gold);}
   .foot .meta{text-align:right;font-family:'Oswald',sans-serif;font-weight:300;font-size:17px;line-height:1.4;color:var(--steel);letter-spacing:.04em;}
@@ -154,66 +139,70 @@
         <span class="lbl">Navy Baseball &nbsp;·&nbsp; The Staff</span>
       </div>
 
-      <div class="toprow">
-        <div class="head">
-          <h1>
-            <div class="l1">Meet The Coach</div>
-            <div class="l2">Who Builds Pros.</div>
-          </h1>
-          <div class="namebar">
-            <span class="nm">Chuck Ristano</span>
-            <span class="rl">Head Coach</span>
+      <div class="split">
+        <div class="left">
+          <div class="head">
+            <h1>
+              <div class="l1">Meet The Coach</div>
+              <div class="l2">Who Builds Pros.</div>
+            </h1>
+            <p class="sub">A 19&#8209;year climb through Division I that's produced <b>41 MLB draft picks and counting.</b></p>
           </div>
-          <p class="sub">A 19&#8209;year climb through Division I that's produced <b>41 MLB draft picks and counting.</b></p>
-        </div>
-        <div class="portrait" style="background-image:url('coach_ristano.jpg');"></div>
-      </div>
 
-      <div class="stats">
-        <div class="stat">
-          <div class="n">41</div>
-          <div class="d">Players he's coached who were drafted into the MLB</div>
-          <div class="src">Navysports.com</div>
+          <div class="stats">
+            <div class="stat">
+              <div class="n">41</div>
+              <div class="d">Players he's coached drafted into pro ball</div>
+              <div class="badge">MLB Draft</div>
+            </div>
+            <div class="stat">
+              <div class="n">9</div>
+              <div class="d">Of those players reached the Major Leagues</div>
+              <div class="badge">MLB</div>
+            </div>
+            <div class="stat">
+              <div class="n">27</div>
+              <div class="d">All&#8209;Americans coached across his career</div>
+              <div class="badge">All&#8209;America</div>
+            </div>
+          </div>
+
+          <div class="perks">
+            <div class="perk">
+              <svg class="ic" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+              <div class="t">4th Season<span>Navy's head coach since 2023</span></div>
+            </div>
+            <div class="perk">
+              <svg class="ic" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.9 6 6.6.6-5 4.3 1.5 6.5L12 16l-6 3.4 1.5-6.5-5-4.3 6.6-.6z"/></svg>
+              <div class="t">12 Years<span>Pitching coach at Notre Dame</span></div>
+            </div>
+            <div class="perk">
+              <svg class="ic" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>
+              <div class="t">Sacred Heart '04<span>4&#8209;yr letterwinner, 2x captain</span></div>
+            </div>
+          </div>
+
+          <div class="fin">
+            <div class="row">
+              <svg class="mk" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#C9A85C" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4l8 8-8 8"/><path d="M13 4l8 8-8 8"/></svg>
+              <div class="tx">Named Navy's head coach <b>June 17, 2023</b> — the <em>6th head coach in the program's last 85 years.</em></div>
+            </div>
+            <div class="row">
+              <svg class="mk" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#C9A85C" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4l8 8-8 8"/><path d="M13 4l8 8-8 8"/></svg>
+              <div class="tx">Before Navy: <b>12 seasons at Notre Dame</b>, plus stops at Sacred Heart, Monmouth, Temple &amp; Florida State.</div>
+            </div>
+          </div>
+
+          <div class="leftspacer"></div>
         </div>
-        <div class="stat">
-          <div class="n">9</div>
-          <div class="d">Of those players reached the Major Leagues</div>
-          <div class="src">Navysports.com</div>
-        </div>
-        <div class="stat">
-          <div class="n">27</div>
-          <div class="d">All&#8209;Americans coached across his career</div>
-          <div class="src">Navysports.com</div>
+
+        <div class="photocol" style="background-image:url('coach_ristano.jpg');">
+          <div class="cap">
+            <div class="nm">Chuck Ristano</div>
+            <div class="rl">Head Coach</div>
+          </div>
         </div>
       </div>
-
-      <div class="perks">
-        <div class="perk">
-          <svg class="ic" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
-          <div class="t">4th Season<span>Navy's head coach since 2023</span></div>
-        </div>
-        <div class="perk">
-          <svg class="ic" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.9 6 6.6.6-5 4.3 1.5 6.5L12 16l-6 3.4 1.5-6.5-5-4.3 6.6-.6z"/></svg>
-          <div class="t">12 Years<span>Pitching coach at Notre Dame</span></div>
-        </div>
-        <div class="perk">
-          <svg class="ic" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>
-          <div class="t">Sacred Heart '04<span>4&#8209;yr letterwinner, 2x captain</span></div>
-        </div>
-      </div>
-
-      <div class="fin">
-        <div class="row">
-          <svg class="mk" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#C9A85C" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4l8 8-8 8"/><path d="M13 4l8 8-8 8"/></svg>
-          <div class="tx">Named Navy's head coach <b>June 17, 2023</b> — the <em>6th head coach in the program's last 85 years.</em></div>
-        </div>
-        <div class="row">
-          <svg class="mk" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#C9A85C" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4l8 8-8 8"/><path d="M13 4l8 8-8 8"/></svg>
-          <div class="tx">Before Navy: <b>12 seasons at Notre Dame</b> (3 NCAA Tournaments, 1 College World Series), plus stops at Sacred Heart, Monmouth, Temple &amp; Florida State.</div>
-        </div>
-      </div>
-
-      <div class="spacer"></div>
 
       <div class="foot">
         <div class="mark">Navy <span>Baseball</span></div>
