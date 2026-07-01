@@ -88,14 +88,11 @@
 
   /* stat chips */
   .stats{margin-top:28px;display:grid;grid-template-columns:repeat(3,1fr);gap:16px;}
-  .stat{border-top:3px solid var(--gold);padding-top:14px;display:flex;flex-direction:column;}
-  .stat .n{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:66px;line-height:.86;color:#fff;}
-  .stat .d{margin-top:8px;font-family:'Oswald',sans-serif;font-weight:400;font-size:18px;line-height:1.22;color:#DCE4F0;}
-  .stat .logowrap{margin-top:16px;}
-  .stat .logobox{
-    display:block;max-width:100%;height:auto;border:1px solid rgba(201,168,92,0.35);border-radius:5px;
-  }
-  .stat .logoplain{display:block;height:56px;width:auto;filter:drop-shadow(0 2px 6px rgba(0,0,0,0.4));}
+  .stat{border-top:3px solid var(--gold);padding-top:16px;display:flex;flex-direction:column;align-items:center;text-align:center;}
+  .stat .logowrap{height:60px;display:flex;align-items:center;justify-content:center;}
+  .stat .logowrap img,.stat .logowrap svg{display:block;height:60px;width:auto;filter:drop-shadow(0 2px 6px rgba(0,0,0,0.45));}
+  .stat .n{margin-top:14px;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:66px;line-height:.86;color:#fff;}
+  .stat .d{margin-top:8px;font-family:'Oswald',sans-serif;font-weight:400;font-size:17px;line-height:1.22;color:#DCE4F0;}
 
   /* perks list — stacked for the narrower text column */
   .perks{margin-top:22px;display:flex;flex-direction:column;gap:10px;}
@@ -151,29 +148,27 @@
 
           <div class="stats">
             <div class="stat">
+              <div class="logowrap"><img src="mlb_draft_logo.png" alt="MLB Draft"></div>
               <div class="n">41</div>
               <div class="d">Players he's coached drafted into pro ball</div>
-              <div class="logowrap"><img class="logobox" src="mlb_draft_logo.png" alt="MLB Draft"></div>
             </div>
             <div class="stat">
+              <div class="logowrap"><img src="mlb_logo.png" alt="MLB"></div>
               <div class="n">9</div>
               <div class="d">Of those players reached the Major Leagues</div>
-              <div class="logowrap"><img class="logoplain" src="mlb_logo.png" alt="MLB"></div>
             </div>
             <div class="stat">
-              <div class="n">27</div>
-              <div class="d">All&#8209;Americans coached across his career</div>
               <div class="logowrap">
-                <svg width="120" height="82" viewBox="0 0 120 82">
-                  <rect x="1.5" y="1.5" width="117" height="79" rx="4" fill="rgba(22,55,101,0.35)" stroke="#C9A85C" stroke-width="2"/>
-                  <rect x="7" y="7" width="106" height="68" rx="2" fill="none" stroke="#C9A85C" stroke-width="1" opacity="0.5"/>
-                  <g transform="translate(60,26) scale(1.35)">
+                <svg viewBox="0 0 110 60">
+                  <g transform="translate(55,17) scale(1.15)">
                     <path d="M0 -8l2.4 5.1 5.6.6-4.2 3.7 1.3 5.5L0 3.4l-5.1 2.5 1.3-5.5-4.2-3.7 5.6-.6z" fill="#E6CF8B"/>
                   </g>
-                  <text x="60" y="54" text-anchor="middle" font-family="Anton" font-size="20" letter-spacing="1.5" fill="#F5F2EA">ALL</text>
-                  <text x="60" y="71" text-anchor="middle" font-family="Anton" font-size="15" letter-spacing="1.5" fill="#E6CF8B">AMERICA</text>
+                  <text x="55" y="42" text-anchor="middle" font-family="Anton" font-size="19" letter-spacing="1.5" fill="#F5F2EA">ALL</text>
+                  <text x="55" y="58" text-anchor="middle" font-family="Anton" font-size="14" letter-spacing="1.5" fill="#E6CF8B">AMERICA</text>
                 </svg>
               </div>
+              <div class="n">27</div>
+              <div class="d">All&#8209;Americans coached across his career</div>
             </div>
           </div>
 
