@@ -753,9 +753,19 @@ with tab_sched:
 # ---- Post-Event ----
 with tab_post:
     st.subheader("Post-event ratings")
+
+    # Rollout notice — self-expires 5 days after it was added (2026-06-30),
+    # no manual cleanup needed. Chris asked for this so coaches stop doing
+    # the old copy/paste workflow now that direct writes work.
+    if datetime.now() <= datetime(2026, 7, 5, 23, 59, 59):
+        st.info("**New:** you no longer need to copy/paste ratings into the spreadsheet "
+                "yourself. Fill this out below and click **Write to Recruiting Sheet "
+                "2.0** at the bottom — it goes straight in. (A copy/paste table is still "
+                "available at the very bottom of this page as a manual backup.)")
+
     st.caption("Drop your annotated GoodNotes pages (exported as JPGs). I read the "
                "hand-written New★, split existing-board players from new players, and "
-               "give you two paste-ready files.")
+               "write straight to Recruiting Sheet 2.0.")
 
     pe_api_key = _get_api_key()
     if not pe_api_key:
@@ -957,6 +967,40 @@ with tab_post:
                     except Exception as e:
                         wstatus.update(label="Failed", state="error")
                         st.exception(e)
+
+        # --- Manual fallback: copy/paste tables, same shape as the old
+        # workflow. Chris asked to keep this available at the bottom in
+        # case the direct write has a bad day - it uses the same
+        # edited_rows / pe_upd_rows already built above, not a separate
+        # path, so it can never drift out of sync with what "Write to
+        # Recruiting Sheet 2.0" would send. ---
+        st.divider()
+        with st.expander("🛟 Manual fallback — copy/paste into the sheet yourself"):
+            st.caption("Only needed if the write button above has a bad day. Each "
+                       "block is a tab-separated table — click the copy icon in the "
+                       "top-right of the box, then paste directly into the sheet.")
+            st.markdown("**New players**")
+            if edited_rows:
+                new_tsv = rows_to_csv(edited_rows, NEW_PLAYER_COLUMNS,
+                                      delimiter="\t").decode("utf-8")
+                st.code(new_tsv, language=None)
+                st.download_button("⬇️ New players (CSV)",
+                                   data=rows_to_csv(edited_rows, NEW_PLAYER_COLUMNS),
+                                   file_name="new_players.csv", mime="text/csv",
+                                   key="pe_fallback_new_dl")
+            else:
+                st.caption("No new players on these pages.")
+            st.markdown("**Rating updates**")
+            if st.session_state["pe_upd_rows"]:
+                upd_tsv = rows_to_csv(st.session_state["pe_upd_rows"], UPDATE_COLUMNS,
+                                      delimiter="\t").decode("utf-8")
+                st.code(upd_tsv, language=None)
+                st.download_button("⬇️ Rating updates (CSV)",
+                                   data=rows_to_csv(st.session_state["pe_upd_rows"], UPDATE_COLUMNS),
+                                   file_name="rating_updates.csv", mime="text/csv",
+                                   key="pe_fallback_upd_dl")
+            else:
+                st.caption("No rating updates on these pages.")
 
 
 # ---- Add Player ----
