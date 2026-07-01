@@ -35,7 +35,7 @@ PKL_PATH  = DATA_DIR / "pbr_rankings.pkl"
 
 # Now import the locked scripts. gen_roster_pdf looks for the pkl in
 # <script_dir>/data/pbr_rankings.pkl by default, so nothing to mirror.
-from db_loader import parse_xlsx
+from db_loader import parse_xlsx, find_columns
 import gen_roster_pdf
 from photo_to_roster import extract_roster_from_image, extract_roster_from_images, extract_roster_from_files, to_pdf_payload
 from post_event_extractor import extract_post_event_page
@@ -757,12 +757,13 @@ with tab_post:
                     try:
                         st.write("Loading current sheet…")
                         db_for_write = parse_xlsx(str(XLSX_PATH))
+                        cols = find_columns(str(XLSX_PATH))
 
                         st.write("Matching players…")
                         ops = []
                         for r in upd_raw:
                             ops.append(sheet_write.build_upsert_op(
-                                db_for_write, first=r.get("first", ""), last=r.get("last", ""),
+                                db_for_write, cols, first=r.get("first", ""), last=r.get("last", ""),
                                 event_name=pe_event, new_tier=(r.get("new_star") or "").strip(),
                                 state=r.get("state", ""), hs=r.get("school", ""),
                                 team=r.get("_team_name", ""), pos=r.get("pos", ""),
@@ -770,7 +771,7 @@ with tab_post:
                                 notes=r.get("notes_handwritten", "")))
                         for r in edited_rows:
                             ops.append(sheet_write.build_upsert_op(
-                                db_for_write, first=r.get("First", ""), last=r.get("Last", ""),
+                                db_for_write, cols, first=r.get("First", ""), last=r.get("Last", ""),
                                 event_name=(r.get("Seen") or pe_event),
                                 new_tier=str(r.get("★", "") or "").strip(),
                                 state=r.get("State", ""), hs=r.get("High School", ""),
@@ -793,14 +794,26 @@ with tab_post:
                             n_upd = sum(1 for r in real["results"] if r["action"] == "update")
                             wstatus.update(label="Done", state="complete")
                             st.success(f"✓ Written to Recruiting Sheet 2.0 — "
-                                      f"{n_new} new player(s), {n_upd} update(s).")
+                                      f"{n_new} new player(s), {n_upd} update(s), "
+                                      f"every field verified by reading it back.")
                         else:
                             wstatus.update(label="Failed", state="error")
-                            st.error(f"Write failed: {real.get('error')}")
+                            bad = [(op, r) for op, r in zip(ops, real.get("results", []))
+                                  if not r.get("ok")]
+                            if bad:
+                                st.error("Some fields did not verify after writing — "
+                                        "nothing here is guaranteed applied correctly:")
+                                for op, r in bad:
+                                    st.write(f"- {op.get('player')} (row {r.get('row')}): "
+                                            f"{r.get('error')}")
+                            else:
+                                st.error(f"Write failed: {real.get('error')}")
                         with st.expander("🔍 What was sent (debug)"):
+                            st.write("Resolved columns for this write:")
+                            st.json(cols)
                             st.write("Built from the table above:")
                             st.json(ops)
-                            st.write("Apps Script confirmed it applied:")
+                            st.write("Apps Script verified after writing (read back, not just setValue success):")
                             st.json(real)
                     except Exception as e:
                         wstatus.update(label="Failed", state="error")

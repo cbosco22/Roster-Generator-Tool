@@ -11,41 +11,27 @@
  * the deploying user's own permissions, so it sidesteps that restriction
  * entirely - no GCP project, no service account, no OAuth flow.
  *
- * Column map (1-indexed, matches Sheets' native getRange(row, col)).
- * Verified against the real header row 2026-06-30 - do not guess, re-verify
- * against row 3 of the live sheet if this ever looks wrong. Corrected same
- * day: columns 3 and 4 were backwards in an earlier version of this
- * comment (and in the Python side that calls this), which contributed to
- * a corrupted row - see apps_script/README.md and sheet_write.py's
- * module docstring for the full story.
- *   3  = ID (compound label, e.g. "Noah Stead (0.1) - '25 MINF CA")
- *   4  = Name (plain "First Last")
- *   5  = Pos Group (derived bucket - RHP/LHP/C/INF/OF)
- *   6  = Date Added
- *   7  = By (coach initials)
- *   8  = First Name
- *   9  = Last Name
- *   10 = Class
- *   11 = ★ (tier/rating)
- *   12 = Commit
- *   13 = Pos
- *   17 = State
- *   18 = High School
- *   19 = Summer Team
- *   23 = Seen
- * Data rows start at row 4 (rows 1-3 are header/legend).
+ * Column numbers are NEVER hardcoded here (or on the Python side that calls
+ * this). Confirmed 2026-06-30: Chris deleted two leading columns on the live
+ * sheet, and every hardcoded column number silently pointed at the wrong
+ * field - this script reported "ok: true" for every write while most of the
+ * data never actually showed up anywhere in the row. Column numbers now come
+ * from the request itself (Python resolves them fresh from the live header
+ * via db_loader.find_columns() right before every write).
  *
- * This script's own write logic (setValue per column below) never
- * needed to change for this fix - it just writes whatever column/value
- * pairs it's given. The bug and the fix were entirely on the Python side
- * (sheet_write.py). No redeploy needed for this specific correction.
+ * This script also no longer trusts setValue() not throwing as proof a
+ * write actually stuck. Confirmed the same day: setValue() can report
+ * success while the write does not persist (most likely because the sheet
+ * was being structurally edited - columns deleted - at the same moment).
+ * Every write now flushes and reads the cell back before being reported as
+ * applied.
  */
 
 var SHEET_NAME = 'High School Players';
 var DATA_START_ROW = 4;
+var HEADER_ROW = 3;
 
 function doPost(e) {
-  var result = { ok: false, results: [] };
   try {
     var body = JSON.parse(e.postData.contents);
     var token = PropertiesService.getScriptProperties().getProperty('WRITE_TOKEN');
@@ -57,31 +43,44 @@ function doPost(e) {
     var sheet = ss.getSheetByName(SHEET_NAME);
     if (!sheet) return _json({ ok: false, error: 'sheet not found: ' + SHEET_NAME });
 
+    var firstNameCol = _findHeaderColumn(sheet, 'First Name');
+    if (!firstNameCol) {
+      return _json({ ok: false, error: 'Could not find a "First Name" column in row ' +
+                    HEADER_ROW + ' - sheet header may have changed.' });
+    }
+
     var ops = body.ops || [];
     var results = [];
     for (var i = 0; i < ops.length; i++) {
-      results.push(_applyOp(sheet, ops[i], dryRun));
+      results.push(_applyOp(sheet, ops[i], dryRun, firstNameCol));
     }
-    return _json({ ok: true, dryRun: dryRun, results: results });
+    var allOk = results.every(function(r) { return r.ok; });
+    return _json({ ok: allOk, dryRun: dryRun, results: results });
   } catch (err) {
     return _json({ ok: false, error: String(err) });
   }
 }
 
-// Real First Name column - see column map comment above.
-var FIRST_NAME_COL = 8;
+// Finds a column by its exact header text in HEADER_ROW, instead of a
+// hardcoded number - see file header comment for why this matters.
+function _findHeaderColumn(sheet, label) {
+  var lastCol = sheet.getLastColumn();
+  var headers = sheet.getRange(HEADER_ROW, 1, 1, lastCol).getValues()[0];
+  for (var c = 0; c < headers.length; c++) {
+    if (String(headers[c]).trim() === label) return c + 1;
+  }
+  return null;
+}
 
 // sheet.getLastRow() is unreliable here: extending the Filter range (see
 // README) or any formatting on empty rows makes Sheets report those rows
-// as "having content" even though no player data is there. Caught this
-// 2026-06-30 in a dry run - it would have appended new players around row
-// 5000 while real data ends near row 1980, leaving thousands of blank
-// rows in between. Scan the actual First Name column instead.
-function _findLastDataRow(sheet) {
+// as "having content" even though no player data is there. Scan the real
+// First Name column instead.
+function _findLastDataRow(sheet, firstNameCol) {
   var maxRow = sheet.getMaxRows();
   var span = maxRow - DATA_START_ROW + 1;
   if (span <= 0) return DATA_START_ROW - 1;
-  var values = sheet.getRange(DATA_START_ROW, FIRST_NAME_COL, span, 1).getValues();
+  var values = sheet.getRange(DATA_START_ROW, firstNameCol, span, 1).getValues();
   for (var i = values.length - 1; i >= 0; i--) {
     if (values[i][0] !== '' && values[i][0] !== null) {
       return DATA_START_ROW + i;
@@ -90,29 +89,54 @@ function _findLastDataRow(sheet) {
   return DATA_START_ROW - 1;
 }
 
-function _applyOp(sheet, op, dryRun) {
+// Writes one column's value and reads it back to confirm it actually
+// persisted, instead of trusting that setValue() not throwing means the
+// write stuck (it does not always - see file header comment). Returns the
+// value actually found in the cell afterward.
+function _setAndVerify(sheet, row, col, value) {
+  var range = sheet.getRange(row, col);
+  range.setValue(value);
+  SpreadsheetApp.flush();
+  return range.getValue();
+}
+
+function _applyOp(sheet, op, dryRun, firstNameCol) {
+  var targetRow;
   if (op.action === 'update') {
     if (!op.row || op.row < DATA_START_ROW) {
       return { action: 'update', ok: false, error: 'invalid row: ' + op.row };
     }
-    var written = {};
-    for (var col in op.fields) {
-      written[col] = op.fields[col];
-      if (!dryRun) sheet.getRange(op.row, parseInt(col, 10)).setValue(op.fields[col]);
-    }
-    return { action: 'update', ok: true, row: op.row, fields: written };
+    targetRow = op.row;
+  } else if (op.action === 'append') {
+    targetRow = _findLastDataRow(sheet, firstNameCol) + 1;
+    if (targetRow < DATA_START_ROW) targetRow = DATA_START_ROW;
+  } else {
+    return { action: op.action, ok: false, error: 'unknown action' };
   }
-  if (op.action === 'append') {
-    var newRow = _findLastDataRow(sheet) + 1;
-    if (newRow < DATA_START_ROW) newRow = DATA_START_ROW;
-    var written = {};
-    for (var col in op.fields) {
-      written[col] = op.fields[col];
-      if (!dryRun) sheet.getRange(newRow, parseInt(col, 10)).setValue(op.fields[col]);
+
+  var written = {};
+  var mismatches = [];
+  for (var col in op.fields) {
+    var intended = op.fields[col];
+    if (dryRun) {
+      written[col] = intended;
+    } else {
+      var actual = _setAndVerify(sheet, targetRow, parseInt(col, 10), intended);
+      written[col] = actual;
+      // Loose equality: Sheets can return a Date object for a date string,
+      // or a number for a numeric string - compare as strings to avoid
+      // false-positive mismatches on those, while still catching a value
+      // that genuinely did not take.
+      if (String(actual) !== String(intended) && !(actual === '' && intended === '')) {
+        mismatches.push(col);
+      }
     }
-    return { action: 'append', ok: true, row: newRow, fields: written };
   }
-  return { action: op.action, ok: false, error: 'unknown action' };
+  if (mismatches.length) {
+    return { action: op.action, ok: false, row: targetRow, fields: written,
+            error: 'These columns did not verify after write: ' + mismatches.join(', ') };
+  }
+  return { action: op.action, ok: true, row: targetRow, fields: written };
 }
 
 function _json(obj) {

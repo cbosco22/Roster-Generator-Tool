@@ -78,25 +78,71 @@ def _variants(first, last):
         v.add(f"{alt} {last}")
     return v
 
+# Header text -> canonical field name. Resolved from the LIVE header row at
+# parse time, never hardcoded column numbers - those broke silently on
+# 2026-06-30 when Chris deleted two leading columns and every hardcoded
+# index quietly pointed at the wrong field. If the sheet's headers are ever
+# renamed, update the labels below - do not go back to fixed indices.
+_HEADER_LABELS = {
+    'id': 'ID', 'name': 'Name', 'pos_group': 'Pos Group',
+    'date_added': 'Date Added:', 'by': 'By:',
+    'first': 'First Name', 'last': 'Last Name', 'class': 'Class',
+    'tier': '★', 'commit': 'Commit', 'pos': 'Pos',
+    'state': 'State', 'hs': 'High School', 'team': 'Summer Team',
+    'seen': 'Seen', 'notes': 'Notes',
+}
+
+
+def find_columns(path, sheet_name='High School Players', header_row=3):
+    """Resolve current 1-indexed column numbers by scanning the live header
+    row. Raises clearly if a needed header is missing rather than silently
+    reading/writing the wrong column."""
+    import openpyxl
+    wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
+    ws = wb[sheet_name]
+    header = {}
+    for cell in ws[header_row]:
+        if cell.value not in (None, ''):
+            header[str(cell.value).strip()] = cell.column
+    wb.close()
+    cols, missing = {}, []
+    for field, label in _HEADER_LABELS.items():
+        if label in header:
+            cols[field] = header[label]
+        else:
+            missing.append(label)
+    if missing:
+        raise ValueError(f"Recruiting sheet header changed - could not find column(s) "
+                         f"{missing} in row {header_row}. Check the sheet's real header "
+                         f"before trusting any read or write.")
+    return cols
+
+
 def parse_xlsx(path, sheet_name='High School Players'):
     import openpyxl
+    cols = find_columns(path, sheet_name)
+    i_first, i_last, i_class = cols['first']-1, cols['last']-1, cols['class']-1
+    i_tier, i_commit, i_pos = cols['tier']-1, cols['commit']-1, cols['pos']-1
+    i_state, i_hs, i_team, i_seen = cols['state']-1, cols['hs']-1, cols['team']-1, cols['seen']-1
+    max_idx = max(i_first, i_last, i_class, i_tier, i_commit, i_pos, i_state, i_hs, i_team, i_seen)
+
     wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
     ws = wb[sheet_name]
     db = {}
     skipped = 0
     for i, row in enumerate(ws.iter_rows(values_only=True), 1):
         if i <= 3: continue
-        if len(row) < 10: continue
-        first  = str(row[7]).strip()  if row[7]  is not None else ''
-        last   = str(row[8]).strip()  if row[8]  is not None else ''
-        yr     = str(row[9]).strip()  if row[9]  is not None else ''
-        tier   = str(row[10]).strip() if row[10] is not None else ''
-        commit = str(row[11]).strip() if row[11] is not None else ''
-        pos    = str(row[12]).strip() if row[12] is not None else ''
-        state  = str(row[16]).strip() if len(row) > 16 and row[16] is not None else ''
-        hs     = str(row[17]).strip() if len(row) > 17 and row[17] is not None else ''
-        team   = str(row[18]).strip() if len(row) > 18 and row[18] is not None else ''
-        seen   = str(row[22]).strip() if len(row) > 22 and row[22] is not None else ''
+        if len(row) <= max_idx: continue
+        first  = str(row[i_first]).strip()  if row[i_first]  is not None else ''
+        last   = str(row[i_last]).strip()   if row[i_last]   is not None else ''
+        yr     = str(row[i_class]).strip()  if row[i_class]  is not None else ''
+        tier   = str(row[i_tier]).strip()   if row[i_tier]   is not None else ''
+        commit = str(row[i_commit]).strip() if row[i_commit] is not None else ''
+        pos    = str(row[i_pos]).strip()    if row[i_pos]    is not None else ''
+        state  = str(row[i_state]).strip()  if row[i_state]  is not None else ''
+        hs     = str(row[i_hs]).strip()     if row[i_hs]     is not None else ''
+        team   = str(row[i_team]).strip()   if row[i_team]   is not None else ''
+        seen   = str(row[i_seen]).strip()   if row[i_seen]   is not None else ''
         if yr.endswith('.0'): yr = yr[:-2]
         if tier.endswith('.0') and tier != '0.1': tier = tier[:-2]
         if not first or not last: skipped += 1; continue
