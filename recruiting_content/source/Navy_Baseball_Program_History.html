@@ -46,7 +46,7 @@
   .frame::before{top:-2px;left:-2px;border-right:0;border-bottom:0;}
   .frame::after{bottom:-2px;right:-2px;border-left:0;border-top:0;}
 
-  .wrap{position:relative;z-index:5;height:100%;padding:92px 84px 78px;display:flex;flex-direction:column;}
+  .wrap{position:relative;z-index:5;height:100%;padding:88px 84px 70px;display:flex;flex-direction:column;}
 
   /* eyebrow */
   .eyebrow{display:flex;align-items:center;gap:18px;}
@@ -61,69 +61,40 @@
   .wing i:nth-child(3){top:10px;right:14px;}
 
   /* headline */
-  .head{margin-top:34px;}
+  .head{margin-top:20px;}
   .head h1{
     font-family:'Anton',sans-serif;font-weight:400;text-transform:uppercase;
     line-height:.86;letter-spacing:.005em;transform:skewX(-7deg);transform-origin:left;
   }
-  .head .l1{font-size:118px;color:var(--cream);}
-  .head .l2{font-size:118px;color:var(--gold);}
-  .head .l2 .dot{color:var(--cream);}
+  .head .l1{font-size:84px;color:var(--cream);}
+  .head .l2{font-size:84px;color:var(--gold);}
   .sub{
-    margin-top:26px;max-width:760px;font-family:'Oswald',sans-serif;font-weight:300;
-    font-size:31px;line-height:1.32;color:#D7E0EE;
+    margin-top:14px;max-width:900px;font-family:'Oswald',sans-serif;font-weight:300;
+    font-size:22px;line-height:1.3;color:#D7E0EE;
   }
   .sub b{font-weight:600;color:#fff;}
 
-  /* signature comparison */
-  .compare{
-    margin-top:40px;display:grid;grid-template-columns:1fr 78px 1fr;align-items:center;
-    background:linear-gradient(180deg, rgba(22,55,101,0.55), rgba(9,26,52,0.35));
-    border:1px solid rgba(201,168,92,0.30);border-radius:6px;padding:26px 30px;
-  }
-  .compare .cell .k{
-    font-family:'Oswald',sans-serif;font-weight:500;font-size:19px;letter-spacing:.16em;
-    text-transform:uppercase;color:var(--steel);
-  }
-  .compare .cell .v{
-    font-family:'Barlow Condensed',sans-serif;font-weight:700;line-height:.95;margin-top:4px;
-  }
-  .compare .left .v{font-size:88px;color:#9FB1CC;text-decoration:line-through;text-decoration-thickness:4px;text-decoration-color:rgba(201,168,92,.85);}
-  .compare .right .v{font-size:88px;color:var(--gold-br);}
-  .compare .right .plus{font-family:'Oswald',sans-serif;font-weight:500;font-size:22px;color:var(--cream);letter-spacing:.02em;}
-  .arrow{display:flex;align-items:center;justify-content:center;color:var(--gold);font-size:46px;font-family:'Barlow Condensed';font-weight:700;}
+  /* hero photo */
+  .hero{margin-top:20px;height:220px;border-radius:6px;overflow:hidden;position:relative;
+    border:1px solid rgba(201,168,92,0.35);background-size:cover;}
+  .hero::after{content:"";position:absolute;inset:0;z-index:1;background:linear-gradient(0deg,rgba(3,10,24,0.92) 0%,rgba(3,10,24,0.35) 45%,rgba(3,10,24,0.05) 70%);}
+  .hero .cap{position:absolute;left:0;right:0;bottom:0;z-index:2;padding:16px 22px;}
+  .hero .cap .nm{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:32px;line-height:1;color:var(--gold-br);text-shadow:0 2px 8px rgba(0,0,0,0.8);}
+  .hero .cap .rl{margin-top:4px;font-family:'Oswald',sans-serif;font-weight:500;font-size:15.5px;letter-spacing:.02em;color:#fff;text-shadow:0 2px 6px rgba(0,0,0,0.8);}
 
-  /* stat chips */
-  .stats{margin-top:34px;display:grid;grid-template-columns:repeat(3,1fr);gap:22px;}
-  .stat{border-top:3px solid var(--gold);padding-top:16px;}
-  .stat .n{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:96px;line-height:.86;color:#fff;}
-  .stat .n small{font-size:48px;color:var(--gold-br);font-weight:700;vertical-align:top;}
-  .stat .d{margin-top:10px;min-height:92px;font-family:'Oswald',sans-serif;font-weight:400;font-size:25px;line-height:1.22;color:#DCE4F0;}
-  .stat .src{margin-top:8px;font-family:'Oswald',sans-serif;font-weight:500;font-size:15px;letter-spacing:.14em;text-transform:uppercase;color:var(--gold-br);}
-
-  /* perks strip */
-  .perks{margin-top:30px;display:flex;gap:16px;}
-  .perk{
-    flex:1;display:flex;align-items:center;gap:14px;
-    border:1px solid rgba(201,168,92,0.34);border-radius:5px;
-    background:rgba(22,55,101,0.28);padding:16px 18px;
-  }
-  .perk .ic{flex:0 0 auto;color:var(--gold);}
-  .perk .t{font-family:'Oswald',sans-serif;font-weight:500;font-size:18.5px;line-height:1.12;letter-spacing:.02em;text-transform:uppercase;color:#E7EDF6;}
-  .perk .t span{display:block;font-weight:300;font-size:15px;letter-spacing:.03em;color:var(--steel);text-transform:none;margin-top:2px;}
-
-  /* financial bullets */
-  .fin{margin-top:24px;display:flex;flex-direction:column;gap:15px;}
-  .fin .row{display:flex;align-items:flex-start;gap:15px;}
-  .fin .mk{flex:0 0 auto;margin-top:7px;}
-  .fin .tx{font-family:'Oswald',sans-serif;font-weight:300;font-size:23.5px;line-height:1.24;color:#DCE4F0;}
-  .fin .tx b{font-weight:600;color:#fff;}
-  .fin .tx em{font-style:normal;font-weight:600;color:var(--gold-br);}
+  /* draft list */
+  .listwrap{margin-top:18px;border-top:1px solid rgba(201,168,92,0.3);}
+  .row{display:flex;align-items:baseline;gap:14px;padding:9px 2px;border-bottom:1px solid rgba(201,168,92,0.14);}
+  .row:nth-child(even){background:rgba(22,55,101,0.18);}
+  .row .yr{flex:0 0 62px;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:21px;color:var(--gold-br);}
+  .row .nm{flex:1;min-width:0;font-family:'Oswald',sans-serif;font-weight:600;font-size:17px;color:#F1F5FA;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .row .nm span{font-weight:300;color:var(--steel);}
+  .row .rd{flex:0 0 auto;font-family:'Oswald',sans-serif;font-weight:400;font-size:15.5px;color:#B9C6DA;text-align:right;white-space:nowrap;}
 
   .spacer{flex:1;}
 
   /* footer */
-  .foot{display:flex;align-items:flex-end;justify-content:space-between;border-top:1px solid rgba(201,168,92,0.28);padding-top:24px;}
+  .foot{display:flex;align-items:flex-end;justify-content:space-between;border-top:1px solid rgba(201,168,92,0.28);padding-top:20px;margin-top:14px;}
   .foot .mark{font-family:'Anton',sans-serif;font-size:42px;letter-spacing:.01em;text-transform:uppercase;color:var(--cream);transform:skewX(-7deg);}
   .foot .mark span{color:var(--gold);}
   .foot .meta{text-align:right;font-family:'Oswald',sans-serif;font-weight:300;font-size:17px;line-height:1.4;color:var(--steel);letter-spacing:.04em;}
@@ -145,54 +116,31 @@
 
       <div class="head">
         <h1>
-          <div class="l1">It Took</div>
-          <div class="l2">94 Years.</div>
+          <div class="l1">Annapolis</div>
+          <div class="l2">To The Show.</div>
         </h1>
-        <p class="sub">Nemo Gaines was the <b>first Midshipman ever to play in the Major Leagues</b> — in 1921. Navy wouldn't see another <b>for nearly a century.</b></p>
+        <p class="sub">Eleven Midshipmen have heard their name called in the <b>MLB Draft</b> since 2003 — Navy Baseball's pipeline to professional ball, pick by pick.</p>
       </div>
 
-      <div class="stats">
-        <div class="stat">
-          <div class="n">1921</div>
-          <div class="d">Nemo Gaines becomes the first Midshipman ever in MLB (Washington Senators)</div>
-          <div class="src">Baseball Almanac</div>
-        </div>
-        <div class="stat">
-          <div class="n">2015</div>
-          <div class="d">Mitch Harris — first Navy grad in an MLB game since Gaines. A 94&#8209;year gap.</div>
-          <div class="src">Navysports.com</div>
-        </div>
-        <div class="stat">
-          <div class="n">2019</div>
-          <div class="d">Noah Song — Navy's highest&#8209;ever MLB draft pick (Red Sox, 4th round)</div>
-          <div class="src">Navysports.com</div>
+      <div class="hero" style="background-image:url('noah_song_usa.jpg');background-position:50% 30%;">
+        <div class="cap">
+          <div class="nm">Noah Song</div>
+          <div class="rl">4th Round, Boston Red Sox (2019) — now pitching for Team USA at the AAA level</div>
         </div>
       </div>
 
-      <div class="fin">
-        <div class="row">
-          <svg class="mk" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#C9A85C" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4l8 8-8 8"/><path d="M13 4l8 8-8 8"/></svg>
-          <div class="tx">Oliver Drake followed in 2008 (Orioles, 43rd round) and went on to a <em>6&#8209;year MLB career.</em></div>
-        </div>
-        <div class="row">
-          <svg class="mk" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#C9A85C" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4l8 8-8 8"/><path d="M13 4l8 8-8 8"/></svg>
-          <div class="tx"><b>131 seasons of Navy Baseball</b> — and the pipeline to pro ball keeps growing.</div>
-        </div>
-      </div>
-
-      <div class="perks" style="margin-top:40px;">
-        <div class="perk">
-          <svg class="ic" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
-          <div class="t">1893<span>Program founded</span></div>
-        </div>
-        <div class="perk">
-          <svg class="ic" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.9 6 6.6.6-5 4.3 1.5 6.5L12 16l-6 3.4 1.5-6.5-5-4.3 6.6-.6z"/></svg>
-          <div class="t">11<span>NCAA Tournament bids</span></div>
-        </div>
-        <div class="perk">
-          <svg class="ic" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>
-          <div class="t">13<span>All&#8209;America selections</span></div>
-        </div>
+      <div class="listwrap">
+        <div class="row"><div class="yr">2003</div><div class="nm">Matt Foster <span>— P</span></div><div class="rd">13th Rd, Toronto</div></div>
+        <div class="row"><div class="yr">2007</div><div class="nm">Mitch Harris <span>— P</span></div><div class="rd">24th Rd, Atlanta</div></div>
+        <div class="row"><div class="yr">2007</div><div class="nm">Jonathan Johnston <span>— C</span></div><div class="rd">42nd Rd, Oakland</div></div>
+        <div class="row"><div class="yr">2008</div><div class="nm">Mitch Harris <span>— P</span></div><div class="rd">13th Rd, St. Louis</div></div>
+        <div class="row"><div class="yr">2008</div><div class="nm">Oliver Drake <span>— P</span></div><div class="rd">43rd Rd, Baltimore</div></div>
+        <div class="row"><div class="yr">2012</div><div class="nm">Alex Azor <span>— OF</span></div><div class="rd">10th Rd, Toronto</div></div>
+        <div class="row"><div class="yr">2012</div><div class="nm">Preston Gainey <span>— P</span></div><div class="rd">11th Rd, Milwaukee</div></div>
+        <div class="row"><div class="yr">2015</div><div class="nm">Stephen Moore <span>— P</span></div><div class="rd">10th Rd, Atlanta</div></div>
+        <div class="row"><div class="yr">2016</div><div class="nm">Luke Gillingham <span>— P</span></div><div class="rd">37th Rd, Toronto</div></div>
+        <div class="row"><div class="yr">2019</div><div class="nm">Noah Song <span>— P</span></div><div class="rd">4th Rd, Boston</div></div>
+        <div class="row"><div class="yr">2021</div><div class="nm">Charlie Connolly <span>— P</span></div><div class="rd">20th Rd, LA Dodgers</div></div>
       </div>
 
       <div class="spacer"></div>
@@ -200,7 +148,7 @@
       <div class="foot">
         <div class="mark">Navy <span>Baseball</span></div>
         <div class="meta">
-          <b>131 seasons.</b>
+          <b>11 draft picks.</b>
           And counting.
         </div>
       </div>

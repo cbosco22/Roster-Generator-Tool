@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<style>
+  :root{
+    --navy-0:#06152C;
+    --navy-1:#0B2348;
+    --navy-2:#163765;
+    --gold:#C9A85C;
+    --gold-br:#E6CF8B;
+    --cream:#F5F2EA;
+    --steel:#90A6C6;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  html,body{width:1080px;height:1350px;}
+  .card{
+    position:relative;width:1080px;height:1350px;overflow:hidden;
+    background:
+      radial-gradient(120% 90% at 18% 0%, #1B3E72 0%, rgba(27,62,114,0) 55%),
+      radial-gradient(140% 120% at 100% 100%, #0E2B57 0%, rgba(14,43,87,0) 50%),
+      linear-gradient(160deg, #0B2348 0%, #081B38 55%, #06152C 100%);
+    font-family:'Oswald',sans-serif;color:var(--cream);
+  }
+  /* halftone texture */
+  .card::before{
+    content:"";position:absolute;inset:0;
+    background-image:radial-gradient(rgba(255,255,255,0.05) 1px, transparent 1.4px);
+    background-size:7px 7px;mix-blend-mode:overlay;opacity:.5;
+  }
+  /* vignette */
+  .card::after{
+    content:"";position:absolute;inset:0;pointer-events:none;
+    box-shadow:inset 0 0 220px 60px rgba(2,9,20,0.65);
+  }
+  /* faint real anchor watermark */
+  .anchor{
+    position:absolute;right:-205px;bottom:-205px;width:720px;height:auto;
+    opacity:.07;z-index:0;filter:brightness(1.2) saturate(.7);
+  }
+  /* official N-star mark, top-right */
+  .brandmark{position:absolute;top:84px;right:84px;height:118px;width:auto;z-index:6;
+    filter:drop-shadow(0 2px 10px rgba(0,0,0,0.35));}
+  .frame{position:absolute;inset:34px;border:1.5px solid rgba(201,168,92,0.40);z-index:3;pointer-events:none;}
+  .frame::before,.frame::after{content:"";position:absolute;width:22px;height:22px;border:2px solid var(--gold);}
+  .frame::before{top:-2px;left:-2px;border-right:0;border-bottom:0;}
+  .frame::after{bottom:-2px;right:-2px;border-left:0;border-top:0;}
+
+  .wrap{position:relative;z-index:5;height:100%;padding:92px 84px 78px;display:flex;flex-direction:column;}
+
+  /* eyebrow */
+  .eyebrow{display:flex;align-items:center;gap:18px;}
+  .eyebrow .lbl{
+    font-family:'Oswald',sans-serif;font-weight:600;font-size:25px;
+    letter-spacing:.42em;color:var(--gold-br);text-transform:uppercase;white-space:nowrap;
+  }
+  .wing{flex:0 0 64px;height:13px;position:relative;}
+  .wing i{position:absolute;left:0;right:0;height:2.5px;background:var(--gold);border-radius:2px;}
+  .wing i:nth-child(1){top:0;right:14px;}
+  .wing i:nth-child(2){top:5px;}
+  .wing i:nth-child(3){top:10px;right:14px;}
+
+  /* headline */
+  .head h1{
+    font-family:'Anton',sans-serif;font-weight:400;text-transform:uppercase;
+    line-height:.86;letter-spacing:.005em;transform:skewX(-7deg);transform-origin:left;
+  }
+  .head .l1{font-size:68px;color:var(--cream);white-space:nowrap;}
+  .head .l2{font-size:68px;color:var(--gold);white-space:nowrap;}
+  .sub{
+    margin-top:18px;font-family:'Oswald',sans-serif;font-weight:300;
+    font-size:24px;line-height:1.32;color:#D7E0EE;
+  }
+  .sub b{font-weight:600;color:#fff;}
+
+  /* split layout — photo stretches to match the text column's full height */
+  .split{flex:1;display:flex;gap:34px;margin-top:26px;min-height:0;}
+  .left{flex:1;min-width:0;display:flex;flex-direction:column;}
+  .photocol{
+    flex:0 0 380px;width:380px;border-radius:8px;overflow:hidden;position:relative;
+    border:1px solid rgba(201,168,92,0.40);background-size:cover;background-position:50% 18%;
+    box-shadow:0 16px 40px rgba(0,0,0,0.45);
+  }
+  .photocol::after{content:"";position:absolute;inset:0;z-index:1;background:linear-gradient(0deg,rgba(3,10,24,0.97) 0%,rgba(3,10,24,0.75) 20%,rgba(3,10,24,0.25) 40%,rgba(3,10,24,0) 58%);}
+  .photocol .cap{position:absolute;left:0;right:0;bottom:0;z-index:2;padding:24px 26px;}
+  .photocol .cap .nm{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:48px;line-height:1;color:var(--gold-br);letter-spacing:.01em;text-shadow:0 2px 10px rgba(0,0,0,0.85);}
+  .photocol .cap .rl{margin-top:6px;font-family:'Oswald',sans-serif;font-weight:600;font-size:17px;letter-spacing:.16em;text-transform:uppercase;color:#fff;text-shadow:0 2px 8px rgba(0,0,0,0.85);}
+
+  /* stat chips */
+  .stats{margin-top:36px;display:grid;grid-template-columns:repeat(3,1fr);gap:18px;}
+  .stat{border-top:3px solid var(--gold);padding-top:20px;display:flex;flex-direction:column;align-items:center;text-align:center;}
+  .stat .logowrap{height:82px;display:flex;align-items:center;justify-content:center;}
+  .stat .logowrap img,.stat .logowrap svg{display:block;height:82px;width:auto;filter:drop-shadow(0 2px 6px rgba(0,0,0,0.45));}
+  .stat .logowrap.draft img{height:96px;}
+  .stat .n{margin-top:16px;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:78px;line-height:.86;color:#fff;}
+  .stat .d{margin-top:10px;font-family:'Oswald',sans-serif;font-weight:400;font-size:18px;line-height:1.24;color:#DCE4F0;}
+
+  /* perks list — stacked for the narrower text column */
+  .perks{margin-top:32px;display:flex;flex-direction:column;gap:14px;}
+  .perk{
+    display:flex;align-items:center;gap:16px;
+    border:1px solid rgba(201,168,92,0.34);border-radius:5px;
+    background:rgba(22,55,101,0.28);padding:16px 18px;
+  }
+  .perk .ic{flex:0 0 auto;color:var(--gold);width:28px;height:28px;}
+  .perk .t{font-family:'Oswald',sans-serif;font-weight:500;font-size:18px;line-height:1.1;letter-spacing:.02em;text-transform:uppercase;color:#E7EDF6;}
+  .perk .t span{display:block;font-weight:300;font-size:15px;letter-spacing:.03em;color:var(--steel);text-transform:none;margin-top:3px;}
+
+  /* financial bullets */
+  .fin{margin-top:28px;display:flex;flex-direction:column;gap:16px;}
+  .fin .row{display:flex;align-items:flex-start;gap:14px;}
+  .fin .mk{flex:0 0 auto;margin-top:6px;}
+  .fin .tx{font-family:'Oswald',sans-serif;font-weight:300;font-size:20px;line-height:1.26;color:#DCE4F0;}
+  .fin .tx b{font-weight:600;color:#fff;}
+  .fin .tx em{font-style:normal;font-weight:600;color:var(--gold-br);}
+
+  .leftspacer{flex:1;}
+
+  /* footer */
+  .foot{display:flex;align-items:flex-end;justify-content:space-between;border-top:1px solid rgba(201,168,92,0.28);padding-top:24px;margin-top:20px;}
+  .foot .mark{font-family:'Anton',sans-serif;font-size:42px;letter-spacing:.01em;text-transform:uppercase;color:var(--cream);transform:skewX(-7deg);}
+  .foot .mark span{color:var(--gold);}
+  .foot .meta{text-align:right;font-family:'Oswald',sans-serif;font-weight:300;font-size:17px;line-height:1.4;color:var(--steel);letter-spacing:.04em;}
+  .foot .meta b{display:block;font-weight:600;color:#C4D0E2;letter-spacing:.1em;text-transform:uppercase;font-size:15px;}
+</style>
+</head>
+<body>
+  <div class="card">
+    <img class="anchor" src="anchor.png" alt="">
+    <img class="brandmark" src="nstar.png" alt="Navy">
+
+    <div class="frame"></div>
+
+    <div class="wrap">
+      <div class="eyebrow">
+        <span class="wing"><i></i><i></i><i></i></span>
+        <span class="lbl">Navy Baseball &nbsp;·&nbsp; The Alumni</span>
+      </div>
+
+      <div class="split">
+        <div class="left">
+          <div class="head">
+            <h1>
+              <div class="l1">The Highest</div>
+              <div class="l2">Pick Ever.</div>
+            </h1>
+            <p class="sub">Noah Song is <b>Navy Baseball's highest&#8209;ever MLB Draft pick</b> — and Team USA's newest arm.</p>
+          </div>
+
+          <div class="stats">
+            <div class="stat">
+              <div class="logowrap draft"><img src="mlb_draft_logo.png" alt="MLB Draft"></div>
+              <div class="n">4th Rd</div>
+              <div class="d">Boston Red Sox, 2019 MLB Draft</div>
+            </div>
+            <div class="stat">
+              <div class="logowrap">
+                <svg viewBox="0 0 110 60">
+                  <g transform="translate(55,17) scale(1.15)">
+                    <path d="M0 -8l2.4 5.1 5.6.6-4.2 3.7 1.3 5.5L0 3.4l-5.1 2.5 1.3-5.5-4.2-3.7 5.6-.6z" fill="#E6CF8B"/>
+                  </g>
+                  <text x="55" y="46" text-anchor="middle" font-family="Anton" font-size="17" letter-spacing="1" fill="#F5F2EA">GOLDEN</text>
+                  <text x="55" y="62" text-anchor="middle" font-family="Anton" font-size="17" letter-spacing="1" fill="#E6CF8B">SPIKES</text>
+                </svg>
+              </div>
+              <div class="n">2019</div>
+              <div class="d">Golden Spikes Award Finalist</div>
+            </div>
+            <div class="stat">
+              <div class="logowrap"><img src="mlb_logo.png" alt="MLB"></div>
+              <div class="n">AAA</div>
+              <div class="d">Currently pitching for Team USA</div>
+            </div>
+          </div>
+
+          <div class="perks">
+            <div class="perk">
+              <svg class="ic" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>
+              <div class="t">Class of 2019<span>Naval Academy graduate</span></div>
+            </div>
+            <div class="perk">
+              <svg class="ic" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.9 6 6.6.6-5 4.3 1.5 6.5L12 16l-6 3.4 1.5-6.5-5-4.3 6.6-.6z"/></svg>
+              <div class="t">No. 137 Overall<span>Highest Navy pick in draft history</span></div>
+            </div>
+            <div class="perk">
+              <svg class="ic" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 22V4a2 2 0 0 1 2-2h9l5 5v15"/><path d="M9 22V12h6v10"/></svg>
+              <div class="t">Right&#8209;Handed<span>Pitcher</span></div>
+            </div>
+          </div>
+
+          <div class="fin">
+            <div class="row">
+              <svg class="mk" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#C9A85C" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4l8 8-8 8"/><path d="M13 4l8 8-8 8"/></svg>
+              <div class="tx">Selected <b>4th round, No. 137 overall</b> by the Boston Red Sox in 2019 — <em>the highest a Navy player has ever been drafted.</em></div>
+            </div>
+            <div class="row">
+              <svg class="mk" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#C9A85C" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4l8 8-8 8"/><path d="M13 4l8 8-8 8"/></svg>
+              <div class="tx">After his service commitment, Song is now pitching at the <b>Triple&#8209;A level</b> — and representing <em>Team USA</em> on the international stage.</div>
+            </div>
+          </div>
+
+          <div class="leftspacer"></div>
+        </div>
+
+        <div class="photocol" style="background-image:url('noah_song_usa.jpg');background-position:50% 25%;">
+          <div class="cap">
+            <div class="nm">Noah Song</div>
+            <div class="rl">Pitcher &middot; Class of 2019</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="foot">
+        <div class="mark">Navy <span>Baseball</span></div>
+        <div class="meta">
+          <b>Noah Song.</b>
+          Highest pick in program history.
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

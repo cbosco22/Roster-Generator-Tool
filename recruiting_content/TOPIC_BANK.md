@@ -46,12 +46,12 @@ Each Service community deep-dive is broken into: what the job is day-to-day, the
 
 ## Tuesday — "People" (24-item bank, 8 rounds of Player → Alumni → Coach)
 
-Player and Alumni stay generic placeholder slots (new real content needed every time they come up). Coach pulls from a named queue — 5 real bios are ready now (sourced in `RESEARCH_FINDINGS.md` §1), the last 3 rounds are support staff pending names from Chris.
+Player and Alumni stay generic placeholder slots (new real content needed every time they come up). Coach pulls from a named queue — 5 real bios are ready now (sourced in `RESEARCH_FINDINGS.md` §1), the last 3 rounds are support staff pending names from Chris. The first Alumni Spotlight turn is now filled by Noah Song (built ahead of schedule — see `Navy_Baseball_Alumni_Noah_Song.png`).
 
 | # | Concept | Status |
 |---|---------|--------|
 | 1 | Player Spotlight — recruit/commit feature (name, one-line bio, photo) | 🔴 |
-| 2 | Alumni Spotlight — pro-pipeline or post-service career feature (name, story, photo) | 🔴 |
+| 2 | Alumni Spotlight: **Noah Song** — highest-ever Navy MLB Draft pick, now AAA/Team USA | ✅ |
 | 3 | Coach Bio: **Chuck Ristano** — Head Coach | ✅ |
 | 4 | Player Spotlight | 🔴 |
 | 5 | Alumni Spotlight | 🔴 |
@@ -109,8 +109,8 @@ Items 2 and 7 are now sourced (usna.edu, see `RESEARCH_FINDINGS.md` §4) — upg
 | 10 | $5M renovation — progress update | 🔴 |
 | 11 | Program History: 1893–2026, 131 seasons, 11 NCAA Tournament bids, 2 Elite Eight runs (1954, 1986), 2016's 43-win program record | 🟡 |
 | 12 | Program History: Patriot League — 11 titles in the last 16 years, reigning 2024–25 champs, 13 All-America selections | 🟡 |
-| 13 | Program History: the "94-year gap" — Nemo Gaines (1921) to Mitch Harris (2015), Navy's MLB pioneers | 🟡 |
-| 14 | Program History: Noah Song, highest-ever Navy MLB draft pick (Red Sox, 4th round, 2019) | 🟡 |
+| 13 | Program History: **"Annapolis to the Show"** — full 11-pick MLB Draft list (2003–2021) with Noah Song hero photo | ✅ (built — `Navy_Baseball_Program_History.png`, rebuilt around Chris's reference graphic, replaces the earlier placeholder "94-year gap" framing) |
+| 14 | Program History: the "94-year gap" — Nemo Gaines (1921), Navy's first Midshipman in MLB (pre-draft era), to Mitch Harris (2015) | 🟡 |
 
 Items 1, 9, 11–14 sourced from official navysports.com pages — see `RESEARCH_FINDINGS.md` §2–3.
 
