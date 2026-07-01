@@ -45,6 +45,41 @@ Order below is a suggested posting sequence, not fixed — post in whatever orde
 - Coach Ristano's stat row uses the official MLB logo, a cropped MLB Draft logo (year removed), and an original All-America badge (no official mark exists for that designation) — logos supplied/approved by Chris directly for use in the program's own materials.
 - All facts sourced from official navysports.com/usna.edu pages or supplied directly by Chris — see `RESEARCH_FINDINGS.md`.
 
+---
+
+# Second Batch — 9 More Ready-to-Post Graphics
+
+Built after launch-batch review, covering the rest of Wednesday ("USNA Life") and Thursday ("Facility & Program") content banks. All 9 are rendered and in `exports/`. No fixed order — mix these into the posting cadence alongside the launch batch.
+
+**9. How the Yard Works** — `exports/Navy_Baseball_USNA_Companies.png`
+> How the Yard works. 4,400 midshipmen. 36 companies, about 150 each, broken into 4 platoons and 3 squads. It's not a dorm — it's a chain of command from day one. ⚓ #NavyBaseball
+
+**10. Led By Their Own** — `exports/Navy_Baseball_USNA_Leadership.png`
+> Led by their own. From the Brigade Commander down through 6 battalions and 36 companies, the Yard's leadership is run by midshipmen, for midshipmen — real command reps before you ever commission. ⚓ #NavyBaseball
+
+**11. Strength. Built In.** — `exports/Navy_Baseball_Weight_Room.png`
+> Strength. Built in. Navy Baseball trains year-round in a purpose-built strength facility — part of the everyday infrastructure that comes standard with the program. ⚓ #NavyBaseball
+
+**12. Hands On. Every Day.** — `exports/Navy_Baseball_Coaches_Work.png`
+> Hands on. Every day. Development doesn't happen by accident — Navy's staff is in the cage, on the mound, and in the film room with players every single day. ⚓ #NavyBaseball
+
+**13. See The Spin Rate.** — `exports/Navy_Baseball_Tech_TrackMan.png`
+> See the spin rate. Navy trains with TrackMan — the same radar-based ball-tracking tech MLB teams use to develop pitchers and hitters. ⚓ #NavyBaseball
+
+**14. Every Swing. Broken Down.** — `exports/Navy_Baseball_Tech_TruMedia.png`
+> Every swing, broken down. Navy runs video and analytics through TruMedia — the same platform pro front offices and top college programs use to scout, prep, and develop. ⚓ #NavyBaseball
+
+**15. $5M. Breaking Ground.** — `exports/Navy_Baseball_Renovation.png`
+> $5M. Breaking ground. Right after this season, Navy Baseball's home gets a full facilities overhaul — new locker room, wardroom, nutrition center, coaches' offices, fan suites, and a modern press box. Targeting the 2027 home opener. ⚓ #NavyBaseball
+
+**16. 131 Seasons.** — `exports/Navy_Baseball_History_1893.png`
+> 131 seasons. Navy Baseball has been on the field since 1893 — 11 NCAA Tournament appearances, 2 Elite Eight runs, and a program-record 43 wins in 2016. Still adding to it every year. ⚓ #NavyBaseball
+
+**17. 11 Titles. 16 Years.** — `exports/Navy_Baseball_Patriot_League.png`
+> 11 titles. 16 years. Navy hasn't just competed in the Patriot League — it's owned it. Eleven conference championships since 2009, and the reigning 2024 champs. ⚓ #NavyBaseball
+
+---
+
 ## What's still pending
 
-The regular 6-month calendar (`calendar/2026-H2-content-calendar.md`) hasn't been reconciled with this launch batch yet — holding off until you finish marking up which specific days/topics you want to keep, cut, or move. Once you're back with that, I'll adjust the calendar so it doesn't immediately repeat what launch day already covered, and fold in Noah Song as the first real Alumni Spotlight entry.
+The regular 6-month calendar (`calendar/2026-H2-content-calendar.md`) hasn't been reconciled with these two batches yet — holding off until you finish marking up which specific days/topics you want to keep, cut, or move. Once you're back with that, I'll adjust the calendar so it doesn't immediately repeat what these 17 already covered, and fold in Noah Song as the first real Alumni Spotlight entry.
