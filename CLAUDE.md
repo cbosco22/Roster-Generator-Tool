@@ -54,6 +54,7 @@ Importer tab was removed 2026-06-30 (was unused).
 - **Recruiting Google Sheet (OLD, retired 2026-06-30):** `1ecpbBbWaVaSlmz4qmHUWJw9Esj6P0x5R4y81QQYhMzE`
   - Owned by USNA staff (treilly@usna.edu), not Chris — was never API-writable
   - Sheet now carries a banner pointing to 2.0; keep it read-only, don't delete it (has years of extra notes/tabs not yet migrated)
+  - **2026-07-01: fully retired from AppSheet too.** The separate "Navy Baseball Recruiting" AppSheet app (appId `a58635b0-bdf7-4dd7-a00b-d64d16d1496e`, still in daily coach use, distinct from this Streamlit tool) was still bound to this old sheet until tonight — all 5 of its tables (High School Players, Recruiting Calendar Import, Recruiting Form Responses, Stock Text, Travel Program List) now point to Sheet 2.0 instead, verified with real data. Nothing live points to this old sheet anymore. Full migration details, including a not-yet-attempted future cleanup step, in memory: appsheet-sheet2-migration.
 - **Recruiting Sheet 2.0 (CURRENT source of truth):** `15XDpXkOLtGqyZaEVq3OvbugnB2e1XPbEzWJowPJCVfs`
   - Cloned from the old sheet, owned by Chris (bosco.chris01@gmail.com) — same "High School Players" tab/column layout, so `db_loader.parse_xlsx()` works against it unchanged
   - Shared as "anyone with the link can view" — **intentional, confirmed with Chris 2026-06-30** (the sheet has sensitive player data including minors' info, so don't change this sharing setting without checking with him first)
