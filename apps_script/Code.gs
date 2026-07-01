@@ -55,6 +55,28 @@ function doPost(e) {
   }
 }
 
+// Real First Name column - see column map comment above.
+var FIRST_NAME_COL = 8;
+
+// sheet.getLastRow() is unreliable here: extending the Filter range (see
+// README) or any formatting on empty rows makes Sheets report those rows
+// as "having content" even though no player data is there. Caught this
+// 2026-06-30 in a dry run - it would have appended new players around row
+// 5000 while real data ends near row 1980, leaving thousands of blank
+// rows in between. Scan the actual First Name column instead.
+function _findLastDataRow(sheet) {
+  var maxRow = sheet.getMaxRows();
+  var span = maxRow - DATA_START_ROW + 1;
+  if (span <= 0) return DATA_START_ROW - 1;
+  var values = sheet.getRange(DATA_START_ROW, FIRST_NAME_COL, span, 1).getValues();
+  for (var i = values.length - 1; i >= 0; i--) {
+    if (values[i][0] !== '' && values[i][0] !== null) {
+      return DATA_START_ROW + i;
+    }
+  }
+  return DATA_START_ROW - 1;
+}
+
 function _applyOp(sheet, op, dryRun) {
   if (op.action === 'update') {
     if (!op.row || op.row < DATA_START_ROW) {
@@ -68,7 +90,7 @@ function _applyOp(sheet, op, dryRun) {
     return { action: 'update', ok: true, row: op.row, fields: written };
   }
   if (op.action === 'append') {
-    var newRow = sheet.getLastRow() + 1;
+    var newRow = _findLastDataRow(sheet) + 1;
     if (newRow < DATA_START_ROW) newRow = DATA_START_ROW;
     var written = {};
     for (var col in op.fields) {

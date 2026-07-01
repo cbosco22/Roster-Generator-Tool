@@ -59,3 +59,14 @@ Every write request can include `"dryRun": true` in the JSON body — the
 script validates everything (token, row numbers, sheet name) and reports
 back exactly what it *would* write, without touching any cells. The Python
 side defaults to dry-run until explicitly told not to — see `sheet_write.py`.
+
+**This is not just a suggestion — it caught a real bug 2026-06-30.** A dry
+run of the append path came back targeting row 5001, because extending the
+Filter range (previous section) made `sheet.getLastRow()` think row 5000
+had content, even though real data ends around row 1980. Fixed in `Code.gs`
+(scans the actual First Name column for the real last data row instead of
+trusting `getLastRow()`), but that fix needs to be **re-pasted and
+re-deployed** the same way as step 3+7 above (paste the updated file, then
+Deploy → Manage deployments → edit → New version → Deploy) before any real
+write is safe to run. Always re-run a dry run after any Code.gs update and
+actually read the row numbers in the response before trusting it.

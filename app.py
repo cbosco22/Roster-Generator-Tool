@@ -46,6 +46,7 @@ from post_event_flow import (
 )
 import run_event
 import schedule_refresh
+import sheet_write
 try:
     from push_event import push_event as _push_event
     _HAVE_PUSH = True
@@ -681,7 +682,9 @@ with tab_post:
                 r["Seen"] = pe_event
         st.session_state["pe_new_rows"] = new_rows
         st.session_state["pe_upd_rows"] = build_updates_rows(result["updates"])
+        st.session_state["pe_upd_raw"] = result["updates"]
         st.session_state["pe_stats"] = result["stats"]
+        st.session_state["pe_write_preview"] = None
 
     if "pe_stats" in st.session_state:
         import pandas as pd
@@ -728,6 +731,7 @@ with tab_post:
 
         # --- New players (editable before download) ---
         st.markdown("**🆕 New players** — review/edit, then copy or download")
+        edited_rows = []
         if st.session_state["pe_new_rows"]:
             df = pd.DataFrame(st.session_state["pe_new_rows"],
                               columns=NEW_PLAYER_COLUMNS)
@@ -752,6 +756,76 @@ with tab_post:
                                mime="text/csv", use_container_width=True)
         else:
             st.caption("No new players on these pages.")
+
+        # --- Write straight to Recruiting Sheet 2.0 ---
+        st.divider()
+        st.markdown("**✍️ Write to Recruiting Sheet 2.0**")
+        sw_url = st.secrets.get("sheet_write_url")
+        sw_token = st.secrets.get("sheet_write_token")
+        if not (sw_url and sw_token):
+            st.info("Not configured — set `sheet_write_url` / `sheet_write_token` in "
+                    "Streamlit secrets (see `apps_script/README.md`) to enable writing "
+                    "straight into the sheet instead of copy/paste above.")
+        elif not pe_event:
+            st.info("Fill in the **Event** field above first — it is what gets "
+                    "appended to each player's Seen history.")
+        else:
+            upd_raw = st.session_state.get("pe_upd_raw", [])
+            db_for_write = parse_xlsx(str(XLSX_PATH))
+
+            def _build_ops():
+                ops = []
+                for r in upd_raw:
+                    ops.append(sheet_write.build_upsert_op(
+                        db_for_write, first=r.get("first", ""), last=r.get("last", ""),
+                        event_name=pe_event, new_tier=(r.get("new_star") or "").strip(),
+                        state=r.get("state", ""), hs=r.get("school", ""),
+                        team=r.get("_team_name", ""), pos=r.get("pos", ""),
+                        commit=r.get("commit", "")))
+                for r in edited_rows:
+                    ops.append(sheet_write.build_upsert_op(
+                        db_for_write, first=r.get("First", ""), last=r.get("Last", ""),
+                        event_name=(r.get("Seen") or pe_event),
+                        new_tier=str(r.get("★", "") or "").strip(),
+                        state=r.get("State", ""), hs=r.get("High School", ""),
+                        team=r.get("Summer Team", ""), pos=r.get("Pos", ""),
+                        commit=r.get("Commit", ""), class_year=r.get("Class", "")))
+                return ops
+
+            if st.button("🔍 Preview writes (dry run)", use_container_width=True,
+                        disabled=not (upd_raw or edited_rows)):
+                ops = _build_ops()
+                try:
+                    resp = sheet_write.post_ops(ops, sw_url, sw_token, dry_run=True)
+                    st.session_state["pe_write_preview"] = resp
+                except Exception as e:
+                    st.session_state["pe_write_preview"] = None
+                    st.exception(e)
+
+            preview = st.session_state.get("pe_write_preview")
+            if preview:
+                if preview.get("ok"):
+                    st.success(f"Dry run OK — {len(preview['results'])} operation(s) "
+                              "validated. Review exactly what will change below, "
+                              "then confirm.")
+                    for r in preview["results"]:
+                        label = "UPDATE existing" if r["action"] == "update" else "ADD new"
+                        st.write(f"**{label}** row {r.get('row', '?')} — "
+                                f"fields: {r.get('fields', {})}")
+                    if st.button("✅ Write for real", type="primary",
+                                use_container_width=True):
+                        ops = _build_ops()
+                        try:
+                            real = sheet_write.post_ops(ops, sw_url, sw_token, dry_run=False)
+                            if real.get("ok"):
+                                st.success("Written to Recruiting Sheet 2.0.")
+                                st.session_state["pe_write_preview"] = None
+                            else:
+                                st.error(f"Write failed: {real.get('error')}")
+                        except Exception as e:
+                            st.exception(e)
+                else:
+                    st.error(f"Dry run failed: {preview.get('error')}")
 
 
 # ---- Admin ----
