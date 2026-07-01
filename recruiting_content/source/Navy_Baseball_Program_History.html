@@ -75,7 +75,7 @@
   .sub b{font-weight:600;color:#fff;}
 
   /* hero photo */
-  .hero{flex:0 0 280px;margin-top:14px;height:280px;border-radius:6px;overflow:hidden;position:relative;
+  .hero{flex:1 1 340px;min-height:300px;margin-top:14px;border-radius:6px;overflow:hidden;position:relative;
     border:1px solid rgba(201,168,92,0.35);background-size:cover;}
   .hero::after{content:"";position:absolute;inset:0;z-index:1;background:linear-gradient(0deg,rgba(3,10,24,0.92) 0%,rgba(3,10,24,0.3) 48%,rgba(3,10,24,0.05) 72%);}
   .hero .cap{position:absolute;left:0;right:0;bottom:0;z-index:2;padding:18px 24px;}
@@ -83,21 +83,21 @@
   .hero .cap .rl{margin-top:4px;font-family:'Oswald',sans-serif;font-weight:500;font-size:16px;letter-spacing:.02em;color:#fff;text-shadow:0 2px 6px rgba(0,0,0,0.8);}
 
   /* draft picks grid */
-  .listlabel{flex:0 0 auto;margin-top:16px;display:flex;align-items:center;gap:14px;}
-  .listlabel img{height:34px;width:auto;filter:drop-shadow(0 2px 6px rgba(0,0,0,0.4));}
-  .listlabel span{font-family:'Oswald',sans-serif;font-weight:600;font-size:15px;letter-spacing:.2em;text-transform:uppercase;color:var(--gold-br);}
-  .pickgrid{flex:0 0 auto;margin-top:12px;display:grid;grid-template-columns:repeat(3,1fr);gap:9px;}
+  .listlabel{flex:0 0 auto;margin-top:12px;display:flex;align-items:center;gap:14px;}
+  .listlabel img{height:30px;width:auto;filter:drop-shadow(0 2px 6px rgba(0,0,0,0.4));}
+  .listlabel span{font-family:'Oswald',sans-serif;font-weight:600;font-size:14px;letter-spacing:.2em;text-transform:uppercase;color:var(--gold-br);}
+  .pickgrid{flex:0 0 auto;margin-top:10px;display:grid;grid-template-columns:repeat(3,1fr);gap:7px;}
   .pk{background:rgba(22,55,101,0.28);border:1px solid rgba(201,168,92,0.28);border-radius:8px;
-    padding:10px 12px;display:flex;flex-direction:row;align-items:center;gap:12px;text-align:left;}
-  .pk .logowrap{flex:0 0 92px;height:92px;display:flex;align-items:center;justify-content:center;}
-  .pk .logowrap img{max-width:92px;max-height:92px;width:auto;height:auto;filter:drop-shadow(0 2px 8px rgba(0,0,0,0.4));}
+    padding:7px 10px;display:flex;flex-direction:row;align-items:center;gap:10px;text-align:left;}
+  .pk .logowrap{flex:0 0 74px;height:74px;display:flex;align-items:center;justify-content:center;}
+  .pk .logowrap img{max-width:74px;max-height:74px;width:auto;height:auto;filter:drop-shadow(0 2px 8px rgba(0,0,0,0.4));}
   .pk .ptxt{flex:1;min-width:0;display:flex;flex-direction:column;}
-  .pk .pnm{font-family:'Oswald',sans-serif;font-weight:600;font-size:17px;color:#F1F5FA;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;}
+  .pk .pnm{font-family:'Oswald',sans-serif;font-weight:600;font-size:15.5px;color:#F1F5FA;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;}
   .pk .pnm span{font-weight:300;color:var(--steel);}
-  .pk .pyr{margin-top:4px;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:34px;line-height:1;color:var(--gold-br);}
-  .pk .pyr span{display:block;margin-top:5px;font-family:'Oswald',sans-serif;font-weight:400;font-size:14.5px;color:#B9C6DA;letter-spacing:.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .pk .pyr{margin-top:3px;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:28px;line-height:1;color:var(--gold-br);}
+  .pk .pyr span{display:block;margin-top:4px;font-family:'Oswald',sans-serif;font-weight:400;font-size:13px;color:#B9C6DA;letter-spacing:.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 
-  .spacer{flex:1;}
+  .spacer{flex:0 0 0;}
 
   /* footer */
   .foot{flex:0 0 auto;display:flex;align-items:flex-end;justify-content:space-between;border-top:1px solid rgba(201,168,92,0.28);padding-top:16px;margin-top:12px;}
@@ -128,7 +128,7 @@
         <p class="sub">Eleven Midshipmen have heard their name called in the <b>MLB Draft</b> since 2003 — Navy Baseball's pipeline to professional ball, pick by pick.</p>
       </div>
 
-      <div class="hero" style="background-image:url('noah_song_usa.jpg');background-position:50% 42%;">
+      <div class="hero" style="background-image:url('noah_song_usa.jpg');background-position:50% 22%;">
         <div class="cap">
           <div class="nm">Noah Song</div>
           <div class="rl">4th Round, Boston Red Sox (2019) — now pitching for Team USA at the AAA level</div>
