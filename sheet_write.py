@@ -73,16 +73,21 @@ def today_str():
 
 
 def build_upsert_op(current_db, cols, *, first, last, event_name, new_tier=None,
-                     state=None, hs=None, team=None, pos=None, commit=None,
-                     class_year=None, by_initials=None, date_added=None,
-                     notes=None):
-    """Build one Apps Script op dict for a single post-event player review.
-    `cols` must come from db_loader.find_columns() on the SAME xlsx used to
-    build `current_db` — never hardcode column numbers here, see module
+                     state=None, hs=None, team=None, pos=None, pos2=None,
+                     bt=None, hometown=None, commit=None, class_year=None,
+                     by_initials=None, date_added=None, notes=None,
+                     academic=None, email=None, phone=None):
+    """Build one Apps Script op dict for a single player review (post-event
+    rating, or a new/updated player from the Add Player tool). `cols` must
+    come from db_loader.find_columns() on the SAME xlsx used to build
+    `current_db` — never hardcode column numbers here, see module
     docstring for why. Looks the player up via db_loader's existing
     lookup() — does not duplicate or weaken that matching logic."""
     from db_loader import lookup
     existing = lookup(current_db, f"{first} {last}")
+    simple_vals = {'hs': hs, 'team': team, 'commit': commit, 'pos2': pos2,
+                   'bt': bt, 'hometown': hometown, 'academic': academic,
+                   'email': email, 'phone': phone}
 
     if existing:
         fields = {}
@@ -95,8 +100,8 @@ def build_upsert_op(current_db, cols, *, first, last, event_name, new_tier=None,
             fields[cols['tier']] = new_tier
         relabel_inputs = {'tier': existing.get('tier'), 'class': existing.get('class'),
                           'pos': existing.get('pos'), 'state': existing.get('state')}
-        for key, val in (('state', state), ('hs', hs), ('team', team),
-                          ('pos', pos), ('commit', commit), ('class', class_year)):
+        for key, val in list(simple_vals.items()) + [('state', state), ('pos', pos),
+                                                       ('class', class_year)]:
             if val and val != existing.get(key):
                 fields[cols[key]] = val
                 if key == 'pos':
@@ -122,11 +127,10 @@ def build_upsert_op(current_db, cols, *, first, last, event_name, new_tier=None,
     if new_tier: fields[cols['tier']] = new_tier
     if class_year: fields[cols['class']] = class_year
     if pos: fields[cols['pos']] = pos
-    if commit: fields[cols['commit']] = commit
     if state: fields[cols['state']] = state
-    if hs: fields[cols['hs']] = hs
-    if team: fields[cols['team']] = team
     if notes: fields[cols['notes']] = notes
+    for key, val in simple_vals.items():
+        if val: fields[cols[key]] = val
     fields[cols['id']] = _id_label(first, last, new_tier, class_year, pos, state)
     fields[cols['pos_group']] = _pos_group(pos)
     return {'action': 'append', 'fields': fields, 'player': f"{first} {last}"}

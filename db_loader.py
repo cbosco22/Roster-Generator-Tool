@@ -87,8 +87,10 @@ _HEADER_LABELS = {
     'id': 'ID', 'name': 'Name', 'pos_group': 'Pos Group',
     'date_added': 'Date Added:', 'by': 'By:',
     'first': 'First Name', 'last': 'Last Name', 'class': 'Class',
-    'tier': '★', 'commit': 'Commit', 'pos': 'Pos',
+    'tier': '★', 'commit': 'Commit', 'pos': 'Pos', 'pos2': 'POS2',
+    'bt': 'B/T', 'hometown': 'Hometown',
     'state': 'State', 'hs': 'High School', 'team': 'Summer Team',
+    'academic': 'Academic', 'email': 'Email', 'phone': 'Phone Number',
     'seen': 'Seen', 'notes': 'Notes',
 }
 
@@ -121,10 +123,10 @@ def find_columns(path, sheet_name='High School Players', header_row=3):
 def parse_xlsx(path, sheet_name='High School Players'):
     import openpyxl
     cols = find_columns(path, sheet_name)
-    i_first, i_last, i_class = cols['first']-1, cols['last']-1, cols['class']-1
-    i_tier, i_commit, i_pos = cols['tier']-1, cols['commit']-1, cols['pos']-1
-    i_state, i_hs, i_team, i_seen = cols['state']-1, cols['hs']-1, cols['team']-1, cols['seen']-1
-    max_idx = max(i_first, i_last, i_class, i_tier, i_commit, i_pos, i_state, i_hs, i_team, i_seen)
+    idx = {k: v - 1 for k, v in cols.items()}
+    core = ['first', 'last', 'class', 'tier', 'commit', 'pos', 'pos2', 'bt',
+            'hometown', 'state', 'hs', 'team', 'academic', 'email', 'phone', 'seen']
+    max_idx = max(idx[k] for k in core)
 
     wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
     ws = wb[sheet_name]
@@ -133,24 +135,22 @@ def parse_xlsx(path, sheet_name='High School Players'):
     for i, row in enumerate(ws.iter_rows(values_only=True), 1):
         if i <= 3: continue
         if len(row) <= max_idx: continue
-        first  = str(row[i_first]).strip()  if row[i_first]  is not None else ''
-        last   = str(row[i_last]).strip()   if row[i_last]   is not None else ''
-        yr     = str(row[i_class]).strip()  if row[i_class]  is not None else ''
-        tier   = str(row[i_tier]).strip()   if row[i_tier]   is not None else ''
-        commit = str(row[i_commit]).strip() if row[i_commit] is not None else ''
-        pos    = str(row[i_pos]).strip()    if row[i_pos]    is not None else ''
-        state  = str(row[i_state]).strip()  if row[i_state]  is not None else ''
-        hs     = str(row[i_hs]).strip()     if row[i_hs]     is not None else ''
-        team   = str(row[i_team]).strip()   if row[i_team]   is not None else ''
-        seen   = str(row[i_seen]).strip()   if row[i_seen]   is not None else ''
+        vals = {}
+        for k in core:
+            v = row[idx[k]]
+            vals[k] = str(v).strip() if v is not None else ''
+        first, last, yr, tier = vals['first'], vals['last'], vals['class'], vals['tier']
         if yr.endswith('.0'): yr = yr[:-2]
         if tier.endswith('.0') and tier != '0.1': tier = tier[:-2]
         if not first or not last: skipped += 1; continue
         if first in ('First Name','First',':-:','By:','NAME'): skipped += 1; continue
         if not yr or not yr.startswith('20'): skipped += 1; continue
-        entry = {'tier':tier,'pos':pos,'class':yr,'commit':commit,
+        entry = {'tier':tier,'pos':vals['pos'],'pos2':vals['pos2'],'bt':vals['bt'],
+                 'class':yr,'commit':vals['commit'],
                  'first':first,'last':last,'canonical_name':f"{first} {last}",
-                 'state':state,'hs':hs,'team':team,'seen':seen,'_row':i}
+                 'hometown':vals['hometown'],'state':vals['state'],'hs':vals['hs'],
+                 'team':vals['team'],'academic':vals['academic'],'email':vals['email'],
+                 'phone':vals['phone'],'seen':vals['seen'],'_row':i}
         for v in _variants(first, last):
             db[v] = entry
     wb.close()

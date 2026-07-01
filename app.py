@@ -47,6 +47,8 @@ from post_event_flow import (
 import run_event
 import schedule_refresh
 import sheet_write
+import twitter_extract
+from org_tier import lookup_org_tier
 try:
     from push_event import push_event as _push_event
     _HAVE_PUSH = True
@@ -62,6 +64,17 @@ def _get_api_key():
         return st.secrets["ANTHROPIC_API_KEY"]
     except Exception:
         return os.environ.get("ANTHROPIC_API_KEY")
+
+
+def _get_secret(key):
+    """st.secrets raises StreamlitSecretNotFoundError on ANY access -
+    including .get() - when no secrets.toml exists at all, not just when
+    the specific key is missing. Same bug class as _get_api_key() already
+    guards against; this is the same fix for the sheet-write secrets."""
+    try:
+        return st.secrets.get(key)
+    except Exception:
+        return None
 
 
 @st.cache_data(ttl=600, show_spinner="Syncing recruiting sheet…")
@@ -239,6 +252,90 @@ st.set_page_config(
 
 _sheet_sync_result = _sync_recruiting_sheet()
 
+# Global design system — professional sports-org look (Inter, refined
+# buttons/tabs/metrics/tables), not just the header brand lockup. Added
+# 2026-06-30 per direct feedback that the default Streamlit look read as
+# "JV" — goal is something an NFL/MLB front office tool would look like.
+st.markdown(
+    """
+    <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+    html, body, [data-testid="stAppViewContainer"], [data-testid="stApp"],
+    .stMarkdown, .stText, p, span, label, div {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif !important;
+    }
+
+    h1, h2, h3 {
+      font-weight: 800 !important;
+      letter-spacing: -0.02em;
+      color: #14233B;
+    }
+
+    /* Buttons — depth and weight instead of the flat default box */
+    .stButton > button, .stDownloadButton > button {
+      border-radius: 10px !important;
+      font-weight: 600 !important;
+      transition: all 0.15s ease !important;
+      border: 1px solid #E4E1D8 !important;
+      box-shadow: 0 1px 2px rgba(20,35,59,0.06) !important;
+    }
+    .stButton > button:hover, .stDownloadButton > button:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 10px rgba(20,35,59,0.12) !important;
+    }
+    .stButton > button[kind="primary"] {
+      background: #14233B !important;
+      border: none !important;
+      box-shadow: 0 2px 8px rgba(20,35,59,0.25) !important;
+    }
+    .stButton > button[kind="primary"]:hover {
+      background: #1F3357 !important;
+      box-shadow: 0 6px 16px rgba(20,35,59,0.35) !important;
+    }
+
+    /* Tabs — cleaner bar, gold active indicator matching the brand */
+    .stTabs [data-baseweb="tab-list"] {
+      gap: 4px;
+      border-bottom: 2px solid #E4E1D8;
+    }
+    .stTabs [data-baseweb="tab"] {
+      font-weight: 600 !important;
+      font-size: 14px !important;
+      color: #6B7682 !important;
+      padding: 10px 6px !important;
+    }
+    .stTabs [aria-selected="true"] { color: #14233B !important; }
+    .stTabs [data-baseweb="tab-highlight"] {
+      background-color: #C8A24B !important;
+      height: 3px !important;
+      border-radius: 3px 3px 0 0;
+    }
+
+    /* Metrics — card treatment instead of bare numbers */
+    [data-testid="stMetric"] {
+      background: #F7F6F2;
+      border-radius: 12px;
+      padding: 14px 16px;
+      border: 1px solid #E4E1D8;
+    }
+    [data-testid="stMetricLabel"] { font-weight: 600 !important; color: #6B7682 !important; }
+    [data-testid="stMetricValue"] { font-weight: 800 !important; color: #14233B !important; }
+
+    /* Tables / dataframes — rounded, bordered, less "spreadsheet" */
+    [data-testid="stDataFrame"], [data-testid="stTable"] {
+      border-radius: 10px;
+      overflow: hidden;
+      border: 1px solid #E4E1D8;
+    }
+
+    /* Status boxes (success/info/warning/error) — softer corners */
+    [data-testid="stAlert"] { border-radius: 10px !important; }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
 # Brand lockup — mirrors the Event Day app (navy header, gold eyebrow).
 st.markdown(
     """
@@ -260,9 +357,9 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-tab_field, tab_tourney, tab_sched, tab_post, tab_admin = st.tabs(
+tab_field, tab_tourney, tab_sched, tab_post, tab_add, tab_admin = st.tabs(
     ["🎯 Field Tool", "🏟️ Tournament Builder", "🔄 Schedule Refresh",
-     "📥 Post-Event", "⚙️  Admin"])
+     "📥 Post-Event", "➕ Add Player", "⚙️  Admin"])
 
 
 # ---- Field Tool ----
@@ -738,8 +835,8 @@ with tab_post:
 
         # --- Write straight to Recruiting Sheet 2.0 ---
         st.divider()
-        sw_url = st.secrets.get("sheet_write_url")
-        sw_token = st.secrets.get("sheet_write_token")
+        sw_url = _get_secret("sheet_write_url")
+        sw_token = _get_secret("sheet_write_token")
         if not (sw_url and sw_token):
             st.info("Sheet write-back not configured — set `sheet_write_url` / "
                     "`sheet_write_token` in Streamlit secrets (see "
@@ -818,6 +915,146 @@ with tab_post:
                     except Exception as e:
                         wstatus.update(label="Failed", state="error")
                         st.exception(e)
+
+
+# ---- Add Player ----
+@st.cache_data(ttl=60, show_spinner=False)
+def _load_db_and_cols(mtime_key):
+    """Cached so the live duplicate-check below doesn't re-parse the xlsx on
+    every keystroke. Keyed on the file's mtime so it naturally refreshes
+    after a sync/write without a manual cache-clear."""
+    return parse_xlsx(str(XLSX_PATH)), find_columns(str(XLSX_PATH))
+
+
+with tab_add:
+    st.subheader("Add a player")
+    st.caption("Straight into Recruiting Sheet 2.0 — from a screenshot, or by hand.")
+
+    ap_api_key = _get_api_key()
+    ap_sw_url = _get_secret("sheet_write_url")
+    ap_sw_token = _get_secret("sheet_write_token")
+
+    ap_mode = st.radio("How are you adding this player?",
+                       ["📸 From a screenshot", "✍️ Manual entry"],
+                       horizontal=True, key="ap_mode")
+
+    if "ap_draft" not in st.session_state:
+        st.session_state["ap_draft"] = {}
+
+    if ap_mode == "📸 From a screenshot":
+        if not ap_api_key:
+            st.warning("Anthropic API key missing — set `ANTHROPIC_API_KEY` in Streamlit secrets.")
+        ap_img = st.file_uploader(
+            "Twitter/X profile, FiveTool/PBR profile, or a roster-list screenshot",
+            type=["jpg", "jpeg", "png", "webp", "heic"], key="ap_img")
+        if st.button("🔍 Extract player info", disabled=not (ap_img and ap_api_key)):
+            with st.spinner("Reading screenshot…"):
+                mt = ap_img.type or "image/jpeg"
+                if mt == "image/jpg": mt = "image/jpeg"
+                try:
+                    extracted = twitter_extract.extract_twitter_player(
+                        ap_img.read(), media_type=mt, api_key=ap_api_key)
+                    st.session_state["ap_draft"] = extracted
+                    found = " ".join(x for x in [extracted.get("first"), extracted.get("last")] if x)
+                    st.success(f"Extracted {found or 'a player'} — review below before adding.")
+                except Exception as e:
+                    st.exception(e)
+
+    d = st.session_state["ap_draft"]
+
+    st.divider()
+    st.markdown("**Review before adding**")
+    c1, c2 = st.columns(2)
+    with c1:
+        ap_first = st.text_input("First", value=d.get("first", ""), key="ap_first")
+        ap_last = st.text_input("Last", value=d.get("last", ""), key="ap_last")
+        ap_class = st.text_input("Class (grad year)", value=d.get("class", ""), key="ap_class")
+        ap_pos = st.text_input("Pos", value=d.get("pos", ""), key="ap_pos")
+        ap_pos2 = st.text_input("POS2", value=d.get("pos2", ""), key="ap_pos2")
+        ap_bt = st.text_input("B/T", value=d.get("bt", ""), key="ap_bt")
+        ap_state = st.text_input("State", value=d.get("state", ""), key="ap_state")
+    with c2:
+        ap_hometown = st.text_input("Hometown", value=d.get("hometown", ""), key="ap_hometown")
+        ap_hs = st.text_input("High School", value=d.get("hs", ""), key="ap_hs")
+        ap_team = st.text_input("Summer / Travel Team", value=d.get("team", ""), key="ap_team")
+        ap_tier = st.selectbox("Tier (★)", ["", "0.1", "1", "2", "3", "4", "XX"], key="ap_tier")
+        ap_commit = st.text_input("Commit (leave blank if uncommitted)",
+                                  value=d.get("commit", ""), key="ap_commit")
+        ap_academic = st.text_input("Academic (GPA / SAT / ACT)",
+                                    value=d.get("academic", ""), key="ap_academic")
+        ap_by = st.selectbox("By (your initials)", ["CB", "AP", "TR", "AM", "CR"], key="ap_by")
+    ap_email = st.text_input("Email", value=d.get("email", ""), key="ap_email")
+    ap_phone = st.text_input("Phone", value=d.get("phone", ""), key="ap_phone")
+    ap_notes = st.text_area("Notes", value=d.get("notes", ""), key="ap_notes", height=80)
+    ap_source = st.text_input("Source (fills Seen)",
+                              placeholder="e.g. Twitter scouting, NPI 2026", key="ap_source")
+
+    if ap_team:
+        ap_tier_match = lookup_org_tier(ap_team)
+        if ap_tier_match:
+            st.caption(f"✓ \"{ap_team}\" recognized as a Tier {ap_tier_match} travel program.")
+        else:
+            st.caption(f"⚠️ \"{ap_team}\" isn't in the tracked travel programs list — "
+                      "will still be saved exactly as written.")
+
+    ap_dup = None
+    if ap_first and ap_last and XLSX_PATH.exists():
+        from db_loader import lookup as _ap_lookup
+        ap_db, ap_cols = _load_db_and_cols(XLSX_PATH.stat().st_mtime)
+        ap_dup = _ap_lookup(ap_db, f"{ap_first} {ap_last}")
+        if ap_dup:
+            st.warning(f"⚠️ **{ap_dup['canonical_name']}** is already in the database "
+                      f"(Tier {ap_dup.get('tier') or '?'}, "
+                      f"{ap_dup.get('hs') or 'no school listed'}) — submitting will "
+                      "**update** this existing player instead of creating a duplicate.")
+
+    ap_label = "🔄 Update existing player" if ap_dup else "➕ Add to Recruiting Sheet 2.0"
+    if not (ap_sw_url and ap_sw_token):
+        st.info("Sheet write-back not configured — set `sheet_write_url` / "
+                "`sheet_write_token` in Streamlit secrets (see `apps_script/README.md`).")
+    elif st.button(ap_label, type="primary", use_container_width=True,
+                  disabled=not (ap_first and ap_last)):
+        with st.status("Writing to Recruiting Sheet 2.0…", expanded=True) as ap_wstatus:
+            try:
+                st.write("Loading current sheet…")
+                ap_db_write = parse_xlsx(str(XLSX_PATH))
+                ap_cols_write = find_columns(str(XLSX_PATH))
+
+                st.write("Building record…")
+                ap_op = sheet_write.build_upsert_op(
+                    ap_db_write, ap_cols_write, first=ap_first, last=ap_last,
+                    event_name=ap_source or "Added via app", new_tier=ap_tier or None,
+                    state=ap_state, hs=ap_hs, team=ap_team, pos=ap_pos, pos2=ap_pos2,
+                    bt=ap_bt, hometown=ap_hometown, commit=ap_commit,
+                    class_year=ap_class, by_initials=ap_by, academic=ap_academic,
+                    email=ap_email, phone=ap_phone, notes=ap_notes)
+
+                st.write("Validating…")
+                ap_check = sheet_write.post_ops([ap_op], ap_sw_url, ap_sw_token, dry_run=True)
+                if not ap_check.get("ok"):
+                    ap_wstatus.update(label="Failed", state="error")
+                    st.error(f"Validation failed, nothing written: {ap_check.get('error')}")
+                    st.stop()
+
+                st.write("Writing…")
+                ap_real = sheet_write.post_ops([ap_op], ap_sw_url, ap_sw_token, dry_run=False)
+                if ap_real.get("ok"):
+                    ap_wstatus.update(label="Done", state="complete")
+                    verb = "Updated" if ap_op["action"] == "update" else "Added"
+                    st.success(f"✓ {verb} {ap_op['player']} in Recruiting Sheet 2.0, "
+                              "every field verified by reading it back.")
+                    st.session_state["ap_draft"] = {}
+                    _load_db_and_cols.clear()
+                else:
+                    ap_wstatus.update(label="Failed", state="error")
+                    r = ap_real.get("results", [{}])[0]
+                    st.error(f"Some fields did not verify: {r.get('error', ap_real.get('error'))}")
+                with st.expander("🔍 What was sent (debug)"):
+                    st.json(ap_op)
+                    st.json(ap_real)
+            except Exception as e:
+                ap_wstatus.update(label="Failed", state="error")
+                st.exception(e)
 
 
 # ---- Admin ----

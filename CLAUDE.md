@@ -21,7 +21,8 @@ Used by coaches AP, CB, TR, CR, AM on iPads (GoodNotes) and iPhones.
 2. **Tournament Builder** — pre-event PDF generation
 3. **Schedule Refresh** — pulls updated tournament schedule
 4. **Post-Event** — processes annotated GoodNotes JPGs into DB updates
-5. **Admin** — config, recruiting-sheet sync status, PBR rankings rebuild
+5. **Add Player** — screenshot (Twitter/X, FiveTool/PBR) or manual entry, writes straight to Sheet 2.0
+6. **Admin** — config, recruiting-sheet sync status, PBR rankings rebuild
 
 Importer tab was removed 2026-06-30 (was unused).
 
@@ -39,8 +40,9 @@ Importer tab was removed 2026-06-30 (was unused).
 | `gen_schedule_csv.py` | Generates schedule CSV from event JSON |
 | `run_event.py` | Single entry point for full event prep workflow |
 | `sheet_sync.py` | Pulls Recruiting Sheet 2.0 as xlsx via Drive's public export endpoint (no auth — see file docstring for why) |
-| `sheet_write.py` | Builds upsert ops (update/append) for writing post-event data back to Sheet 2.0 |
+| `sheet_write.py` | Builds upsert ops (update/append) for writing post-event and Add Player data back to Sheet 2.0 |
 | `apps_script/Code.gs` | Deployed manually by Chris into the Sheet's own Apps Script editor — the actual write endpoint |
+| `twitter_extract.py` | Vision extraction for the Add Player tab — Twitter/X, FiveTool/PBR profile, or roster-list screenshots |
 
 ---
 
@@ -351,14 +353,15 @@ Build these in order:
 ### QUEUED
 4. ~~Remove Importer tab~~ — done 2026-06-30
 5. ~~Copy recruiting sheet Chris owns → automatic DB pull~~ — done and LIVE 2026-06-30: `sheet_sync.py` + Admin tab auto-sync from Sheet 2.0 (10-min cache, re-pulls on every container boot), no secrets/credentials needed — see Google Drive Resources above for why. Verified end-to-end against the real production sheet (1,710 players). Manual-upload fallback still works as an override.
-6. **Player add from Twitter/X** — housed directly in app. Chris already does this manually via a Claude Project; port that prompt/extraction logic in next, similar pattern to `photo_to_roster.py`
+6. ~~Player add from Twitter/X~~ — done 2026-06-30: new "Add Player" tab, screenshot (Twitter/X, FiveTool/PBR, or roster-list) or manual entry, toggle at the top defaults to screenshot. Extraction fields/rules/prompt came from Chris's own refined spec (`twitter_extract.py`'s system prompt), not written from scratch — only the output format changed (structured JSON into `sheet_write.py`'s upsert path, not the old copy-paste TSV row). Live duplicate detection via the existing locked fuzzy-match, before submit — warns and switches to an update instead of silently creating a duplicate. Verified live: toggle, manual-entry form, and duplicate detection against a real existing player (Noah Stead) all confirmed working in a browser preview.
 7. ~~Recruiting Tools page redesign~~ — done 2026-06-30 (Event Day brand lockup)
-8. **Google Sheet write-back** — now unblocked (Chris owns Sheet 2.0), not yet built
+8. ~~Google Sheet write-back~~ — done 2026-06-30: `sheet_write.py` + `apps_script/Code.gs`, used by both Post-Event and Add Player
 9. **Extension download + scrape-instructions page** — inside the existing app
 10. **Capabilities one-pager PDF** — for sharing with other programs
 11. **App consolidation** — Chris wants one umbrella app: Big Board view, full player list, schedule, instead of 3 separate apps (this Streamlit tool, navy-event-day, and a legacy AppSheet recruiting-board app). Lean toward expanding this app with Big Board/Player List tabs and retiring AppSheet; keep navy-event-day separate (built for one-handed mobile use at a tournament, which Streamlit doesn't do well). Not started — needs a real design pass, not a quick add.
    - 2026-06-30 update: Chris is now thinking even bigger than this — one site for the *whole* coaching staff (recruiting + visit scheduling + budget + full depth chart, which currently all live as different tabs in the recruiting spreadsheet), plus folding in a separate player-analysis website he built independently. This item may get superseded by that larger scope — ask Chris before assuming which version is current.
-12. **Post-event: write ratings straight to DB after review** — write path built 2026-06-30 (`sheet_write.py` + `apps_script/`), tested against real production data in dry-run, all upsert scenarios verified correct (re-seen/no change, new tier, field change, duplicate-event dedupe, brand-new player). **Not yet wired into the Post-Event tab UI** — needs Chris to deploy `apps_script/Code.gs` first (see its README) so the live round-trip can be verified, then a review/confirm screen built before any write fires for real. Don't skip the dry-run verification step once the URL exists — this writes into the live recruiting board.
+12. ~~Post-event: write ratings straight to DB after review~~ — done and wired 2026-06-30. Single "Write to Recruiting Sheet 2.0" button (not a separate dry-run-then-confirm flow — Chris didn't want that), `st.status()` progress, verified with real writes against production data. Real bugs found and fixed the same night in production use: corrupted row (formula/column mixup), missing Date Added/By/Notes, hardcoded column numbers going stale when Chris restructured the sheet, and Apps Script falsely reporting write success — see `sheet_write.py` and `apps_script/Code.gs` docstrings for the full history. Not yet done: a full click-through with a real GoodNotes photo through the current UI.
+14. **App-wide visual redesign** — done 2026-06-30 (first pass): Inter font, refined buttons/tabs/metrics/tables via injected CSS in `app.py`, goal was "look like an NFL/MLB team's internal tool, not JV." Kept the existing navy/gold brand. Room for more polish later (backlog item 2, PDF visual redesign, is separate — that's the actual roster PDF output, not the web app chrome).
 13. **"Seen" column becomes an append-only history** — done 2026-06-30, Chris chose: comma-space-delimited list in the existing single Seen cell (e.g. "WWBA 16U 2026, NPI 2026"), never overwritten, only appended, with a dedupe guard against re-appending the same event twice. Implemented in `sheet_write.py`, verified. Other fields (tier, state, HS, summer team, etc.) follow Chris's rule: overwrite only if a new value was actually captured this round and differs from what's there — never blank out something just because this round didn't mention it.
 
 ---
