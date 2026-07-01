@@ -27,9 +27,9 @@ This is a 5-post/week cadence, not literal daily — sustainable and realistic g
 1. **The Pitch: Value Props** — the 5 pillar graphics (`source/`, `exports/`) plus their broken-down sub-topics in `TOPIC_BANK.md`, including the Service community deep-dives (Aviation, Surface Warfare, Submarines, Marine Corps, Special Warfare, Cyber & Intel, plus others) — job day-to-day, minimum-commitment path, 20-year career path, pay/lifestyle per community. Fully evergreen, can rotate indefinitely.
 2. **Commits & Signings** — reactive news content, one post per real commit or signing.
 3. **Game Highlights / Recaps** — in-season only (Feb–June); dormant during summer travel-ball season.
-4. **Player & Alumni Spotlights + Coach Bios** — recruit features, alumni in the pro pipeline or notable post-service careers, and coaching staff backgrounds.
+4. **Player & Alumni Spotlights + Coach Bios** — recruit features, alumni in the pro pipeline or notable post-service careers, and coaching staff backgrounds. All 5 on-field coaches now have sourced bios ready (Ristano, Reilly, Pavkovich, Bosco, Moritz — see `RESEARCH_FINDINGS.md` §1); strength coach, nutritionist, and athletic trainer are queued but need names.
 5. **USNA Life** — culture/lifestyle content and explainers, humanizes the program beyond the recruiting pitch.
-6. **Facility & Program** — the $5M facility renovation, individual facility spaces, tech (TrackMan/TruMedia/Aware), program culture.
+6. **Facility & Program** — the $5M facility renovation, individual facility spaces, tech (TrackMan/TruMedia/Aware), and a Program History sub-family (131 seasons, Patriot League titles, MLB alumni like Nemo Gaines, Mitch Harris, Noah Song).
 7. **Player Development (video)** — hitting/pitching/defense-by-position breakdowns with real footage. New track, needs its own production pipeline (see §3).
 8. **Draft / Cape Cod / Pro-Pipeline Milestones** — draft day, summer-league placements, pro call-ups.
 

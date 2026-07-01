@@ -44,13 +44,36 @@ Each Service community deep-dive is broken into: what the job is day-to-day, the
 
 ---
 
-## Tuesday — "People" (3-item bank, weekly cycle)
+## Tuesday — "People" (24-item bank, 8 rounds of Player → Alumni → Coach)
+
+Player and Alumni stay generic placeholder slots (new real content needed every time they come up). Coach pulls from a named queue — 5 real bios are ready now (sourced in `RESEARCH_FINDINGS.md` §1), the last 3 rounds are support staff pending names from Chris.
 
 | # | Concept | Status |
 |---|---------|--------|
 | 1 | Player Spotlight — recruit/commit feature (name, one-line bio, photo) | 🔴 |
 | 2 | Alumni Spotlight — pro-pipeline or post-service career feature (name, story, photo) | 🔴 |
-| 3 | Coach Bio — coaching staff background feature (name, bio, photo) | 🔴 |
+| 3 | Coach Bio: **Chuck Ristano** — Head Coach | ✅ |
+| 4 | Player Spotlight | 🔴 |
+| 5 | Alumni Spotlight | 🔴 |
+| 6 | Coach Bio: **Tim Reilly** — Pitching Coach | ✅ |
+| 7 | Player Spotlight | 🔴 |
+| 8 | Alumni Spotlight | 🔴 |
+| 9 | Coach Bio: **Adam Pavkovich** — Hitters/Infielders Coach | ✅ |
+| 10 | Player Spotlight | 🔴 |
+| 11 | Alumni Spotlight | 🔴 |
+| 12 | Coach Bio: **Chris Bosco** — Assistant Coach | ✅ |
+| 13 | Player Spotlight | 🔴 |
+| 14 | Alumni Spotlight | 🔴 |
+| 15 | Coach Bio: **Andrew Moritz** — Director of Baseball Operations | ✅ |
+| 16 | Player Spotlight | 🔴 |
+| 17 | Alumni Spotlight | 🔴 |
+| 18 | Coach Bio: **Strength & Conditioning Coach** | 🔴 needs name |
+| 19 | Player Spotlight | 🔴 |
+| 20 | Alumni Spotlight | 🔴 |
+| 21 | Coach Bio: **Nutritionist** | 🔴 needs name |
+| 22 | Player Spotlight | 🔴 |
+| 23 | Alumni Spotlight | 🔴 |
+| 24 | Coach Bio: **Athletic Trainer** | 🔴 needs name |
 
 ---
 
@@ -59,31 +82,37 @@ Each Service community deep-dive is broken into: what the job is day-to-day, the
 | # | Concept | Status |
 |---|---------|--------|
 | 1 | Day in the Yard — morning formation | 🔴 |
-| 2 | How the company system works (explainer) | 🔴 |
+| 2 | How the company system works — 36 companies (6 battalions × 6), ~4,400 midshipmen brigade-wide, ~150/company, 4 platoons × 3 squads (10–14 each) | 🟡 |
 | 3 | Plebe year overview | 🔴 |
 | 4 | A day in the life — schedule walkthrough | 🔴 |
 | 5 | Bancroft Hall / dorm life | 🔴 |
 | 6 | Team downtime / study hours | 🔴 |
-| 7 | Leadership structure / chain of command explainer | 🔴 |
+| 7 | Leadership structure: Brigade Commander (top 1/c midshipman) + company/battalion student leadership | 🟡 |
 
-Note: items 2, 3, 7 describe how USNA itself works (not just photos) — these need verified, current specifics (Chris or an official USNA source), not assumed structure, before publishing.
+Items 2 and 7 are now sourced (usna.edu, see `RESEARCH_FINDINGS.md` §4) — upgraded from Needs Input to Needs Design. Items 1, 3, 4, 5, 6 still need real photos/schedule specifics.
 
 ---
 
-## Thursday — "Facility & Program" (10-item bank)
+## Thursday — "Facility & Program" (14-item bank: 10 Facility + 4 Program History)
 
 | # | Concept | Status |
 |---|---------|--------|
-| 1 | The field — all-turf stadium | 🟡 (photo already in kit: `source/bb_field.jpg`) |
-| 2 | Weight room | 🟡 (photo already in kit: `source/bb_weight.jpg`) |
+| 1 | The field — **Terwilliger Brothers Field at Max Bishop Stadium** | 🟡 (photo already in kit: `source/bb_field.jpg`) |
+| 2 | Weight room | 🟡 (photo already in kit: `source/bb_weight.jpg` — confirm Halsey Field House vs. Ricketts Hall) |
 | 3 | Coaches/team at work | 🟡 (possible photo in kit: `source/bb_huddle.jpg` — confirm before use) |
-| 4 | Indoor cage facility | 🔴 |
+| 4 | **Joe Duff Indoor Batting Facility** | 🔴 (name confirmed, photo needed) |
 | 5 | Nutrition station | 🔴 |
 | 6 | Tech spotlight: TrackMan | 🟡 |
 | 7 | Tech spotlight: TruMedia | 🟡 |
 | 8 | Tech spotlight: Aware | 🟡 |
-| 9 | $5M renovation — groundbreaking | 🟡 |
+| 9 | $5M renovation — groundbreaking (new locker room, expanded training room, wardroom, nutrition center, coaches' offices, 2 fan suites, press box; targets 2027 home opener) | 🟡 |
 | 10 | $5M renovation — progress update | 🔴 |
+| 11 | Program History: 1893–2026, 131 seasons, 11 NCAA Tournament bids, 2 Elite Eight runs (1954, 1986), 2016's 43-win program record | 🟡 |
+| 12 | Program History: Patriot League — 11 titles in the last 16 years, reigning 2024–25 champs, 13 All-America selections | 🟡 |
+| 13 | Program History: the "94-year gap" — Nemo Gaines (1921) to Mitch Harris (2015), Navy's MLB pioneers | 🟡 |
+| 14 | Program History: Noah Song, highest-ever Navy MLB draft pick (Red Sox, 4th round, 2019) | 🟡 |
+
+Items 1, 9, 11–14 sourced from official navysports.com pages — see `RESEARCH_FINDINGS.md` §2–3.
 
 **Recruiting Trail override:** on any Thursday coaches are actually at a live event, swap in a behind-the-scenes post for that week instead of the next bank item (bank item resumes the following cycle).
 

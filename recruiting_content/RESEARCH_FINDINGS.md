@@ -29,7 +29,23 @@ All three on-field coaches have solid, sourced bios. Fills 3 of the "Coach Bio" 
 - Coaching path: volunteer assistant (2014–15), Notre Dame (2019), Western Kentucky (2020–22, catchers/outfielders + recruiting coordinator).
 - Source: [navysports.com](https://navysports.com/sports/baseball/roster/coaches/adam-pavkovich/2401)
 
-*Not researched: Andrew Moritz (Director of Operations) — off-field role, lower priority for a "coach bio" post but flag if you want him included.*
+**Chris Bosco — Assistant Coach**
+- Joined Navy July 2025 (1st season in 2026), works with offense and catchers.
+- Prior 5 of the last 6 seasons on the Northeastern staff — helped Northeastern to 2 NCAA Tournament berths, mentored 7 All-America hitters and 3 CAA Players of the Year. Guided the Huskies' base-running attack to 2nd nationally in stolen bases in back-to-back seasons and the nation's longest active winning streak (27 games) in 2025.
+- Played at Roger Williams University — 3x all-conference, 2x team captain, 2019 Commonwealth Coast Conference Defensive Player of the Year, All-CCC First Team.
+- North Andover, MA native.
+- Source: [navysports.com](https://navysports.com/news/2025/7/8/chris-bosco-named-assistant-baseball-coach-at-naval-academy.aspx), [Eagle-Tribune](https://www.eagletribune.com/sports/bosco-moves-on-to-navy-north-andover-native-takes-role-as-top-assistant/article_3578f281-d48e-4d4a-9f83-4114fb48ac75.html)
+
+**Andrew Moritz — Director of Baseball Operations**
+- Joined Navy June 2025.
+- Pro career: 6 years, 5 seasons in the Atlanta Braves organization after being drafted in the 6th round of the 2018 MLB Draft. Reached Double-A Mississippi; Southern League Player of the Week (Sept. 2022) and MiLB Organizational All-Star (2022).
+- College: 3 seasons at UNC-Greensboro under now-Florida State head coach Link Jarrett. 2018 ABCA/Rawlings First Team All-American, D1Baseball.com 2nd Team All-American, Baseball America/Perfect Game 3rd Team All-American, 3x All-Southern Conference, 2018 SoCon Player of the Year. Academics: CoSIDA Academic All-American (1st Team 2017, 2nd Team 2018).
+- **Nice program-history callback:** played the 2017 Cape Cod League summer for the Harwich Mariners alongside former Navy ace Noah Song (the "highest-ever Navy MLB draft pick" from §2) — a real, sourced thread connecting current staff to the program's alumni pipeline.
+- Coaching path before Navy: Missouri Western (2025, D2, 3 All-MIAA selections in his one year), his alma mater Providence HS in Charlotte, NC.
+- 2021 UNC-Greensboro grad, business administration.
+- Source: [navysports.com](https://navysports.com/news/2025/6/25/andrew-moritz-named-navy-baseballs-director-of-operations.aspx)
+
+**Support staff (strength coach, nutritionist, athletic trainer):** confirmed Navy Athletics has all three roles institutionally (a baseball-assigned athletic trainer, a Strength & Conditioning department, and nutritionists on the sports-medicine staff), but search didn't surface the specific individuals assigned to baseball — official staff-directory pages are gated behind subscription/JS-rendered content this session can't reach. Needs names directly from you; added as 3 more "Coach Bio" queue slots below, marked needs input.
 
 ---
 
