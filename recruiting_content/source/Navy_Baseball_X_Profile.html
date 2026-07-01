@@ -17,6 +17,7 @@
     background:
       radial-gradient(120% 120% at 50% 42%, #1B3E72 0%, rgba(27,62,114,0) 60%),
       linear-gradient(160deg, #0B2348 0%, #081B38 55%, #06152C 100%);
+    font-family:'Oswald',sans-serif;
   }
   .card::before{
     content:"";position:absolute;inset:0;
@@ -37,18 +38,26 @@
     border:3px solid var(--gold);box-shadow:0 0 0 8px rgba(201,168,92,0.14);
     z-index:2;
   }
-  .star{
-    position:absolute;left:50%;top:50%;height:216px;width:auto;
-    transform:translate(-50%,-52%);z-index:3;
-    filter:drop-shadow(0 4px 16px rgba(0,0,0,0.5));
+  .stack{
+    position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+    z-index:3;display:flex;flex-direction:column;align-items:center;
   }
+  .stack img{height:172px;width:auto;filter:drop-shadow(0 4px 16px rgba(0,0,0,0.5));}
+  .stack .lbl{margin-top:14px;text-align:center;line-height:1.05;}
+  .stack .lbl b{display:block;font-family:'Oswald',sans-serif;font-weight:700;font-size:33px;
+    letter-spacing:.04em;color:var(--cream);text-shadow:0 2px 8px rgba(0,0,0,0.6);}
+  .stack .lbl span{display:block;margin-top:4px;font-family:'Oswald',sans-serif;font-weight:500;font-size:22px;
+    letter-spacing:.14em;color:var(--gold-br);text-transform:uppercase;text-shadow:0 2px 8px rgba(0,0,0,0.6);}
 </style>
 </head>
 <body>
   <div class="card">
     <img class="anchor" src="anchor.png" alt="">
     <div class="ring"></div>
-    <img class="star" src="nstar.png" alt="Navy">
+    <div class="stack">
+      <img src="nstar_markonly.png" alt="Navy">
+      <div class="lbl"><b>BASEBALL</b><span>Recruiting</span></div>
+    </div>
   </div>
 </body>
 </html>
