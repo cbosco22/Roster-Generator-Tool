@@ -49,7 +49,7 @@ from datetime import date
 COL = {
     'id': 3, 'name': 4, 'pos_group': 5, 'date_added': 6, 'by': 7,
     'first': 8, 'last': 9, 'class': 10, 'tier': 11, 'commit': 12, 'pos': 13,
-    'state': 17, 'hs': 18, 'team': 19, 'seen': 23,
+    'state': 17, 'hs': 18, 'team': 19, 'seen': 23, 'notes': 27,
 }
 
 # Mirrors the live sheet's E1 formula exactly:
@@ -88,7 +88,8 @@ def today_str():
 
 def build_upsert_op(current_db, *, first, last, event_name, new_tier=None,
                      state=None, hs=None, team=None, pos=None, commit=None,
-                     class_year=None, by_initials=None, date_added=None):
+                     class_year=None, by_initials=None, date_added=None,
+                     notes=None):
     """Build one Apps Script op dict for a single post-event player review.
     Looks the player up via db_loader's existing lookup() — does not
     duplicate or weaken that matching logic."""
@@ -120,6 +121,7 @@ def build_upsert_op(current_db, *, first, last, event_name, new_tier=None,
             fields[COL['id']] = _id_label(existing['first'], existing['last'],
                                           relabel_inputs['tier'], relabel_inputs['class'],
                                           relabel_inputs['pos'], relabel_inputs['state'])
+        if notes: fields[COL['notes']] = notes
         return {'action': 'update', 'row': existing['_row'], 'fields': fields,
                 'player': existing['canonical_name']}
 
@@ -136,6 +138,7 @@ def build_upsert_op(current_db, *, first, last, event_name, new_tier=None,
     if state: fields[COL['state']] = state
     if hs: fields[COL['hs']] = hs
     if team: fields[COL['team']] = team
+    if notes: fields[COL['notes']] = notes
     fields[COL['id']] = _id_label(first, last, new_tier, class_year, pos, state)
     fields[COL['pos_group']] = _pos_group(pos)
     return {'action': 'append', 'fields': fields, 'player': f"{first} {last}"}

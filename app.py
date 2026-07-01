@@ -715,22 +715,11 @@ with tab_post:
         if st.session_state["pe_upd_rows"]:
             st.dataframe(pd.DataFrame(st.session_state["pe_upd_rows"]),
                          use_container_width=True, hide_index=True)
-            st.caption("Tap the copy icon (top-right of the box), then paste into the "
-                       "next empty row of your sheet — columns split automatically.")
-            upd_copy = rows_to_csv(st.session_state["pe_upd_rows"], UPDATE_COLUMNS,
-                                   delimiter="\t", header=False).decode()
-            st.code(upd_copy, language=None)
-            upd_tsv = rows_to_csv(st.session_state["pe_upd_rows"], UPDATE_COLUMNS,
-                                  delimiter="\t")
-            st.download_button("⬇️  Or download (TSV, with headers)",
-                               data=upd_tsv, file_name="rating_updates.tsv",
-                               mime="text/tab-separated-values",
-                               use_container_width=True)
         else:
             st.caption("No rating updates on these pages.")
 
-        # --- New players (editable before download) ---
-        st.markdown("**🆕 New players** — review/edit, then copy or download")
+        # --- New players (editable before write) ---
+        st.markdown("**🆕 New players** — review/edit before writing")
         edited_rows = []
         if st.session_state["pe_new_rows"]:
             df = pd.DataFrame(st.session_state["pe_new_rows"],
@@ -744,16 +733,6 @@ with tab_post:
                 },
             )
             edited_rows = edited.fillna("").to_dict("records")
-            st.caption("Tap the copy icon (top-right of the box), then paste into the "
-                       "next empty row of your sheet — columns split automatically. "
-                       "Reflects any edits you made above.")
-            new_copy = rows_to_csv(edited_rows, NEW_PLAYER_COLUMNS,
-                                   delimiter="\t", header=False).decode()
-            st.code(new_copy, language=None)
-            new_csv = rows_to_csv(edited_rows, NEW_PLAYER_COLUMNS)
-            st.download_button("⬇️  Or download (CSV, with headers)",
-                               data=new_csv, file_name="new_players.csv",
-                               mime="text/csv", use_container_width=True)
         else:
             st.caption("No new players on these pages.")
 
@@ -787,7 +766,8 @@ with tab_post:
                                 event_name=pe_event, new_tier=(r.get("new_star") or "").strip(),
                                 state=r.get("state", ""), hs=r.get("school", ""),
                                 team=r.get("_team_name", ""), pos=r.get("pos", ""),
-                                commit=r.get("commit", "")))
+                                commit=r.get("commit", ""),
+                                notes=r.get("notes_handwritten", "")))
                         for r in edited_rows:
                             ops.append(sheet_write.build_upsert_op(
                                 db_for_write, first=r.get("First", ""), last=r.get("Last", ""),
@@ -796,7 +776,8 @@ with tab_post:
                                 state=r.get("State", ""), hs=r.get("High School", ""),
                                 team=r.get("Summer Team", ""), pos=r.get("Pos", ""),
                                 commit=r.get("Commit", ""), class_year=r.get("Class", ""),
-                                by_initials=r.get("By", ""), date_added=r.get("Date Added", "")))
+                                by_initials=r.get("By", ""), date_added=r.get("Date Added", ""),
+                                notes=r.get("Notes", "")))
 
                         st.write("Validating…")
                         check = sheet_write.post_ops(ops, sw_url, sw_token, dry_run=True)
@@ -816,6 +797,11 @@ with tab_post:
                         else:
                             wstatus.update(label="Failed", state="error")
                             st.error(f"Write failed: {real.get('error')}")
+                        with st.expander("🔍 What was sent (debug)"):
+                            st.write("Built from the table above:")
+                            st.json(ops)
+                            st.write("Apps Script confirmed it applied:")
+                            st.json(real)
                     except Exception as e:
                         wstatus.update(label="Failed", state="error")
                         st.exception(e)
