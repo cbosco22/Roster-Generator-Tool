@@ -13,8 +13,16 @@
  *
  * Column map (1-indexed, matches Sheets' native getRange(row, col)).
  * Verified against the real header row 2026-06-30 - do not guess, re-verify
- * against row 3 of the live sheet if this ever looks wrong:
- *   4  = Name (composite label, e.g. "Noah Stead (0.1) - '25 MINF CA")
+ * against row 3 of the live sheet if this ever looks wrong. Corrected same
+ * day: columns 3 and 4 were backwards in an earlier version of this
+ * comment (and in the Python side that calls this), which contributed to
+ * a corrupted row - see apps_script/README.md and sheet_write.py's
+ * module docstring for the full story.
+ *   3  = ID (compound label, e.g. "Noah Stead (0.1) - '25 MINF CA")
+ *   4  = Name (plain "First Last")
+ *   5  = Pos Group (derived bucket - RHP/LHP/C/INF/OF)
+ *   6  = Date Added
+ *   7  = By (coach initials)
  *   8  = First Name
  *   9  = Last Name
  *   10 = Class
@@ -26,6 +34,11 @@
  *   19 = Summer Team
  *   23 = Seen
  * Data rows start at row 4 (rows 1-3 are header/legend).
+ *
+ * This script's own write logic (setValue per column below) never
+ * needed to change for this fix - it just writes whatever column/value
+ * pairs it's given. The bug and the fix were entirely on the Python side
+ * (sheet_write.py). No redeploy needed for this specific correction.
  */
 
 var SHEET_NAME = 'High School Players';

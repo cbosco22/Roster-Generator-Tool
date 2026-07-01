@@ -45,6 +45,29 @@ current data (e.g. to row 5000) so new rows land inside it automatically.
 This is a one-time manual fix, not something Code.gs manages dynamically
 (safer — it won't fight with a filter you have open or have customized).
 
+## One-time fix: flatten the ID/Name/Pos Group formulas
+
+Columns C ("ID"), D ("Name"), and E ("Pos Group") on High School Players
+are live spilling array formulas, not real data. Confirmed 2026-06-30 the
+hard way: the first real write (row 1982) got corrupted because the live
+formula reacted to new data in column D and re-derived a second label on
+top of what the write path had already written there.
+
+The write path (`sheet_write.py`) now computes and writes all three of
+these columns itself as plain values, on every write it makes — so this
+only matters for the ~1980 rows that predate the write path. One-time
+manual fix: select columns **C:E** across all existing data rows, copy
+(Cmd+C), then paste special → **values only** (Cmd+Shift+V) onto that same
+range. This freezes whatever's currently displayed as plain text and
+removes the live formulas for good — nothing about what you see changes,
+only how it's produced.
+
+Row 1982 specifically has bad data from before this fix (a corrupted ID
+label, and it's missing Date Added / By, which the write path did not set
+until this same fix). Needs a manual correction pass after the C:E
+flatten — ask me to do it once you've confirmed the flatten is done, since
+I can write the corrected values through the same write path.
+
 ## Re-deploying after editing Code.gs
 
 If `Code.gs` changes in this repo in the future, the live script needs the
