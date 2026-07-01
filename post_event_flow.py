@@ -35,14 +35,24 @@ UPDATE_COLUMNS = ["Name", "Team", "Cur \u2605", "New \u2605"]
 def split_pools(extracted_pages, db=None):
     """
     Split every extracted row into:
-      - updates:     New* present AND Cur* present (existing board player)
-      - new_players: New* present AND Cur* blank   (true new add)
+      - updates:     matches an existing player in `db` (live lookup, same
+                      db_loader.lookup() the write path uses), or the page
+                      has a printed Cur* as a fallback signal
+      - new_players: no existing match and no printed Cur*
       - skipped:     no New* (nothing to record)
 
-    `db` is accepted for call-signature compatibility but intentionally unused:
-    new players are never DB-searched, and updates report the printed Cur*
-    straight off the page (which came from the DB at print time).
+    Classification prefers a live DB lookup over the page's printed Cur*.
+    Cur* is a snapshot from whenever the roster PDF was generated, and goes
+    stale the moment anything changes about the player after that point.
+    Confirmed 2026-06-30: re-testing a second event for an already-added
+    player showed this tab as "1 new player" (his page had no printed Cur*
+    because it predated his first add) even though the write step's own
+    lookup correctly found him and updated instead of appending a
+    duplicate - the two stages disagreed because only one of them checked
+    the real database. Pass `db` (from parse_xlsx) so this stage checks it too.
     """
+    from db_loader import lookup as _db_lookup
+
     updates, new_players, skipped = [], [], []
 
     for page in extracted_pages:
@@ -58,7 +68,16 @@ def split_pools(extracted_pages, db=None):
 
             if not new_star:
                 skipped.append(row)
-            elif cur_star:
+                continue
+
+            existing = None
+            if db is not None:
+                name = f"{row.get('first', '')} {row.get('last', '')}".strip()
+                existing = _db_lookup(db, name)
+
+            if existing or cur_star:
+                if existing and not cur_star:
+                    row["cur_star"] = existing.get("tier", "")
                 updates.append(row)
             else:
                 new_players.append(row)

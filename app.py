@@ -797,7 +797,8 @@ with tab_post:
                     pages.append(page)
                     st.write(f"✓ {page.get('team_name') or 'page'} — "
                              f"{len(page.get('players', []))} rows read")
-                result = split_pools(pages)
+                pe_db = parse_xlsx(str(XLSX_PATH)) if XLSX_PATH.exists() else None
+                result = split_pools(pages, db=pe_db)
                 pstatus.update(label="Done", state="complete")
             except Exception as e:
                 pstatus.update(label="Error", state="error")
