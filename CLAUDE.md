@@ -358,11 +358,17 @@ Plain-list JSONs auto-wrapped as `{"teams":[...]}`
 Build these in order:
 
 ### IN PROGRESS / NEXT
-1. **PBR player profile crawler** (`pbr_crawler.js` — Node.js, same-origin fetch, ~2s throttle)
+1. **PBR player profile crawler** (`pbr_crawler.py` — Python, not Node.js; see below)
    - Broad shallow scrape for Tier 1/Tier 2 enrichment
    - Event-triggered: runs night before each event, ~30–45 min unattended
    - Player DB stored as `players.parquet` with `profile_path` join key
    - "DB Builder" Streamlit tab to ingest crawler JSON with field provenance
+   - **2026-07-01 progress:** Core scrape + resolve is built and tested live against 2 real profiles (Dylan Seward SS/2B, Connor Salerno RHP — deliberately different positions to prove the "capture whatever cards exist" approach). Key findings:
+     - **No PBR login/subscription needed.** Verified by hand: the profile page's bio + measurable stat cards (60 time, exit velo, arm velo, bat speed, FB velo/spin, height/weight, travel team, commitment) are all plain server-rendered HTML, no JS execution required. Only the numeric national/state RANK and videos are gated behind PBR+ — irrelevant since `pbr_rankings.pkl` already has rank.
+     - Switched from the originally-envisioned Node.js/"same-origin fetch" (browser-extension) approach to a plain Python `requests` + `bs4` script — simpler, consistent with the rest of this repo, and the auth concern that motivated "same-origin" turned out not to apply.
+     - Identity resolution POSTs the site's own `/profile-search-results` search form (`player_name`/`player_state`/`player_class`/`player_school`/`player_position` — **`player_position` must always be sent, even as `"#"`, or the site silently returns zero results**, found by diffing a real browser submission against the script's request), then cross-validates grad year + state the same way `_pbr_match()` already does in `gen_roster_pdf.py` (prevents the "John Smith problem").
+     - **Not yet resolved — needs Chris:** which players actually get crawled. Working assumption is players Chris has already starred ★1/★2 on the board (matches `app.py`'s existing `tier_label` mapping: "1"→"Tier 1", "2"→"Tier 2") who are on a roster for tomorrow's event — cross-referenced from the event schedule's Navy Players list. Confirm before wiring up the real trigger.
+     - **Still to build:** the "DB Builder" Streamlit tab (ingest crawler JSON → `players.parquet`, with field provenance), and the actual event-trigger wiring (which players list feeds the crawler nightly).
 
 2. **PDF visual redesign** — Chris has a sketch of the new layout
    - Will incorporate richer scraped data (velocity, stats, etc.)

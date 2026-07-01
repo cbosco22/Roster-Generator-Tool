@@ -18,6 +18,7 @@ venv/
 # Local working files
 *.log
 *.tmp
+pbr_crawler_output.json
 
 # Recruiting xlsx is now auto-synced live from Sheet 2.0 at runtime
 # (sheet_sync.py) — no longer needs to be committed, and shouldn't be:
