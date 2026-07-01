@@ -91,7 +91,7 @@ _HEADER_LABELS = {
     'bt': 'B/T', 'hometown': 'Hometown',
     'state': 'State', 'hs': 'High School', 'team': 'Summer Team',
     'academic': 'Academic', 'email': 'Email', 'phone': 'Phone Number',
-    'seen': 'Seen', 'notes': 'Notes',
+    'seen': 'Seen', 'comms': 'Comms', 'notes': 'Notes',
 }
 
 
@@ -125,7 +125,8 @@ def parse_xlsx(path, sheet_name='High School Players'):
     cols = find_columns(path, sheet_name)
     idx = {k: v - 1 for k, v in cols.items()}
     core = ['first', 'last', 'class', 'tier', 'commit', 'pos', 'pos2', 'bt',
-            'hometown', 'state', 'hs', 'team', 'academic', 'email', 'phone', 'seen']
+            'hometown', 'state', 'hs', 'team', 'academic', 'email', 'phone',
+            'seen', 'comms']
     max_idx = max(idx[k] for k in core)
 
     wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
@@ -150,7 +151,7 @@ def parse_xlsx(path, sheet_name='High School Players'):
                  'first':first,'last':last,'canonical_name':f"{first} {last}",
                  'hometown':vals['hometown'],'state':vals['state'],'hs':vals['hs'],
                  'team':vals['team'],'academic':vals['academic'],'email':vals['email'],
-                 'phone':vals['phone'],'seen':vals['seen'],'_row':i}
+                 'phone':vals['phone'],'seen':vals['seen'],'comms':vals['comms'],'_row':i}
         for v in _variants(first, last):
             db[v] = entry
     wb.close()

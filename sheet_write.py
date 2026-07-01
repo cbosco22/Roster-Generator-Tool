@@ -76,7 +76,7 @@ def build_upsert_op(current_db, cols, *, first, last, event_name, new_tier=None,
                      state=None, hs=None, team=None, pos=None, pos2=None,
                      bt=None, hometown=None, commit=None, class_year=None,
                      by_initials=None, date_added=None, notes=None,
-                     academic=None, email=None, phone=None):
+                     academic=None, email=None, phone=None, comms=None):
     """Build one Apps Script op dict for a single player review (post-event
     rating, or a new/updated player from the Add Player tool). `cols` must
     come from db_loader.find_columns() on the SAME xlsx used to build
@@ -87,7 +87,7 @@ def build_upsert_op(current_db, cols, *, first, last, event_name, new_tier=None,
     existing = lookup(current_db, f"{first} {last}")
     simple_vals = {'hs': hs, 'team': team, 'commit': commit, 'pos2': pos2,
                    'bt': bt, 'hometown': hometown, 'academic': academic,
-                   'email': email, 'phone': phone}
+                   'email': email, 'phone': phone, 'comms': comms}
 
     if existing:
         fields = {}
