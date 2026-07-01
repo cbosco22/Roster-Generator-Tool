@@ -10,7 +10,7 @@ Order below is a suggested posting sequence, not fixed — post in whatever orde
 > 23 majors. Zero limits. #1 public college in America, top-5 undergrad engineering, an 8:1 student-faculty ratio — go all-in on nuclear engineering or English, and graduate ready for the fleet or the Fortune 500. Major in anything. Lead everywhere. ⚓ #NavyBaseball
 
 **2. Coach Ristano** — `exports/Navy_Baseball_Coach_Ristano.png` *(new)*
-> Meet the coach who builds pros. Chuck Ristano is Navy Baseball's Head Coach — a 19-year climb through Division I that's produced 41 MLB draft picks, 9 big leaguers, and 27 All-Americans. Third season on the Yard. ⚓ #NavyBaseball
+> Meet the coach who builds pros. Chuck Ristano is Navy Baseball's Head Coach — a 19-year climb through Division I that's produced 41 MLB draft picks, 9 big leaguers, and 27 All-Americans. Fourth season on the Yard. ⚓ #NavyBaseball
 
 **3. Baseball / Program Culture** — `exports/Navy_Baseball_Baseball.png`
 > We don't buy players. We build them. No scholarships, no NIL, no portal — every dollar goes into development. TrackMan, TruMedia, a fully-loaded staff, a $5M facility on the way, and the lowest portal activity in the country. #BuiltNotBought
@@ -35,10 +35,11 @@ Order below is a suggested posting sequence, not fixed — post in whatever orde
 ## Notes on the 4 new pieces
 
 - Built on the same locked brand system (colors, fonts, frame, footer) as the original 5 — HTML sources in `source/Navy_Baseball_Coach_Ristano.html`, `Navy_Baseball_The_Field.html`, `Navy_Baseball_Program_History.html`, `Navy_Baseball_Annapolis.html`.
-- Coach Ristano, Program History, and Annapolis use a text/stat-driven layout (no photo required) since no headshot or Annapolis photo was available this round.
+- Coach Ristano now features a real photo (courtesy Navy Athletics) in a portrait tile, with his name run large in gold under the headline. Annapolis now features 4 real photos (City Dock sunset banner + a chapel/harbor/Yard trio) plus a schematic proximity map to D.C./Baltimore.
+- Program History (the "94 years" piece) is still text/stat-driven, pending the reference graphic from the recruiting site — see below.
 - The Field uses the existing `bb_field.jpg` aerial photo already in the kit.
 - Each new eyebrow label ("The Staff," "The Facilities," "The Legacy," "The Setting") tags the content family at a glance — same gold-caps treatment as "The Pitch," just a different label per category.
-- All facts sourced from official navysports.com/usna.edu pages — see `RESEARCH_FINDINGS.md`.
+- All facts sourced from official navysports.com/usna.edu pages — see `RESEARCH_FINDINGS.md`. Coach Ristano's "4th season" note came directly from Chris, correcting the navysports.com-derived "3rd season."
 
 ## What's still pending
 

@@ -61,22 +61,30 @@
   .wing i:nth-child(3){top:10px;right:14px;}
 
   /* headline */
-  .head{margin-top:34px;}
+  .toprow{margin-top:34px;display:flex;align-items:flex-start;gap:36px;}
+  .head{flex:1;min-width:0;}
   .head h1{
     font-family:'Anton',sans-serif;font-weight:400;text-transform:uppercase;
     line-height:.86;letter-spacing:.005em;transform:skewX(-7deg);transform-origin:left;
   }
-  .head .l1{font-size:118px;color:var(--cream);}
-  .head .l2{font-size:118px;color:var(--gold);}
+  .head .l1{font-size:74px;color:var(--cream);}
+  .head .l2{font-size:74px;color:var(--gold);}
   .head .l2 .dot{color:var(--cream);}
   .sub{
-    margin-top:16px;max-width:760px;font-family:'Oswald',sans-serif;font-weight:300;
-    font-size:31px;line-height:1.32;color:#D7E0EE;
+    margin-top:16px;font-family:'Oswald',sans-serif;font-weight:300;
+    font-size:24px;line-height:1.32;color:#D7E0EE;
   }
   .sub b{font-weight:600;color:#fff;}
-  .namebar{margin-top:22px;display:flex;align-items:baseline;gap:20px;}
-  .namebar .nm{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:64px;line-height:1;color:var(--gold-br);letter-spacing:.01em;}
-  .namebar .rl{font-family:'Oswald',sans-serif;font-weight:500;font-size:22px;letter-spacing:.14em;text-transform:uppercase;color:var(--steel);}
+  .namebar{margin-top:18px;display:flex;flex-direction:column;gap:2px;}
+  .namebar .nm{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:50px;line-height:1;color:var(--gold-br);letter-spacing:.01em;}
+  .namebar .rl{font-family:'Oswald',sans-serif;font-weight:500;font-size:18px;letter-spacing:.14em;text-transform:uppercase;color:var(--steel);}
+  .portrait{
+    flex:0 0 300px;width:300px;height:390px;margin-top:66px;border-radius:6px;overflow:hidden;position:relative;
+    border:1px solid rgba(201,168,92,0.40);background-size:cover;background-position:50% 22%;
+    box-shadow:0 10px 30px rgba(0,0,0,0.35);
+  }
+  .portrait::after{content:"";position:absolute;inset:0;background:linear-gradient(0deg,rgba(6,18,38,0.55) 0%,rgba(6,18,38,0) 30%);}
+  .portrait .cap{position:absolute;left:0;right:0;bottom:0;padding:12px 14px;font-family:'Oswald';font-weight:500;font-size:14px;letter-spacing:.12em;text-transform:uppercase;color:var(--gold-br);}
 
   /* signature comparison */
   .compare{
@@ -146,16 +154,19 @@
         <span class="lbl">Navy Baseball &nbsp;·&nbsp; The Staff</span>
       </div>
 
-      <div class="head">
-        <h1>
-          <div class="l1">Meet The Coach</div>
-          <div class="l2">Who Builds Pros.</div>
-        </h1>
-        <div class="namebar">
-          <span class="nm">Chuck Ristano</span>
-          <span class="rl">Head Coach</span>
+      <div class="toprow">
+        <div class="head">
+          <h1>
+            <div class="l1">Meet The Coach</div>
+            <div class="l2">Who Builds Pros.</div>
+          </h1>
+          <div class="namebar">
+            <span class="nm">Chuck Ristano</span>
+            <span class="rl">Head Coach</span>
+          </div>
+          <p class="sub">A 19&#8209;year climb through Division I that's produced <b>41 MLB draft picks and counting.</b></p>
         </div>
-        <p class="sub">A 19&#8209;year climb through Division I that's produced <b>41 MLB draft picks and counting.</b></p>
+        <div class="portrait" style="background-image:url('coach_ristano.jpg');"></div>
       </div>
 
       <div class="stats">
@@ -179,7 +190,7 @@
       <div class="perks">
         <div class="perk">
           <svg class="ic" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
-          <div class="t">3rd Season<span>Navy's head coach since 2023</span></div>
+          <div class="t">4th Season<span>Navy's head coach since 2023</span></div>
         </div>
         <div class="perk">
           <svg class="ic" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.9 6 6.6.6-5 4.3 1.5 6.5L12 16l-6 3.4 1.5-6.5-5-4.3 6.6-.6z"/></svg>
@@ -208,7 +219,7 @@
         <div class="mark">Navy <span>Baseball</span></div>
         <div class="meta">
           <b>Coach Ristano.</b>
-          Third season on the Yard.
+          Fourth season on the Yard.
         </div>
       </div>
     </div>
