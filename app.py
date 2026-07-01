@@ -20,6 +20,7 @@ import pickle
 from datetime import datetime
 from pathlib import Path
 
+import requests
 import streamlit as st
 
 # Ensure local imports work no matter where streamlit is launched from
@@ -945,6 +946,14 @@ with tab_post:
                             st.json(ops)
                             st.write("Apps Script verified after writing (read back, not just setValue success):")
                             st.json(real)
+                    except requests.exceptions.RequestException as e:
+                        wstatus.update(label="Failed", state="error")
+                        st.error(f"Couldn't reach the Recruiting Sheet 2.0 write endpoint "
+                                f"after retrying — this is a network/timeout issue, not a "
+                                f"data problem. **Nothing was written** (this failed during "
+                                f"validation, before any real write is attempted). This is "
+                                f"most common right after a Code.gs redeploy — wait a few "
+                                f"seconds and click the write button again.\n\n`{e}`")
                     except Exception as e:
                         wstatus.update(label="Failed", state="error")
                         st.exception(e)
@@ -1124,6 +1133,14 @@ with tab_add:
                         with st.expander("🔍 What was sent (debug)"):
                             st.json(bops)
                             st.json(breal)
+                    except requests.exceptions.RequestException as e:
+                        bstatus.update(label="Failed", state="error")
+                        st.error(f"Couldn't reach the Recruiting Sheet 2.0 write endpoint "
+                                f"after retrying — this is a network/timeout issue, not a "
+                                f"data problem. **Nothing was written** (this failed during "
+                                f"validation, before any real write is attempted). This is "
+                                f"most common right after a Code.gs redeploy — wait a few "
+                                f"seconds and click the write button again.\n\n`{e}`")
                     except Exception as e:
                         bstatus.update(label="Failed", state="error")
                         st.exception(e)
@@ -1214,6 +1231,14 @@ with tab_add:
                     with st.expander("🔍 What was sent (debug)"):
                         st.json(ap_op)
                         st.json(ap_real)
+                except requests.exceptions.RequestException as e:
+                    ap_wstatus.update(label="Failed", state="error")
+                    st.error(f"Couldn't reach the Recruiting Sheet 2.0 write endpoint "
+                            f"after retrying — this is a network/timeout issue, not a "
+                            f"data problem. **Nothing was written** (this failed during "
+                            f"validation, before any real write is attempted). This is "
+                            f"most common right after a Code.gs redeploy — wait a few "
+                            f"seconds and click the write button again.\n\n`{e}`")
                 except Exception as e:
                     ap_wstatus.update(label="Failed", state="error")
                     st.exception(e)

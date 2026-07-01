@@ -136,10 +136,27 @@ def build_upsert_op(current_db, cols, *, first, last, event_name, new_tier=None,
     return {'action': 'append', 'fields': fields, 'player': f"{first} {last}"}
 
 
-def post_ops(ops, url, token, dry_run=True, timeout=30):
+def post_ops(ops, url, token, dry_run=True, timeout=45, retries=2):
     """Send a batch of ops to the deployed Apps Script web app. Defaults to
-    dry_run=True — caller must explicitly opt into a real write."""
-    resp = requests.post(url, json={'token': token, 'dryRun': dry_run, 'ops': ops},
-                          timeout=timeout)
-    resp.raise_for_status()
-    return resp.json()
+    dry_run=True — caller must explicitly opt into a real write.
+
+    Apps Script web apps commonly have a slow "cold start" on the first
+    request after a fresh deploy (or after sitting idle) - confirmed
+    2026-06-30 when a dry-run call timed out at 30s right after a Code.gs
+    redeploy, with nothing wrong in the code itself. Retries a bare
+    Timeout/ConnectionError a couple times before giving up, since those
+    are transient by nature - a real validation or write failure comes
+    back as a normal (non-exception) response and is never retried here."""
+    import time
+    last_exc = None
+    for attempt in range(retries + 1):
+        try:
+            resp = requests.post(url, json={'token': token, 'dryRun': dry_run, 'ops': ops},
+                                  timeout=timeout)
+            resp.raise_for_status()
+            return resp.json()
+        except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as e:
+            last_exc = e
+            if attempt < retries:
+                time.sleep(2 * (attempt + 1))
+    raise last_exc
