@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<style>
+  :root{
+    --navy-0:#06152C;
+    --navy-1:#0B2348;
+    --gold:#C9A85C;
+    --gold-br:#E6CF8B;
+    --cream:#F5F2EA;
+    --steel:#90A6C6;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  html,body{width:1500px;height:500px;}
+  .card{
+    position:relative;width:1500px;height:500px;overflow:hidden;
+    background:#06152C;
+    font-family:'Oswald',sans-serif;color:var(--cream);
+  }
+  .photo{
+    position:absolute;inset:0;
+    background-image:url('svc_sub.jpg');background-size:cover;background-position:50% 42%;
+    filter:saturate(0.92) brightness(0.92);
+  }
+  .scrim{
+    position:absolute;inset:0;z-index:1;
+    background:
+      linear-gradient(100deg, rgba(4,12,28,0.97) 0%, rgba(4,12,28,0.90) 24%, rgba(4,12,28,0.55) 46%, rgba(4,12,28,0.28) 62%, rgba(4,12,28,0.42) 100%),
+      linear-gradient(0deg, rgba(3,10,24,0.55) 0%, rgba(3,10,24,0.0) 30%, rgba(3,10,24,0.0) 70%, rgba(3,10,24,0.55) 100%);
+  }
+  .card::after{
+    content:"";position:absolute;inset:0;z-index:1;pointer-events:none;
+    box-shadow:inset 0 0 140px 40px rgba(2,9,20,0.55);
+  }
+  .halftone{
+    position:absolute;inset:0;z-index:1;
+    background-image:radial-gradient(rgba(255,255,255,0.05) 1px, transparent 1.4px);
+    background-size:7px 7px;mix-blend-mode:overlay;opacity:.4;
+  }
+  .frame{position:absolute;inset:20px;border:1.5px solid rgba(201,168,92,0.38);z-index:3;pointer-events:none;}
+  .frame::before,.frame::after{content:"";position:absolute;width:20px;height:20px;border:2px solid var(--gold);}
+  .frame::before{top:-2px;right:-2px;border-left:0;border-bottom:0;}
+  .frame::after{bottom:-2px;right:-2px;border-left:0;border-top:0;}
+
+  .content{position:relative;z-index:4;height:100%;display:flex;flex-direction:column;justify-content:flex-start;
+    padding:64px 74px 0 64px;}
+  .eyebrow{display:flex;align-items:center;gap:14px;}
+  .eyebrow .wing{flex:0 0 50px;height:11px;position:relative;}
+  .eyebrow .wing i{position:absolute;left:0;right:0;height:2px;background:var(--gold);border-radius:2px;}
+  .eyebrow .wing i:nth-child(1){top:0;right:11px;}
+  .eyebrow .wing i:nth-child(2){top:4.5px;}
+  .eyebrow .wing i:nth-child(3){top:9px;right:11px;}
+  .eyebrow span{font-family:'Oswald',sans-serif;font-weight:600;font-size:17px;letter-spacing:.4em;
+    color:var(--gold-br);text-transform:uppercase;white-space:nowrap;}
+
+  .word{margin-top:12px;}
+  .word h1{font-family:'Anton',sans-serif;font-weight:400;text-transform:uppercase;
+    line-height:.86;letter-spacing:.005em;transform:skewX(-7deg);transform-origin:left;font-size:98px;}
+  .word .l1{color:var(--cream);}
+  .word .l2{color:var(--gold);}
+
+  .tag{margin-top:14px;font-family:'Oswald',sans-serif;font-weight:400;font-size:20px;
+    letter-spacing:.06em;color:#D7E0EE;}
+  .tag b{font-weight:600;color:#fff;}
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="photo"></div>
+    <div class="scrim"></div>
+    <div class="halftone"></div>
+    <div class="frame"></div>
+
+    <div class="content">
+      <div class="eyebrow">
+        <span class="wing"><i></i><i></i><i></i></span>
+        <span>United States Naval Academy</span>
+      </div>
+      <div class="word">
+        <h1>
+          <div class="l1">Navy</div>
+          <div class="l2">Baseball.</div>
+        </h1>
+      </div>
+      <div class="tag">Annapolis, MD &nbsp;&middot;&nbsp; <b>Est. 1893</b> &nbsp;&middot;&nbsp; Building Officers. Building Ballplayers.</div>
+    </div>
+  </div>
+</body>
+</html>

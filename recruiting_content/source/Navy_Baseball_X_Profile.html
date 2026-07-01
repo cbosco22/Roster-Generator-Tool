@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<style>
+  :root{
+    --navy-0:#06152C;
+    --navy-1:#0B2348;
+    --gold:#C9A85C;
+    --gold-br:#E6CF8B;
+    --cream:#F5F2EA;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  html,body{width:400px;height:400px;}
+  .card{
+    position:relative;width:400px;height:400px;overflow:hidden;
+    background:
+      radial-gradient(120% 120% at 50% 42%, #1B3E72 0%, rgba(27,62,114,0) 60%),
+      linear-gradient(160deg, #0B2348 0%, #081B38 55%, #06152C 100%);
+  }
+  .card::before{
+    content:"";position:absolute;inset:0;
+    background-image:radial-gradient(rgba(255,255,255,0.06) 1px, transparent 1.4px);
+    background-size:7px 7px;mix-blend-mode:overlay;opacity:.5;
+  }
+  .card::after{
+    content:"";position:absolute;inset:0;pointer-events:none;
+    box-shadow:inset 0 0 90px 30px rgba(2,9,20,0.7);
+  }
+  .anchor{
+    position:absolute;left:50%;top:52%;width:430px;height:auto;
+    transform:translate(-50%,-50%);opacity:.10;z-index:0;filter:brightness(1.2) saturate(.7);
+  }
+  .ring{
+    position:absolute;left:50%;top:50%;width:340px;height:340px;
+    transform:translate(-50%,-50%);border-radius:50%;
+    border:3px solid var(--gold);box-shadow:0 0 0 8px rgba(201,168,92,0.14);
+    z-index:2;
+  }
+  .star{
+    position:absolute;left:50%;top:50%;height:216px;width:auto;
+    transform:translate(-50%,-52%);z-index:3;
+    filter:drop-shadow(0 4px 16px rgba(0,0,0,0.5));
+  }
+</style>
+</head>
+<body>
+  <div class="card">
+    <img class="anchor" src="anchor.png" alt="">
+    <div class="ring"></div>
+    <img class="star" src="nstar.png" alt="Navy">
+  </div>
+</body>
+</html>
