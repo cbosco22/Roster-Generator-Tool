@@ -100,6 +100,20 @@ function _setAndVerify(sheet, row, col, value) {
   return range.getValue();
 }
 
+// Sheets auto-converts a date-looking string (e.g. "7/1/2026", written for
+// Date Added) into a real Date value on write. Reading that cell back then
+// returns a Date object, and JS's default String(Date) ("Wed Jul 01 2026
+// 00:00:00 GMT...") never matches the plain date string we wrote - a false
+// "did not verify" failure on data that landed correctly. Format any Date
+// back to M/d/yyyy (matching sheet_write.py's today_str()) before comparing.
+function _normalizeForCompare(val) {
+  if (Object.prototype.toString.call(val) === '[object Date]') {
+    var tz = SpreadsheetApp.getActiveSpreadsheet().getSpreadsheetTimeZone();
+    return Utilities.formatDate(val, tz, 'M/d/yyyy');
+  }
+  return String(val);
+}
+
 function _applyOp(sheet, op, dryRun, firstNameCol) {
   var targetRow;
   if (op.action === 'update') {
@@ -124,10 +138,11 @@ function _applyOp(sheet, op, dryRun, firstNameCol) {
       var actual = _setAndVerify(sheet, targetRow, parseInt(col, 10), intended);
       written[col] = actual;
       // Loose equality: Sheets can return a Date object for a date string,
-      // or a number for a numeric string - compare as strings to avoid
-      // false-positive mismatches on those, while still catching a value
-      // that genuinely did not take.
-      if (String(actual) !== String(intended) && !(actual === '' && intended === '')) {
+      // or a number for a numeric string - normalize both sides before
+      // comparing to avoid false-positive mismatches on those, while still
+      // catching a value that genuinely did not take.
+      if (_normalizeForCompare(actual) !== _normalizeForCompare(intended) &&
+          !(actual === '' && intended === '')) {
         mismatches.push(col);
       }
     }

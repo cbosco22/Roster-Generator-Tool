@@ -1054,7 +1054,7 @@ with tab_add:
             st.divider()
             st.markdown("**Review before adding**")
             ap_batch_df = st.data_editor(
-                ap_batch_rows, use_container_width=True, hide_index=True,
+                pd.DataFrame(ap_batch_rows), use_container_width=True, hide_index=True,
                 num_rows="dynamic", key="ap_batch_editor",
                 column_config={
                     "By": st.column_config.SelectboxColumn("By", options=_AP_BY_OPTIONS, width="small"),
