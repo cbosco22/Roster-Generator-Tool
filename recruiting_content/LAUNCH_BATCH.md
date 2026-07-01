@@ -30,7 +30,7 @@ Order below is a suggested posting sequence, not fixed — post in whatever orde
 **8. Annapolis** — `exports/Navy_Baseball_Annapolis.png` *(new)*
 > Welcome to Annapolis. Founded in 1649, the "Sailing Capital of the World" has been Navy Baseball's home port for over a century — 33 miles from D.C., 26 from Baltimore, and unlike anywhere else you'll play. ⚓ #NavyBaseball
 
-**Bonus 9. Noah Song — Alumni Spotlight** — `exports/Navy_Baseball_Alumni_Noah_Song.png` *(new — first real Alumni Spotlight, not part of the original 8 but ready to post)*
+**Bonus 9. Noah Song — Alumni Spotlight** — `exports/Navy_Baseball_Alumni_Noah_Song.png` — **HELD BACK, not part of the initial post batch.** Chris wants to save this one for later, as one of the first Alumni Spotlights posted on its own rather than lumped into the launch batch. Ready to post whenever he calls for it.
 > The highest pick ever. Noah Song is Navy Baseball's highest-ever MLB Draft pick (Red Sox, 4th round, No. 137 overall, 2019) and a 2019 Golden Spikes Award finalist. After his service commitment, he's now pitching at the Triple-A level. ⚓ #NavyBaseball
 
 ---
