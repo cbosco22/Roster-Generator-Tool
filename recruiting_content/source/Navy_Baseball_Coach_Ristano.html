@@ -65,11 +65,11 @@
     font-family:'Anton',sans-serif;font-weight:400;text-transform:uppercase;
     line-height:.86;letter-spacing:.005em;transform:skewX(-7deg);transform-origin:left;
   }
-  .head .l1{font-size:66px;color:var(--cream);}
-  .head .l2{font-size:66px;color:var(--gold);}
+  .head .l1{font-size:68px;color:var(--cream);white-space:nowrap;}
+  .head .l2{font-size:68px;color:var(--gold);white-space:nowrap;}
   .sub{
-    margin-top:14px;font-family:'Oswald',sans-serif;font-weight:300;
-    font-size:21px;line-height:1.32;color:#D7E0EE;
+    margin-top:18px;font-family:'Oswald',sans-serif;font-weight:300;
+    font-size:24px;line-height:1.32;color:#D7E0EE;
   }
   .sub b{font-weight:600;color:#fff;}
 
@@ -87,29 +87,30 @@
   .photocol .cap .rl{margin-top:4px;font-family:'Oswald',sans-serif;font-weight:500;font-size:16px;letter-spacing:.14em;text-transform:uppercase;color:#DCE4F0;}
 
   /* stat chips */
-  .stats{margin-top:28px;display:grid;grid-template-columns:repeat(3,1fr);gap:16px;}
-  .stat{border-top:3px solid var(--gold);padding-top:16px;display:flex;flex-direction:column;align-items:center;text-align:center;}
-  .stat .logowrap{height:60px;display:flex;align-items:center;justify-content:center;}
-  .stat .logowrap img,.stat .logowrap svg{display:block;height:60px;width:auto;filter:drop-shadow(0 2px 6px rgba(0,0,0,0.45));}
-  .stat .n{margin-top:14px;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:66px;line-height:.86;color:#fff;}
-  .stat .d{margin-top:8px;font-family:'Oswald',sans-serif;font-weight:400;font-size:17px;line-height:1.22;color:#DCE4F0;}
+  .stats{margin-top:36px;display:grid;grid-template-columns:repeat(3,1fr);gap:18px;}
+  .stat{border-top:3px solid var(--gold);padding-top:20px;display:flex;flex-direction:column;align-items:center;text-align:center;}
+  .stat .logowrap{height:82px;display:flex;align-items:center;justify-content:center;}
+  .stat .logowrap img,.stat .logowrap svg{display:block;height:82px;width:auto;filter:drop-shadow(0 2px 6px rgba(0,0,0,0.45));}
+  .stat .logowrap.draft img{height:96px;}
+  .stat .n{margin-top:16px;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:78px;line-height:.86;color:#fff;}
+  .stat .d{margin-top:10px;font-family:'Oswald',sans-serif;font-weight:400;font-size:18px;line-height:1.24;color:#DCE4F0;}
 
   /* perks list — stacked for the narrower text column */
-  .perks{margin-top:22px;display:flex;flex-direction:column;gap:10px;}
+  .perks{margin-top:32px;display:flex;flex-direction:column;gap:14px;}
   .perk{
-    display:flex;align-items:center;gap:14px;
+    display:flex;align-items:center;gap:16px;
     border:1px solid rgba(201,168,92,0.34);border-radius:5px;
-    background:rgba(22,55,101,0.28);padding:12px 16px;
+    background:rgba(22,55,101,0.28);padding:16px 18px;
   }
-  .perk .ic{flex:0 0 auto;color:var(--gold);}
-  .perk .t{font-family:'Oswald',sans-serif;font-weight:500;font-size:17px;line-height:1.1;letter-spacing:.02em;text-transform:uppercase;color:#E7EDF6;}
-  .perk .t span{display:block;font-weight:300;font-size:14px;letter-spacing:.03em;color:var(--steel);text-transform:none;margin-top:2px;}
+  .perk .ic{flex:0 0 auto;color:var(--gold);width:28px;height:28px;}
+  .perk .t{font-family:'Oswald',sans-serif;font-weight:500;font-size:18px;line-height:1.1;letter-spacing:.02em;text-transform:uppercase;color:#E7EDF6;}
+  .perk .t span{display:block;font-weight:300;font-size:15px;letter-spacing:.03em;color:var(--steel);text-transform:none;margin-top:3px;}
 
   /* financial bullets */
-  .fin{margin-top:20px;display:flex;flex-direction:column;gap:12px;}
-  .fin .row{display:flex;align-items:flex-start;gap:13px;}
-  .fin .mk{flex:0 0 auto;margin-top:5px;}
-  .fin .tx{font-family:'Oswald',sans-serif;font-weight:300;font-size:18.5px;line-height:1.24;color:#DCE4F0;}
+  .fin{margin-top:28px;display:flex;flex-direction:column;gap:16px;}
+  .fin .row{display:flex;align-items:flex-start;gap:14px;}
+  .fin .mk{flex:0 0 auto;margin-top:6px;}
+  .fin .tx{font-family:'Oswald',sans-serif;font-weight:300;font-size:20px;line-height:1.26;color:#DCE4F0;}
   .fin .tx b{font-weight:600;color:#fff;}
   .fin .tx em{font-style:normal;font-weight:600;color:var(--gold-br);}
 
@@ -148,7 +149,7 @@
 
           <div class="stats">
             <div class="stat">
-              <div class="logowrap"><img src="mlb_draft_logo.png" alt="MLB Draft"></div>
+              <div class="logowrap draft"><img src="mlb_draft_logo.png" alt="MLB Draft"></div>
               <div class="n">41</div>
               <div class="d">Players he's coached drafted into pro ball</div>
             </div>
