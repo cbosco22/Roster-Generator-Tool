@@ -145,15 +145,14 @@ def crawl_lookup(name, team=None, grad_year=None):
 
 
 class MeasChips(Flowable):
-    """Stat pills: rounded chips, value + tiny unit label, wrapping to fit
-    the column. Style per Chris's two review rounds (2026-07-02): outline
-    only, NO fill at all (transparent, so gray alternating rows show
-    through), unbolded values, small — the data should blend into the row,
-    not jump off the page. Renders nothing (zero height) when there are no
-    items. Also used for academics (GPA/SAT/ACT)."""
-    CHIP_H = 8.5
-    GAP = 1.5
-    EDGE = colors.HexColor('#AAAAAA')
+    """Stat blocks: tiny unit label centered ABOVE the value, no outline, no
+    fill — per Chris's third review round (2026-07-02): the pill border
+    itself was 'distracting and makes those pop off the page'. Each stat
+    still reads as its own little unit from the label/value stacking alone.
+    Wraps to fit the column; renders nothing (zero height) when there are
+    no items. Also used for academics (GPA/SAT/ACT)."""
+    CHIP_H = 10.5   # label line (~4pt) stacked over value line (~6pt)
+    GAP = 3.0
     TXT = colors.HexColor('#111111')
     LBL = colors.HexColor('#777777')
     VAL_FONT = ('Helvetica', 5.5)
@@ -161,8 +160,8 @@ class MeasChips(Flowable):
 
     def _chip_w(self, value, label):
         from reportlab.pdfbase.pdfmetrics import stringWidth
-        return stringWidth(value, *self.VAL_FONT) + \
-            stringWidth(label, *self.LBL_FONT) + 6
+        return max(stringWidth(value, *self.VAL_FONT),
+                   stringWidth(label, *self.LBL_FONT)) + 2
 
     def _layout(self):
         rows, cur, cur_w = [], [], 0.0
@@ -209,18 +208,13 @@ class MeasChips(Flowable):
             row_w = sum(w for _, _, w in row) + self.GAP * (len(row) - 1)
             x = (self.max_w - row_w) / 2.0  # center each pill row in the cell
             for value, label, w in row:
-                c.setStrokeColor(self.EDGE)
-                c.setLineWidth(0.5)
-                c.roundRect(x, y, w, self.CHIP_H, 2.5, stroke=1, fill=0)
-                c.setFillColor(self.TXT)
-                c.setFont(*self.VAL_FONT)
-                tx = x + 2.5
-                c.drawString(tx, y + 2.4, value)
-                from reportlab.pdfbase.pdfmetrics import stringWidth
+                cx = x + w / 2.0
                 c.setFillColor(self.LBL)
                 c.setFont(*self.LBL_FONT)
-                c.drawString(tx + stringWidth(value, *self.VAL_FONT) + 1,
-                             y + 2.4, label)
+                c.drawCentredString(cx, y + 6.6, label)
+                c.setFillColor(self.TXT)
+                c.setFont(*self.VAL_FONT)
+                c.drawCentredString(cx, y + 0.6, value)
                 x += w + self.GAP
             y -= self.CHIP_H + self.GAP
 
@@ -1069,8 +1063,10 @@ def build_pdf(json_path, out_path, raw_sheet_text="", proof_only=False,
                            textColor=TEXT_DARK, alignment=TA_CENTER, leading=7)
     # rank stands out on its own (Chris: "I like when the ranking stands
     # out", split back from the combined Acad/Rank column 2026-07-02)
-    sRank = ParagraphStyle('RK', fontName='Helvetica-Bold', fontSize=7,
-                           textColor=TEXT_DARK, alignment=TA_CENTER, leading=8.5)
+    # 6.5pt: measured — at 7pt '#296 NAT' overflows the column and a
+    # state+national+PG kid wraps to 4 lines, bleeding past the row
+    sRank = ParagraphStyle('RK', fontName='Helvetica-Bold', fontSize=6.5,
+                           textColor=TEXT_DARK, alignment=TA_CENTER, leading=8)
     sCmtTag = ParagraphStyle('CT', fontName='Helvetica-Bold', fontSize=3.6,
                              textColor=TEXT_MED, alignment=TA_CENTER, leading=4.6)
     sCmtSchool = ParagraphStyle('CS', fontName='Helvetica-Bold', fontSize=6.5,
@@ -1162,21 +1158,26 @@ def build_pdf(json_path, out_path, raw_sheet_text="", proof_only=False,
         return Paragraph(_esc(c['acad']), sAcad)
 
     def _rank_cell(p, c):
-        return Paragraph(_esc(c['pbr_str']).replace('\n', '<br/>'), sRank)
+        # "Nat'l" -> "NAT": '#1200 Nat'l' at 7pt bold overflows the column
+        # width (measured, not guessed) and would wrap to a 4th line
+        return Paragraph(_esc(c['pbr_str'].replace("Nat'l", 'NAT'))
+                         .replace('\n', '<br/>'), sRank)
 
     def _commit_block(c):
-        """The sketch's right-edge NOTES block: COMMITTED / school logo /
-        date. Logo resolved via college_logos (None -> text fallback)."""
+        """The sketch's right-edge NOTES block: school logo with a single
+        'COMMITTED – date' line right under it (Chris 2026-07-02: the tag
+        above + date below layout read as misaligned and the date collided
+        with the row rule). Logo via college_logos (None -> text fallback)."""
         import college_logos
-        flows = [Paragraph('COMMITTED', sCmtTag)]
+        flows = []
         lp = college_logos.logo_path(c['commit'])
         if lp:
             from reportlab.platypus import Image as RLImage
-            flows.append(RLImage(lp, width=0.34*inch, height=0.34*inch))
+            flows.append(RLImage(lp, width=0.30*inch, height=0.30*inch))
         else:
             flows.append(Paragraph(_esc(c['commit']), sCmtSchool))
-        if c['commit_date']:
-            flows.append(Paragraph(_esc(c['commit_date']), sCmtDate))
+        tagline = 'COMMITTED' + (f" – {c['commit_date']}" if c['commit_date'] else '')
+        flows.append(Paragraph(_esc(tagline), sCmtTag))
         return flows
 
     def _notes_cell(p, c):
@@ -1223,10 +1224,10 @@ def build_pdf(json_path, out_path, raw_sheet_text="", proof_only=False,
             _esc(c['sch']) +
             (f"<br/><font color=#555555>{_esc(c['hometown'])}</font>" if c['hometown'] else ''),
             sSchl)),
-        'meas':   dict(hdr='Measurables', wt=1.9,
+        'meas':   dict(hdr='Measurables', wt=1.8,
                        cell=lambda p, c: MeasChips(c['meas'], _MEAS_W[0])),
         'acad_chips': dict(hdr='Acad', wt=2.0, cell=_acad_cell),
-        'rank':   dict(hdr='Rank', wt=1.3, cell=_rank_cell),
+        'rank':   dict(hdr='Rank', wt=1.4, cell=_rank_cell),
         # real star icon under the label (vector StarGlyph) -- Chris liked
         # the old Sheets look where Cur and New matched, star below the word
         'cur':    dict(hdr='Cur', hdr_star=True, wt=0.7,
