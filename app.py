@@ -796,15 +796,40 @@ with tab_post:
         st.warning("Anthropic API key missing — set `ANTHROPIC_API_KEY` in Streamlit "
                    "secrets (the Admin tab shows status).")
 
-    st.write("**1. Annotated pages (JPG)**")
+    st.write("**1. Annotated pages — whole-event PDF or individual JPGs**")
     pe_imgs = st.file_uploader(
-        "Export each GoodNotes page as a JPG and drop them here",
-        type=["jpg", "jpeg", "png", "webp"],
+        "Export the WHOLE event from GoodNotes as one PDF and drop it here "
+        "(annotated pages are found automatically) — or keep dropping "
+        "individual page JPGs like before",
+        type=["pdf", "jpg", "jpeg", "png", "webp"],
         accept_multiple_files=True,
         label_visibility="collapsed",
         key="post_event_imgs",
-        help="JPG, not PDF — PDF export garbles the handwriting.",
     )
+
+    # Whole-event PDF path: auto-detect the annotated roster pages so only
+    # those (~30 of 200+) go to Vision. Selection is reviewable before the
+    # run. Detection logic + its validation live in event_pdf.py.
+    pe_pdf_selected = {}   # uploader file name -> (pdf_bytes, [page numbers])
+    for _f in (pe_imgs or []):
+        if not _f.name.lower().endswith(".pdf"):
+            continue
+        _pdf_bytes = _f.getvalue()
+        _ck = f"pe_pdf_{_f.name}_{len(_pdf_bytes)}"
+        if _ck not in st.session_state:
+            with st.spinner(f"Scanning {_f.name} for annotated pages…"):
+                from event_pdf import analyze_event_pdf
+                st.session_state[_ck] = analyze_event_pdf(_pdf_bytes)
+        _an = st.session_state[_ck]
+        _flagged = [p for p, _ in _an["flagged"]]
+        st.caption(f"**{_f.name}** — {_an['total']} pages, "
+                   f"{len(_an['roster_pages'])} roster pages, "
+                   f"**{len(_flagged)} look annotated**. Adjust below if a "
+                   f"page was missed or wrongly included.")
+        _sel = st.multiselect(
+            f"Pages to read from {_f.name}", options=_an["roster_pages"],
+            default=_flagged, key=f"pe_sel_{_f.name}")
+        pe_pdf_selected[_f.name] = (_pdf_bytes, _sel)
 
     colA, colB = st.columns(2)
     with colA:
@@ -821,13 +846,32 @@ with tab_post:
     if pe_go:
         with st.status("Reading pages…", expanded=True) as pstatus:
             try:
+                # one work list: (label, jpeg_bytes, media_type) from PDFs
+                # (rasterized on the fly) and plain image uploads alike
+                work = []
+                for f in pe_imgs:
+                    if f.name.lower().endswith(".pdf"):
+                        _pdf_bytes, _sel = pe_pdf_selected.get(f.name, (None, []))
+                        if _pdf_bytes:
+                            from event_pdf import render_page_jpeg
+                            for pno in _sel:
+                                work.append((f"{f.name} p.{pno}",
+                                             lambda b=_pdf_bytes, p=pno: render_page_jpeg(b, p),
+                                             "image/jpeg"))
+                    else:
+                        mt = f.type or "image/jpeg"
+                        if mt == "image/jpg":
+                            mt = "image/jpeg"
+                        work.append((f.name, f.read, mt))
+                if not work:
+                    pstatus.update(label="Nothing to read", state="error")
+                    st.error("No pages selected — pick at least one page "
+                             "from the PDF's page list above.")
+                    st.stop()
                 pages = []
-                for i, f in enumerate(pe_imgs):
-                    mt = f.type or "image/jpeg"
-                    if mt == "image/jpg":
-                        mt = "image/jpeg"
-                    pstatus.update(label=f"📄 Reading page {i+1}/{len(pe_imgs)}…")
-                    page = extract_post_event_page(f.read(), media_type=mt,
+                for i, (label, get_bytes, mt) in enumerate(work):
+                    pstatus.update(label=f"📄 Reading page {i+1}/{len(work)} ({label})…")
+                    page = extract_post_event_page(get_bytes(), media_type=mt,
                                                    api_key=pe_api_key)
                     pages.append(page)
                     st.write(f"✓ {page.get('team_name') or 'page'} — "
