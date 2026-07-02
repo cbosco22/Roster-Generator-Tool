@@ -1533,48 +1533,79 @@ with tab_board:
             # literal ask ("i want to be able to click the name"), the
             # bubble was never required to be part of the click target.
             # Column order after Name, per Chris: POS, ST, TEAM, B/T.
+            # Header row was rendering at ~9.6px tall - `overflow-x: auto` on
+            # the SAME element that also holds the row's content collapsed
+            # it, because Streamlit's own layout wrapper resolves height
+            # against the overflow box rather than the (short, button-less)
+            # header content - confirmed live via computed style, not
+            # guessed. Fix: overflow-x scrolling now lives on ONE outer
+            # wrapper around the whole header+rows stack (so header and
+            # rows scroll horizontally together, in sync, instead of each
+            # row being its own independent scroller), and every row/header
+            # gets an explicit min-height instead of trusting content to
+            # size it. Header is also its own keyed container now, sticky
+            # to the top of the page on vertical scroll ("freeze label row
+            # as we scroll").
             st.markdown("""
                 <style>
+                .st-key-nb_board_rows {
+                    overflow-x: auto !important;
+                    gap: 0.15rem !important;
+                }
                 .st-key-nb_board_rows [data-testid="stHorizontalBlock"] {
                     flex-wrap: nowrap !important;
-                    overflow-x: auto !important;
                     align-items: center !important;
+                    min-height: 30px !important;
                 }
                 .st-key-nb_board_rows [data-testid="stVerticalBlock"] {
                     justify-content: center !important;
+                    gap: 0.1rem !important;
+                }
+                .st-key-nb_board_header [data-testid="stHorizontalBlock"] {
+                    min-height: 24px !important;
+                }
+                .st-key-nb_board_header {
+                    position: sticky !important;
+                    top: 0 !important;
+                    z-index: 5 !important;
+                    background: #FFFFFF !important;
                 }
                 </style>
                 """, unsafe_allow_html=True)
 
-            bd_widths = [34, 140]  # bubble, name
+            # Columns other than Name/Team shrunk - short 1-3 char values at
+            # 11px font don't need 40-50px, per Chris ("less blank space
+            # means more content").
+            bd_widths = [26, 130]  # bubble, name
             if bd_show_pos:
-                bd_widths.append(48)
-            bd_widths += [42, 120]  # ST, TEAM
+                bd_widths.append(34)
+            bd_widths += [30, 120]  # ST, TEAM
             if bd_show_bt:
-                bd_widths.append(42)
+                bd_widths.append(30)
 
             with st.container(key="nb_board_rows"):
-                with st.container(horizontal=True, gap="small"):
-                    headers = ["★", "NAME"]
-                    if bd_show_pos:
-                        headers.append("POS")
-                    headers += ["ST", "TEAM"]
-                    if bd_show_bt:
-                        headers.append("B/T")
-                    for label, w in zip(headers, bd_widths):
-                        with st.container(width=w):
-                            st.markdown(f'<div style="background:#14233B;color:#FFFFFF;'
-                                       f'font-size:11px;font-weight:700;text-align:center;'
-                                       f'padding:4px 2px;border-radius:4px;white-space:nowrap;">'
-                                       f'{label}</div>', unsafe_allow_html=True)
+                with st.container(key="nb_board_header"):
+                    with st.container(horizontal=True, gap="small"):
+                        headers = ["★", "NAME"]
+                        if bd_show_pos:
+                            headers.append("POS")
+                        headers += ["ST", "TEAM"]
+                        if bd_show_bt:
+                            headers.append("B/T")
+                        for label, w in zip(headers, bd_widths):
+                            with st.container(width=w):
+                                st.markdown(f'<div style="background:#14233B;color:#FFFFFF;'
+                                           f'font-size:11px;font-weight:700;text-align:center;'
+                                           f'padding:4px 2px;border-radius:4px;white-space:nowrap;">'
+                                           f'{label}</div>', unsafe_allow_html=True)
 
                 for p in bd_filtered:
                     dot_bg, dot_fg, dot_label = _BOARD_TIER_BADGE.get(p['tier'], ('#CCCCCC', '#000', '?'))
                     with st.container(horizontal=True, gap="small"):
                         with st.container(width=bd_widths[0]):
-                            st.markdown(f'<div style="width:24px;height:24px;border-radius:50%;'
+                            st.markdown(f'<div style="width:22px;height:22px;border-radius:50%;'
                                        f'background:{dot_bg};color:{dot_fg};text-align:center;'
-                                       f'line-height:24px;font-weight:700;font-size:11px;">'
+                                       f'line-height:22px;font-weight:700;font-size:10px;margin:0 auto;">'
                                        f'{dot_label}</div>', unsafe_allow_html=True)
                         with st.container(width=bd_widths[1]):
                             if st.button(p['canonical_name'], key=f"bd_open_{p['_row']}",
