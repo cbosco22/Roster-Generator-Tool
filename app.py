@@ -1352,12 +1352,18 @@ _BOARD_TIER_FILTER_DEFAULT = ['0.1', '1', '2']
 _BOARD_TIER_FILTER_LABELS = {'0.1': '0.1 · Committed', '1': '1 · Offer',
                              '2': '2 · High Follow', '3': '3 · Follow',
                              '4': '4 · Need to see', 'XX': 'XX · Off list'}
-# Name-text color per tier, matching a real mock Chris built directly in
-# Sheets and told me to copy exactly: tier 1 names in green, everything
-# else plain. 0.1 (committed) gets navy+bold since it's the single most
-# important tier - not in Chris's original mock sample, but leaving it
-# plain would bury the most important row on the board.
-_BOARD_NAME_COLOR = {'0.1': '#1A3A6B', '1': '#2E7D32'}
+# Rating bubble colors - matches gen_roster_pdf.TIER_DOT_COLOR exactly
+# (can't import directly, those are reportlab Color objects; this is CSS -
+# duplicated on purpose, keep in sync if that palette ever changes). Per
+# Chris: "show as the bubbles colored like on my pdfs." (dot_bg, dot_fg,
+# dot_label) per tier.
+_BOARD_TIER_BADGE = {
+    '0.1': ('#1A3A6B', '#FFFFFF', 'C'),
+    '1':   ('#2E7D32', '#FFFFFF', '1'),
+    '2':   ('#F9A825', '#333300', '2'),
+    '3':   ('#7E57C2', '#FFFFFF', '3'),
+    '4':   ('#90CAF9', '#1A3A6B', '4'),
+}
 
 
 def _bd_write(ops, sw_url, sw_token, player_label):
@@ -1511,11 +1517,22 @@ with tab_board:
             # click-anywhere, no checkbox, no icon-font dependency) inside
             # st.container(horizontal=True) (doesn't stack on a phone
             # viewport the way st.columns() does). Fixed pixel widths on
-            # every column this time, including TEAM - "stretch" on a
-            # non-last column pushed it onto its own line last attempt.
-            # Wrapped in a scoped, horizontally-scrollable container so a
-            # wide combination (ALL positions + B/T + state + team) scrolls
-            # instead of squeezing, without needing st.dataframe for it.
+            # every column, including TEAM - "stretch" on a non-last column
+            # pushed it onto its own line in an earlier attempt. Wrapped in
+            # a scoped, horizontally-scrollable container so a wide
+            # combination (ALL positions + B/T + state + team) scrolls
+            # instead of squeezing.
+            #
+            # Rating is its own real colored bubble now (matching
+            # gen_roster_pdf.TIER_DOT_COLOR exactly, per Chris - "show as
+            # the bubbles colored like on my pdfs"), not text fused into the
+            # button - a plain st.button label can't render a colored
+            # circle. That splits the click target down to just the name
+            # button (which centers its label natively, unlike the bubble
+            # which sits left in its own narrow column) - matches Chris's
+            # literal ask ("i want to be able to click the name"), the
+            # bubble was never required to be part of the click target.
+            # Column order after Name, per Chris: POS, ST, TEAM, B/T.
             st.markdown("""
                 <style>
                 .st-key-nb_board_rows [data-testid="stHorizontalBlock"] {
@@ -1523,24 +1540,27 @@ with tab_board:
                     overflow-x: auto !important;
                     align-items: center !important;
                 }
+                .st-key-nb_board_rows [data-testid="stVerticalBlock"] {
+                    justify-content: center !important;
+                }
                 </style>
                 """, unsafe_allow_html=True)
 
-            bd_widths = [170]
+            bd_widths = [34, 140]  # bubble, name
             if bd_show_pos:
                 bd_widths.append(48)
+            bd_widths += [42, 120]  # ST, TEAM
             if bd_show_bt:
                 bd_widths.append(42)
-            bd_widths += [42, 120]  # ST, TEAM
 
             with st.container(key="nb_board_rows"):
                 with st.container(horizontal=True, gap="small"):
-                    headers = ["★ / NAME"]
+                    headers = ["★", "NAME"]
                     if bd_show_pos:
                         headers.append("POS")
+                    headers += ["ST", "TEAM"]
                     if bd_show_bt:
                         headers.append("B/T")
-                    headers += ["ST", "TEAM"]
                     for label, w in zip(headers, bd_widths):
                         with st.container(width=w):
                             st.markdown(f'<div style="background:#14233B;color:#FFFFFF;'
@@ -1549,23 +1569,22 @@ with tab_board:
                                        f'{label}</div>', unsafe_allow_html=True)
 
                 for p in bd_filtered:
-                    tier_label = 'C' if p['tier'] == '0.1' else p['tier']
+                    dot_bg, dot_fg, dot_label = _BOARD_TIER_BADGE.get(p['tier'], ('#CCCCCC', '#000', '?'))
                     with st.container(horizontal=True, gap="small"):
                         with st.container(width=bd_widths[0]):
-                            if st.button(f"{tier_label}  {p['canonical_name']}",
-                                        key=f"bd_open_{p['_row']}", width="stretch"):
+                            st.markdown(f'<div style="width:24px;height:24px;border-radius:50%;'
+                                       f'background:{dot_bg};color:{dot_fg};text-align:center;'
+                                       f'line-height:24px;font-weight:700;font-size:11px;">'
+                                       f'{dot_label}</div>', unsafe_allow_html=True)
+                        with st.container(width=bd_widths[1]):
+                            if st.button(p['canonical_name'], key=f"bd_open_{p['_row']}",
+                                        width="stretch"):
                                 _bd_profile_dialog(p, bd_cols, bd_sw_url, bd_sw_token)
-                        wi = 1
+                        wi = 2
                         if bd_show_pos:
                             with st.container(width=bd_widths[wi]):
                                 st.markdown(f'<div style="text-align:center;font-size:11px;'
                                            f'white-space:nowrap;">{html.escape(p["pos"] or "—")}'
-                                           f'</div>', unsafe_allow_html=True)
-                            wi += 1
-                        if bd_show_bt:
-                            with st.container(width=bd_widths[wi]):
-                                st.markdown(f'<div style="text-align:center;font-size:11px;'
-                                           f'white-space:nowrap;">{html.escape(p["bt"] or "—")}'
                                            f'</div>', unsafe_allow_html=True)
                             wi += 1
                         with st.container(width=bd_widths[wi]):
@@ -1577,6 +1596,12 @@ with tab_board:
                             st.markdown(f'<div style="text-align:left;font-size:9px;color:#555;'
                                        f'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'
                                        f'{html.escape(p["team"] or "")}</div>', unsafe_allow_html=True)
+                        wi += 1
+                        if bd_show_bt:
+                            with st.container(width=bd_widths[wi]):
+                                st.markdown(f'<div style="text-align:center;font-size:11px;'
+                                           f'white-space:nowrap;">{html.escape(p["bt"] or "—")}'
+                                           f'</div>', unsafe_allow_html=True)
 
 
 # ---- Admin ----
