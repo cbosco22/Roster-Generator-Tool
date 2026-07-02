@@ -42,15 +42,22 @@ THE TABLE has a printed HEADER ROW. Read every value by the column header it
 sits UNDER — never by a fixed left-to-right position. The set of columns can
 differ between printouts, so anchor on the headers, not their order.
 
-Columns you may see (some printouts include St and/or Acad, some don't):
-  #  |  First  |  Last  |  Pos  |  Ht  |  Wt  |  Class  |  School  |  St  |
-  Cur★  |  New★  |  PBR Rank  |  Commit  |  Acad  |  NOTES
+Column layouts vary by printout era and by custom column presets. Two you
+will commonly see (but treat ANY combination/order as possible):
+  classic:  #  |  First  |  Last  |  Pos  |  Ht  |  Wt  |  Class  |  School  |
+            St  |  Cur★  |  New★  |  PBR Rank  |  Commit  |  Acad  |  NOTES
+  current:  #  |  First  |  Last  |  Pos  |  Class  |  School  |  Measurables |
+            Acad  |  Rank  |  Cur★  |  New★  |  NOTES
+In the current layout, Pos may show B/T under it, Class may show height·weight
+under it, School may show a hometown under it, and Measurables holds small
+stat values with tiny unit labels above them — none of that changes how you
+read Cur★/New★.
 
-The two rating columns are always labeled "Cur ★"/"Cur*" and "New ★"/"New*".
-Find those two headers and read the value directly beneath each. When present,
-the St column (2-letter state) sits just LEFT of Cur★, and the Acad column sits
-between Commit and NOTES. Do NOT let an inserted St or Acad column shift which
-value you read as Cur★ or New★ — go by the header above the cell, every time.
+The two rating columns are always labeled "Cur ★"/"Cur*" and "New ★"/"New*"
+(possibly with a star icon under the word). Find those two headers and read
+the value directly beneath each. Do NOT let inserted, removed, or reordered
+columns shift which value you read as Cur★ or New★ — go by the header above
+the cell, every single time.
 
 CRITICAL DISTINCTIONS — read carefully:
 
