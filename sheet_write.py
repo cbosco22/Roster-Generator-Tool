@@ -223,9 +223,13 @@ def post_ops_chunked(ops, url, token, dry_run=True, chunk_size=10,
     Returns {'ok', 'results', 'error'?} aggregated across chunks; stops at
     the first failed chunk (results has everything up to and incl. it).
     """
+    import time as _t
     all_results = []
     total = len(ops)
     for start in range(0, total, chunk_size):
+        if start:
+            _t.sleep(0.8)  # pacing: rapid-fire requests trip Apps Script's
+                           # flaky response-echo redirect (404 seen live)
         chunk = ops[start:start + chunk_size]
         try:
             r = post_ops(chunk, url, token, dry_run=dry_run, timeout=timeout,
@@ -264,6 +268,21 @@ def post_ops(ops, url, token, dry_run=True, timeout=45, retries=2):
             resp.raise_for_status()
             return resp.json()
         except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as e:
+            last_exc = e
+            if attempt < retries:
+                time.sleep(2 * (attempt + 1))
+        except requests.exceptions.HTTPError as e:
+            # Apps Script's response comes via a 302 to script.googleusercontent
+            # .com/macros/echo?user_content_key=... and that echo URL 404s
+            # intermittently under rapid successive requests (seen live
+            # 2026-07-02, mid-validation). For read-only dry runs a retry is
+            # always safe. For real writes it is NOT retried here: the 404
+            # happens on the response fetch AFTER the script may have already
+            # executed, so a blind retry could double-write - same policy as
+            # timeouts.
+            status = e.response.status_code if e.response is not None else 0
+            if status in (401, 403):
+                raise  # auth problems never fix themselves by retrying
             last_exc = e
             if attempt < retries:
                 time.sleep(2 * (attempt + 1))
