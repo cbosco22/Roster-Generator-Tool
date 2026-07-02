@@ -1503,52 +1503,80 @@ with tab_board:
         if not bd_filtered:
             st.caption(f"No {bd_pos} in the {bd_class} class at the selected rating(s) right now.")
         else:
-            # st.columns()/st.container(horizontal=True) both fight a real
-            # phone viewport - columns stack vertically below Streamlit's
-            # mobile breakpoint (confirmed live at 390px), and hand-tuned
-            # pixel widths in a horizontal container just move the same
-            # problem into a "does this line wrap" guessing game. st.dataframe
-            # sidesteps both: it scrolls horizontally on its own when content
-            # doesn't fit (exactly what Chris asked for - "scrollable side to
-            # side if it doesn't fit"), and its native row-click selection
-            # replaces the per-row st.button used in the last attempt.
-            bd_rows = []
-            for p in bd_filtered:
-                row = {'★': 'C' if p['tier'] == '0.1' else p['tier'], 'NAME': p['canonical_name']}
-                if bd_show_pos:
-                    row['POS'] = p['pos']
-                if bd_show_bt:
-                    row['B/T'] = p['bt'] or ''
-                row['ST'] = p['state'] or ''
-                row['TEAM'] = p['team'] or ''
-                bd_rows.append(row)
-            bd_df = pd.DataFrame(bd_rows)
+            # st.dataframe's row selection only responds to its own checkbox
+            # column - confirmed live 2026-07-02 by clicking directly on a
+            # NAME cell and seeing nothing happen. Chris doesn't want that
+            # checkbox visible at all, and wants the whole row clickable, so
+            # dataframe is out. Back to a real st.button per row (reliable
+            # click-anywhere, no checkbox, no icon-font dependency) inside
+            # st.container(horizontal=True) (doesn't stack on a phone
+            # viewport the way st.columns() does). Fixed pixel widths on
+            # every column this time, including TEAM - "stretch" on a
+            # non-last column pushed it onto its own line last attempt.
+            # Wrapped in a scoped, horizontally-scrollable container so a
+            # wide combination (ALL positions + B/T + state + team) scrolls
+            # instead of squeezing, without needing st.dataframe for it.
+            st.markdown("""
+                <style>
+                .st-key-nb_board_rows [data-testid="stHorizontalBlock"] {
+                    flex-wrap: nowrap !important;
+                    overflow-x: auto !important;
+                    align-items: center !important;
+                }
+                </style>
+                """, unsafe_allow_html=True)
 
-            def _bd_row_style(row):
-                color = _BOARD_NAME_COLOR.get(bd_filtered[row.name]['tier'])
-                style = f'color:{color};font-weight:700;' if color else ''
-                return [style if col in ('★', 'NAME') else '' for col in bd_df.columns]
-
-            bd_col_config = {
-                '★': st.column_config.Column(width=40, alignment='center'),
-                'NAME': st.column_config.Column(width=170, alignment='left'),
-                'ST': st.column_config.Column(width=50, alignment='center'),
-                'TEAM': st.column_config.Column(width=160, alignment='left'),
-            }
+            bd_widths = [170]
             if bd_show_pos:
-                bd_col_config['POS'] = st.column_config.Column(width=55, alignment='center')
+                bd_widths.append(48)
             if bd_show_bt:
-                bd_col_config['B/T'] = st.column_config.Column(width=55, alignment='center')
+                bd_widths.append(42)
+            bd_widths += [42, 120]  # ST, TEAM
 
-            bd_event = st.dataframe(
-                bd_df.style.apply(_bd_row_style, axis=1), hide_index=True,
-                column_config=bd_col_config, on_select='rerun', selection_mode='single-row',
-                row_height=32, key=f'bd_table_{bd_class}_{bd_pos}_{"".join(sorted(bd_tiers))}',
-            )
-            if bd_event and bd_event.selection and bd_event.selection.rows:
-                bd_sel_idx = bd_event.selection.rows[0]
-                if bd_sel_idx < len(bd_filtered):
-                    _bd_profile_dialog(bd_filtered[bd_sel_idx], bd_cols, bd_sw_url, bd_sw_token)
+            with st.container(key="nb_board_rows"):
+                with st.container(horizontal=True, gap="small"):
+                    headers = ["★ / NAME"]
+                    if bd_show_pos:
+                        headers.append("POS")
+                    if bd_show_bt:
+                        headers.append("B/T")
+                    headers += ["ST", "TEAM"]
+                    for label, w in zip(headers, bd_widths):
+                        with st.container(width=w):
+                            st.markdown(f'<div style="background:#14233B;color:#FFFFFF;'
+                                       f'font-size:11px;font-weight:700;text-align:center;'
+                                       f'padding:4px 2px;border-radius:4px;white-space:nowrap;">'
+                                       f'{label}</div>', unsafe_allow_html=True)
+
+                for p in bd_filtered:
+                    tier_label = 'C' if p['tier'] == '0.1' else p['tier']
+                    with st.container(horizontal=True, gap="small"):
+                        with st.container(width=bd_widths[0]):
+                            if st.button(f"{tier_label}  {p['canonical_name']}",
+                                        key=f"bd_open_{p['_row']}", width="stretch"):
+                                _bd_profile_dialog(p, bd_cols, bd_sw_url, bd_sw_token)
+                        wi = 1
+                        if bd_show_pos:
+                            with st.container(width=bd_widths[wi]):
+                                st.markdown(f'<div style="text-align:center;font-size:11px;'
+                                           f'white-space:nowrap;">{html.escape(p["pos"] or "—")}'
+                                           f'</div>', unsafe_allow_html=True)
+                            wi += 1
+                        if bd_show_bt:
+                            with st.container(width=bd_widths[wi]):
+                                st.markdown(f'<div style="text-align:center;font-size:11px;'
+                                           f'white-space:nowrap;">{html.escape(p["bt"] or "—")}'
+                                           f'</div>', unsafe_allow_html=True)
+                            wi += 1
+                        with st.container(width=bd_widths[wi]):
+                            st.markdown(f'<div style="text-align:center;font-size:11px;'
+                                       f'white-space:nowrap;">{html.escape(p["state"] or "—")}'
+                                       f'</div>', unsafe_allow_html=True)
+                        wi += 1
+                        with st.container(width=bd_widths[wi]):
+                            st.markdown(f'<div style="text-align:left;font-size:9px;color:#555;'
+                                       f'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'
+                                       f'{html.escape(p["team"] or "")}</div>', unsafe_allow_html=True)
 
 
 # ---- Admin ----
