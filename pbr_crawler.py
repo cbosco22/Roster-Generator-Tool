@@ -29,6 +29,7 @@ players.json shape: [{"name": "...", "grad_year": "2027", "state": "CA", "school
 
 import argparse
 import json
+import os
 import re
 import sys
 import time
@@ -218,17 +219,54 @@ def fetch_profile(session, profile_path):
     return out
 
 
-def crawl(players, throttle=THROTTLE_SEC, log=print):
+def _ckpt_key(p):
+    return "|".join(_norm(str(p.get(k) or "")) for k in ("name", "grad_year", "state", "school"))
+
+
+def crawl(players, throttle=THROTTLE_SEC, log=print, checkpoint=None):
     """
     players: list of {"name", "grad_year", "state", "school"}.
     Returns (results, unmatched) -- results have profile_path as the join
     key back to the recruiting sheet / players.parquet.
+
+    checkpoint: optional JSONL path. Every processed player is appended
+    (and flushed) as one line the moment it finishes, and players already
+    present in the file are skipped on startup -- so a multi-hour run
+    killed partway through resumes where it left off instead of starting
+    over. Transient search/fetch errors are deliberately NOT checkpointed,
+    so a resume retries them.
     """
     session = _session()
     results, unmatched = [], []
+    done = set()
+    ckpt_f = None
+    if checkpoint:
+        if os.path.exists(checkpoint):
+            with open(checkpoint) as f:
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    rec = json.loads(line)
+                    done.add(rec["key"])
+                    if rec["matched"]:
+                        results.append(rec["record"])
+                    else:
+                        unmatched.append(rec["record"])
+            log(f"checkpoint: {len(done)} players already done, resuming")
+        ckpt_f = open(checkpoint, "a")
+
+    def _ckpt(p, record, matched):
+        if ckpt_f:
+            ckpt_f.write(json.dumps({"key": _ckpt_key(p), "matched": matched,
+                                     "record": record}) + "\n")
+            ckpt_f.flush()
+
     for i, p in enumerate(players):
         name = p.get("name", "").strip()
         if not name:
+            continue
+        if checkpoint and _ckpt_key(p) in done:
             continue
         try:
             profile_path, reason = resolve_profile(
@@ -242,7 +280,9 @@ def crawl(players, throttle=THROTTLE_SEC, log=print):
 
         if not profile_path:
             log(f"[{i+1}/{len(players)}] {name}: {reason}")
-            unmatched.append({**p, "reason": reason})
+            rec = {**p, "reason": reason}
+            unmatched.append(rec)
+            _ckpt(p, rec, matched=False)
             continue
 
         try:
@@ -256,9 +296,12 @@ def crawl(players, throttle=THROTTLE_SEC, log=print):
         profile["query"] = p
         profile["match_reason"] = reason
         results.append(profile)
+        _ckpt(p, profile, matched=True)
         log(f"[{i+1}/{len(players)}] {name}: {reason} -> {profile_path} "
             f"({len(profile['measurables'])} measurables)")
 
+    if ckpt_f:
+        ckpt_f.close()
     return results, unmatched
 
 
@@ -266,6 +309,8 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--input", help="JSON file: [{name, grad_year, state, school}]")
     ap.add_argument("--out", default="pbr_crawler_output.json")
+    ap.add_argument("--checkpoint", help="JSONL progress file: appended per player, "
+                    "resumes a killed run by skipping players already in it")
     ap.add_argument("--test", action="store_true", help="Smoke test against 3 known players")
     args = ap.parse_args()
 
@@ -282,7 +327,7 @@ if __name__ == "__main__":
         ap.error("Provide --input players.json or --test")
         sys.exit(1)
 
-    results, unmatched = crawl(players)
+    results, unmatched = crawl(players, checkpoint=args.checkpoint)
     with open(args.out, "w") as f:
         json.dump({"scraped_at": _dt.datetime.now(_dt.timezone.utc).isoformat(),
                     "results": results, "unmatched": unmatched}, f, indent=2)
