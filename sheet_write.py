@@ -286,4 +286,12 @@ def post_ops(ops, url, token, dry_run=True, timeout=45, retries=2):
             last_exc = e
             if attempt < retries:
                 time.sleep(2 * (attempt + 1))
+        except ValueError as e:
+            # body wasn't JSON (Apps Script edge intermittently serves an
+            # HTML error page / empty body - JSONDecodeError seen live
+            # 2026-07-02 on attempt 4). Same policy as the echo-404: retry
+            # only when the caller allows it (dry runs), never real writes.
+            last_exc = e
+            if attempt < retries:
+                time.sleep(2 * (attempt + 1))
     raise last_exc

@@ -895,6 +895,50 @@ with tab_post:
         st.session_state["pe_stats"] = result["stats"]
         st.session_state["pe_write_preview"] = None
 
+    # --- Resume from downloaded CSVs (no re-extraction) ---
+    # Born 2026-07-02: a flaky write after a 41-page read meant re-reading
+    # everything. The two CSVs the app offers for download are now also an
+    # INPUT - drop them back in and pick up exactly where you left off.
+    with st.expander("📂 Resume from downloaded CSVs (skip re-reading pages)"):
+        pe_csv_new = st.file_uploader("new_players.csv", type=["csv"], key="pe_csv_new")
+        pe_csv_upd = st.file_uploader("rating_updates.csv", type=["csv"], key="pe_csv_upd")
+        if st.button("Load tables from CSVs",
+                     disabled=not (pe_csv_new or pe_csv_upd), key="pe_csv_load"):
+            import csv as _csv
+            import io as _io
+
+            def _rows(f):
+                if not f:
+                    return []
+                return list(_csv.DictReader(
+                    _io.StringIO(f.getvalue().decode("utf-8-sig"))))
+
+            def _tidy_star(v):
+                return (v or "").strip().rstrip("!")  # a handwritten '4!' is a 4
+
+            _new_rows = []
+            for r in _rows(pe_csv_new):
+                row = {c: (r.get(c) or "").strip() for c in NEW_PLAYER_COLUMNS}
+                row["\u2605"] = _tidy_star(r.get("\u2605"))
+                _new_rows.append(row)
+            _upd_raw, _upd_rows = [], []
+            for r in _rows(pe_csv_upd):
+                _nm = (r.get("Name") or "").strip()
+                _first, _, _last = _nm.partition(" ")
+                _ns = _tidy_star(r.get("New \u2605"))
+                _upd_raw.append({"first": _first, "last": _last, "new_star": _ns,
+                                 "_team_name": (r.get("Team") or "").strip()})
+                _upd_rows.append({"Name": _nm, "Team": (r.get("Team") or "").strip(),
+                                  "Cur \u2605": (r.get("Cur \u2605") or "").strip(),
+                                  "New \u2605": _ns})
+            st.session_state["pe_new_rows"] = _new_rows
+            st.session_state["pe_upd_rows"] = _upd_rows
+            st.session_state["pe_upd_raw"] = _upd_raw
+            st.session_state["pe_stats"] = {"new_players": len(_new_rows),
+                                            "updates": len(_upd_rows), "skipped": 0}
+            st.session_state["pe_write_preview"] = None
+            st.rerun()
+
     if "pe_stats" in st.session_state:
         s = st.session_state["pe_stats"]
         st.divider()
