@@ -916,21 +916,37 @@ with tab_post:
             def _tidy_star(v):
                 return (v or "").strip().rstrip("!")  # a handwritten '4!' is a 4
 
+            _VALID_TIERS = {"", "0.1", "1", "2", "3", "4", "XX"}
+            _held = []  # invalid tiers never reach the sheet as junk
+
             _new_rows = []
             for r in _rows(pe_csv_new):
                 row = {c: (r.get(c) or "").strip() for c in NEW_PLAYER_COLUMNS}
-                row["\u2605"] = _tidy_star(r.get("\u2605"))
+                star = _tidy_star(r.get("\u2605"))
+                if star not in _VALID_TIERS:
+                    _held.append(f"{row.get('First','')} {row.get('Last','')} — "
+                                 f"\u2605 read as '{star}': added UNRATED, verify")
+                    row["Notes"] = (f"[\u2605 unclear: read as '{star}' — verify] "
+                                    + row.get("Notes", "")).strip()
+                    star = ""
+                row["\u2605"] = star
                 _new_rows.append(row)
             _upd_raw, _upd_rows = [], []
             for r in _rows(pe_csv_upd):
                 _nm = (r.get("Name") or "").strip()
                 _first, _, _last = _nm.partition(" ")
                 _ns = _tidy_star(r.get("New \u2605"))
+                if _ns not in _VALID_TIERS or not _ns:
+                    _held.append(f"{_nm} — New\u2605 read as '{_ns}': update "
+                                 f"SKIPPED (current rating kept)")
+                    continue
                 _upd_raw.append({"first": _first, "last": _last, "new_star": _ns,
                                  "_team_name": (r.get("Team") or "").strip()})
                 _upd_rows.append({"Name": _nm, "Team": (r.get("Team") or "").strip(),
                                   "Cur \u2605": (r.get("Cur \u2605") or "").strip(),
                                   "New \u2605": _ns})
+            if _held:
+                st.session_state["pe_import_holds"] = _held
             st.session_state["pe_new_rows"] = _new_rows
             st.session_state["pe_upd_rows"] = _upd_rows
             st.session_state["pe_upd_raw"] = _upd_raw
@@ -938,6 +954,10 @@ with tab_post:
                                             "updates": len(_upd_rows), "skipped": 0}
             st.session_state["pe_write_preview"] = None
             st.rerun()
+
+    if st.session_state.get("pe_import_holds"):
+        st.warning("Imported with holds (nothing invalid will be written):\n\n" +
+                   "\n".join(f"• {x}" for x in st.session_state["pe_import_holds"]))
 
     if "pe_stats" in st.session_state:
         s = st.session_state["pe_stats"]
