@@ -1550,19 +1550,28 @@ with tab_board:
                 <style>
                 .st-key-nb_board_rows {
                     overflow-x: auto !important;
-                    gap: 0.15rem !important;
+                    gap: 0.2rem !important;
                 }
                 .st-key-nb_board_rows [data-testid="stHorizontalBlock"] {
                     flex-wrap: nowrap !important;
                     align-items: center !important;
-                    min-height: 30px !important;
+                    min-height: 38px !important;
                 }
                 .st-key-nb_board_rows [data-testid="stVerticalBlock"] {
                     justify-content: center !important;
-                    gap: 0.1rem !important;
+                    gap: 0 !important;
                 }
-                .st-key-nb_board_header [data-testid="stHorizontalBlock"] {
-                    min-height: 24px !important;
+                /* Streamlit gives every element wrapper a bottom margin;
+                   inside the board it skews vertical centering, so zero it. */
+                .st-key-nb_board_rows [data-testid="stMarkdown"],
+                .st-key-nb_board_rows [data-testid="stMarkdownContainer"],
+                .st-key-nb_board_rows .stElementContainer {
+                    margin: 0 !important;
+                }
+                /* Never let a name wrap to a second line inside its button. */
+                .st-key-nb_board_rows .stButton button p {
+                    white-space: nowrap !important;
+                    font-size: 14px !important;
                 }
                 .st-key-nb_board_header {
                     position: sticky !important;
@@ -1573,39 +1582,60 @@ with tab_board:
                 </style>
                 """, unsafe_allow_html=True)
 
-            # Columns other than Name/Team shrunk - short 1-3 char values at
-            # 11px font don't need 40-50px, per Chris ("less blank space
-            # means more content").
-            bd_widths = [26, 130]  # bubble, name
+            # Desktop-first sizing (2026-07-02: "you're forcing it to look
+            # good on mobile and it's just not looking good at all on
+            # desktop"). Name column is sized to the longest visible name so
+            # no button label ever wraps to a second line; everything else
+            # got real breathing room. Narrow phones still get the
+            # horizontal-scroll wrapper below rather than squeezed columns.
+            bd_name_w = max(170, 24 + round(max(
+                len(p['canonical_name']) for p in bd_filtered) * 8.2))
+            bd_widths = [40, bd_name_w]  # bubble, name
             if bd_show_pos:
-                bd_widths.append(34)
-            bd_widths += [30, 120]  # ST, TEAM
+                bd_widths.append(56)
+            bd_widths += [46, 210]  # ST, TEAM
             if bd_show_bt:
-                bd_widths.append(30)
+                bd_widths.append(56)
 
             with st.container(key="nb_board_rows"):
+                # One continuous dark bar (2026-07-02: "I don't like how
+                # those are bubbles. I'd like it to be one straight name
+                # across") - a single flex div whose cells reuse bd_widths,
+                # so the labels line up over the row columns below. The flex
+                # gap must match the gap="small" the row containers use;
+                # verified live with preview_inspect rather than assumed.
+                headers = ["★", "NAME"]
+                if bd_show_pos:
+                    headers.append("POS")
+                headers += ["ST", "TEAM"]
+                if bd_show_bt:
+                    headers.append("B/T")
+                hdr_cells = ''.join(
+                    f'<span style="flex:0 0 {w}px;'
+                    f'text-align:{"left" if lbl == "TEAM" else "center"};">'
+                    f'{lbl}</span>'
+                    for lbl, w in zip(headers, bd_widths))
                 with st.container(key="nb_board_header"):
-                    with st.container(horizontal=True, gap="small"):
-                        headers = ["★", "NAME"]
-                        if bd_show_pos:
-                            headers.append("POS")
-                        headers += ["ST", "TEAM"]
-                        if bd_show_bt:
-                            headers.append("B/T")
-                        for label, w in zip(headers, bd_widths):
-                            with st.container(width=w):
-                                st.markdown(f'<div style="background:#14233B;color:#FFFFFF;'
-                                           f'font-size:11px;font-weight:700;text-align:center;'
-                                           f'padding:4px 2px;border-radius:4px;white-space:nowrap;">'
-                                           f'{label}</div>', unsafe_allow_html=True)
+                    st.markdown(f'<div style="display:flex;gap:1rem;min-width:max-content;'
+                               f'background:#14233B;color:#FFFFFF;font-size:12px;'
+                               f'font-weight:700;padding:7px 0;border-radius:6px;'
+                               f'white-space:nowrap;">{hdr_cells}</div>',
+                               unsafe_allow_html=True)
 
+                # Every text cell gets an explicit line-height equal to the
+                # name button's rendered height, so POS/ST/TEAM sit dead
+                # center against the name no matter what Streamlit's element
+                # wrappers do with margins (2026-07-02: "they're bottom
+                # aligned if you look at it visually to the names").
+                _BD_ROW_H = 38
                 for p in bd_filtered:
                     dot_bg, dot_fg, dot_label = _BOARD_TIER_BADGE.get(p['tier'], ('#CCCCCC', '#000', '?'))
                     with st.container(horizontal=True, gap="small"):
                         with st.container(width=bd_widths[0]):
-                            st.markdown(f'<div style="width:22px;height:22px;border-radius:50%;'
+                            st.markdown(f'<div style="width:28px;height:28px;border-radius:50%;'
                                        f'background:{dot_bg};color:{dot_fg};text-align:center;'
-                                       f'line-height:22px;font-weight:700;font-size:10px;margin:0 auto;">'
+                                       f'line-height:28px;font-weight:700;font-size:12px;'
+                                       f'margin:{(_BD_ROW_H - 28) // 2}px auto;">'
                                        f'{dot_label}</div>', unsafe_allow_html=True)
                         with st.container(width=bd_widths[1]):
                             if st.button(p['canonical_name'], key=f"bd_open_{p['_row']}",
@@ -1614,23 +1644,27 @@ with tab_board:
                         wi = 2
                         if bd_show_pos:
                             with st.container(width=bd_widths[wi]):
-                                st.markdown(f'<div style="text-align:center;font-size:11px;'
+                                st.markdown(f'<div style="text-align:center;font-size:13px;'
+                                           f'line-height:{_BD_ROW_H}px;'
                                            f'white-space:nowrap;">{html.escape(p["pos"] or "—")}'
                                            f'</div>', unsafe_allow_html=True)
                             wi += 1
                         with st.container(width=bd_widths[wi]):
-                            st.markdown(f'<div style="text-align:center;font-size:11px;'
+                            st.markdown(f'<div style="text-align:center;font-size:13px;'
+                                       f'line-height:{_BD_ROW_H}px;'
                                        f'white-space:nowrap;">{html.escape(p["state"] or "—")}'
                                        f'</div>', unsafe_allow_html=True)
                         wi += 1
                         with st.container(width=bd_widths[wi]):
-                            st.markdown(f'<div style="text-align:left;font-size:9px;color:#555;'
+                            st.markdown(f'<div style="text-align:left;font-size:12px;color:#555;'
+                                       f'line-height:{_BD_ROW_H}px;'
                                        f'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'
                                        f'{html.escape(p["team"] or "")}</div>', unsafe_allow_html=True)
                         wi += 1
                         if bd_show_bt:
                             with st.container(width=bd_widths[wi]):
-                                st.markdown(f'<div style="text-align:center;font-size:11px;'
+                                st.markdown(f'<div style="text-align:center;font-size:13px;'
+                                           f'line-height:{_BD_ROW_H}px;'
                                            f'white-space:nowrap;">{html.escape(p["bt"] or "—")}'
                                            f'</div>', unsafe_allow_html=True)
 
