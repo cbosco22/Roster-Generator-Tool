@@ -57,97 +57,144 @@ def _lonlat_to_xy(lon, lat, zoom):
     return x, y
 
 
-def build_map_image(points, width_px=1200, height_px=720):
-    """points: [{'lat','lon','label' (pin number, '' = hub star)}] ->
-    PIL Image with OSM basemap + pins. Returns None if points is empty."""
+def build_map_image(points, width_px=1480, height_px=620):
+    """points: [{'lat','lon','label' (pin number, '' = hub star),'name'}] ->
+    PIL Image with a clean light basemap + labeled pins. None if empty.
+
+    Basemap is CARTO Positron (the pale, Apple-Maps-ish style Chris asked
+    for after seeing default OSM: "get rid of the gray and red and all the
+    colors") and the fit is FRACTIONAL-zoom: tiles render at the next zoom
+    up and downscale to exactly fill the frame, instead of snapping to a
+    power-of-two zoom that left dead space on every side."""
     from PIL import Image, ImageDraw, ImageFont
     pts = [p for p in points if p.get("lat") is not None]
     if not pts:
         return None
 
-    # pick the deepest zoom where all points fit with padding
-    for zoom in range(13, 5, -1):
-        xs, ys = zip(*[_lonlat_to_xy(p["lon"], p["lat"], zoom) for p in pts])
-        w_tiles = (max(xs) - min(xs))
-        h_tiles = (max(ys) - min(ys))
-        if w_tiles * 256 <= width_px * 0.80 and h_tiles * 256 <= height_px * 0.72:
-            break
+    # fractional zoom: bbox fills ~86% of width / ~76% of height
+    xs0, ys0 = zip(*[_lonlat_to_xy(p["lon"], p["lat"], 0) for p in pts])
+    span_x0 = max(max(xs0) - min(xs0), 1e-9)
+    span_y0 = max(max(ys0) - min(ys0), 1e-9)
+    zf = min(math.log2(width_px * 0.86 / (256.0 * span_x0)),
+             math.log2(height_px * 0.76 / (256.0 * span_y0)), 13.0)
+    z = min(13, int(math.ceil(zf)))
+    scale = 2.0 ** (zf - z)   # <= 1: how much the z-level render shrinks
 
-    xs, ys = zip(*[_lonlat_to_xy(p["lon"], p["lat"], zoom) for p in pts])
+    # render window at integer zoom z, sized so the downscale hits the frame
+    rw, rh = int(width_px / scale), int(height_px / scale)
+    xs, ys = zip(*[_lonlat_to_xy(p["lon"], p["lat"], z) for p in pts])
     cx, cy = (min(xs) + max(xs)) / 2.0, (min(ys) + max(ys)) / 2.0
-    # top-left of the crop window, in tile units
-    x0 = cx - width_px / 2.0 / 256.0
-    y0 = cy - height_px / 2.0 / 256.0
+    x0 = cx - rw / 2.0 / 256.0
+    y0 = cy - rh / 2.0 / 256.0
 
-    img = Image.new("RGB", (width_px, height_px), "#DDE4EA")
-    tx0, ty0 = int(math.floor(x0)), int(math.floor(y0))
-    tx1 = int(math.floor(x0 + width_px / 256.0)) + 1
-    ty1 = int(math.floor(y0 + height_px / 256.0)) + 1
-    for tx in range(tx0, tx1 + 1):
-        for ty in range(ty0, ty1 + 1):
-            if tx < 0 or ty < 0 or tx >= 2 ** zoom or ty >= 2 ** zoom:
+    base = Image.new("RGB", (rw, rh), "#F4F4F2")
+    tx1 = int(math.floor(x0 + rw / 256.0)) + 1
+    ty1 = int(math.floor(y0 + rh / 256.0)) + 1
+    for tx in range(int(math.floor(x0)), tx1 + 1):
+        for ty in range(int(math.floor(y0)), ty1 + 1):
+            if tx < 0 or ty < 0 or tx >= 2 ** z or ty >= 2 ** z:
                 continue
             try:
                 r = requests.get(
-                    f"https://tile.openstreetmap.org/{zoom}/{tx}/{ty}.png",
+                    f"https://a.basemaps.cartocdn.com/light_all/{z}/{tx}/{ty}.png",
                     headers=_UA, timeout=20)
                 r.raise_for_status()
                 tile = Image.open(io.BytesIO(r.content)).convert("RGB")
-                img.paste(tile, (int((tx - x0) * 256), int((ty - y0) * 256)))
+                base.paste(tile, (int((tx - x0) * 256), int((ty - y0) * 256)))
             except Exception:
-                pass  # a missing tile leaves a gray square, not a dead build
+                pass  # a missing tile leaves a pale square, not a dead build
 
+    img = base.resize((width_px, height_px), Image.LANCZOS)
     draw = ImageDraw.Draw(img)
-    font = None
-    for fp in ("/System/Library/Fonts/Helvetica.ttc",
-               "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"):
-        try:
-            font = ImageFont.truetype(fp, 22)
-            break
-        except Exception:
-            continue
-    font = font or ImageFont.load_default()
+
+    def _font(size):
+        for fp in ("/System/Library/Fonts/Helvetica.ttc",
+                   "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"):
+            try:
+                return ImageFont.truetype(fp, size)
+            except Exception:
+                continue
+        return ImageFont.load_default()
+    f_pin, f_lbl, f_attr = _font(20), _font(17), _font(14)
+    placed_labels = []  # boxes already used, for collision avoidance
+
+    def _to_px(p):
+        px, py = _lonlat_to_xy(p["lon"], p["lat"], z)
+        return ((px - x0) * 256) * scale, ((py - y0) * 256) * scale
 
     for p in pts:
-        px, py = _lonlat_to_xy(p["lon"], p["lat"], zoom)
-        X, Y = (px - x0) * 256, (py - y0) * 256
+        X, Y = _to_px(p)
         if p.get("label"):
-            r_ = 16
+            r_ = 14
             draw.ellipse([X - r_, Y - r_, X + r_, Y + r_],
                          fill="#14233B", outline="white", width=3)
             t = str(p["label"])
-            bb = draw.textbbox((0, 0), t, font=font)
+            bb = draw.textbbox((0, 0), t, font=f_pin)
             draw.text((X - (bb[2] - bb[0]) / 2, Y - (bb[3] - bb[1]) / 2 - bb[1]),
-                      t, fill="white", font=font)
+                      t, fill="white", font=f_pin)
+            if p.get("name"):
+                _place_label(draw, X, Y, r_ + 5, p["name"], f_lbl, "#14233B",
+                             placed_labels, width_px, height_px)
         else:  # hub star
-            s, s2 = 22, 9
+            s_, s2 = 20, 8
             star = []
             for i in range(10):
                 ang = -math.pi / 2 + i * math.pi / 5
-                rr = s if i % 2 == 0 else s2
+                rr = s_ if i % 2 == 0 else s2
                 star.append((X + rr * math.cos(ang), Y + rr * math.sin(ang)))
             draw.polygon(star, fill="#C9A227", outline="white")
+            if p.get("name"):
+                _place_label(draw, X, Y, s_ + 4, p["name"], f_lbl, "#8A6D14",
+                             placed_labels, width_px, height_px)
 
-    # OSM attribution (required by tile usage policy)
-    tag = "© OpenStreetMap"
-    bb = draw.textbbox((0, 0), tag, font=font)
-    draw.rectangle([width_px - (bb[2] - bb[0]) - 14, height_px - (bb[3] - bb[1]) - 10,
-                    width_px, height_px], fill="white")
-    draw.text((width_px - (bb[2] - bb[0]) - 7, height_px - (bb[3] - bb[1]) - 7),
-              tag, fill="#555555", font=font)
+    tag = "© OpenStreetMap © CARTO"
+    bb = draw.textbbox((0, 0), tag, font=f_attr)
+    draw.text((width_px - (bb[2] - bb[0]) - 8, height_px - (bb[3] - bb[1]) - 8),
+              tag, fill="#999999", font=f_attr)
     return img
 
 
-def venue_map_for(hub, venues, width_px=1480, height_px=620):
+def _place_label(draw, X, Y, off, text, font, color, placed, W, H):
+    """Draw a pin label in the first non-colliding spot: right, below,
+    left, above. Real venue sets collide (Woodland HS vs the hub star)."""
+    bb = draw.textbbox((0, 0), text, font=font)
+    tw, th = bb[2] - bb[0], bb[3] - bb[1]
+    candidates = [(X + off, Y - th / 2), (X - tw / 2, Y + off + 2),
+                  (X - off - tw, Y - th / 2), (X - tw / 2, Y - off - th - 4)]
+    def _clash(box):
+        if box[0] < 2 or box[1] < 2 or box[2] > W - 2 or box[3] > H - 2:
+            return True
+        return any(not (box[2] < b[0] or box[0] > b[2] or
+                        box[3] < b[1] or box[1] > b[3]) for b in placed)
+    for cx_, cy_ in candidates:
+        box = (cx_ - 2, cy_ - 2, cx_ + tw + 2, cy_ + th + 2)
+        if not _clash(box):
+            break
+    placed.append(box)
+    draw.text((cx_, cy_), text, font=font, fill=color,
+              stroke_width=3, stroke_fill="white")
+
+
+def _short_name(venue):
+    """'Woodland High School' -> 'Woodland HS' — map labels stay compact."""
+    import re as _re
+    n = _re.sub(r'\s+High School\b', ' HS', venue)
+    n = _re.sub(r'\s+(College|Community College)\b', '', n)
+    return n[:22]
+
+
+def venue_map_for(hub, venues, height_px=680, min_aspect=1.35, max_aspect=2.35):
     """Geocode hub + venues (addresses -> pins numbered by drive-time order,
     matching the venue table) and return a PIL map image, or None.
-    Default pixel dims match the venue page's 7.4in x 3.1in map box so the
-    tiles aren't stretched."""
+    The frame's aspect adapts to the venue cluster's shape (clamped), so a
+    tall cluster doesn't leave dead space on both sides - the page centers
+    whatever width comes back."""
     pts = []
     hub_addr = hub.get("address") or hub.get("name", "")
     ll = geocode(hub_addr)
     if ll:
-        pts.append({"lat": ll[0], "lon": ll[1], "label": ""})
+        pts.append({"lat": ll[0], "lon": ll[1], "label": "",
+                    "name": hub.get("name", "")[:22]})
     ordered = sorted(venues, key=lambda v: v.get("drive_min", 999))
     for i, v in enumerate(ordered):
         # street address first; when Nominatim can't resolve it (3 of 11 real
@@ -165,5 +212,13 @@ def venue_map_for(hub, venues, width_px=1480, height_px=620):
                 if ll:
                     break
         if ll:
-            pts.append({"lat": ll[0], "lon": ll[1], "label": str(i + 1)})
-    return build_map_image(pts, width_px=width_px, height_px=height_px)
+            pts.append({"lat": ll[0], "lon": ll[1], "label": str(i + 1),
+                        "name": _short_name(v.get("venue", ""))})
+    real = [p for p in pts if p.get("lat") is not None]
+    if not real:
+        return None
+    xs, ys = zip(*[_lonlat_to_xy(p["lon"], p["lat"], 0) for p in real])
+    span_x, span_y = max(max(xs) - min(xs), 1e-9), max(max(ys) - min(ys), 1e-9)
+    aspect = max(min_aspect, min(max_aspect, (span_x / 0.86) / (span_y / 0.76)))
+    return build_map_image(pts, width_px=int(height_px * aspect),
+                           height_px=height_px)

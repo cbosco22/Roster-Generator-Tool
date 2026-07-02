@@ -61,14 +61,20 @@ def draw_venue_page(c, event_name, hub, venues, W=None, H=None, map_img=None):
     map_h = 0.0
     if map_img is not None:
         # shorter map when the venue list is long, so page one stays page one
-        map_h = (3.1 if len(vs) <= 11 else 2.4) * inch
-        map_w = W - 2 * M
+        map_h = (3.2 if len(vs) <= 11 else 2.4) * inch
+        # draw at the image's own aspect, centered - venue_map_for sizes the
+        # frame to the venue cluster's shape, so no stretching, no dead space
+        iw, ih = map_img.size
+        map_w = min(W - 2 * M, map_h * (iw / float(ih)))
+        map_h_draw = map_w / (iw / float(ih))
+        mx = M + (W - 2 * M - map_w) / 2.0
         from reportlab.lib.utils import ImageReader
-        c.drawImage(ImageReader(map_img), M, H - 1.38 * inch - map_h,
-                    width=map_w, height=map_h, preserveAspectRatio=False)
+        c.drawImage(ImageReader(map_img), mx, H - 1.38 * inch - map_h_draw,
+                    width=map_w, height=map_h_draw)
         c.setStrokeColor(LINE_LITE)
         c.setLineWidth(0.8)
-        c.rect(M, H - 1.38 * inch - map_h, map_w, map_h, stroke=1, fill=0)
+        c.rect(mx, H - 1.38 * inch - map_h_draw, map_w, map_h_draw, stroke=1, fill=0)
+        map_h = map_h_draw
 
     # column layout
     x_num, x_venue, x_city, x_addr = M, M + 0.32 * inch, M + 2.55 * inch, M + 3.85 * inch
