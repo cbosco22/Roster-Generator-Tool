@@ -51,8 +51,14 @@ function doPost(e) {
 
     var ops = body.ops || [];
     var results = [];
+    // Find the last data row ONCE per request and count appends forward
+    // from there. The old per-append scan re-read the whole ~4,700-row
+    // name column for every appended player - with a 75-player post-event
+    // batch that alone blew past the caller's HTTP timeout (2026-07-02).
+    var appendCursor = { next: _findLastDataRow(sheet, firstNameCol) + 1 };
+    if (appendCursor.next < DATA_START_ROW) appendCursor.next = DATA_START_ROW;
     for (var i = 0; i < ops.length; i++) {
-      results.push(_applyOp(sheet, ops[i], dryRun, firstNameCol));
+      results.push(_applyOp(sheet, ops[i], dryRun, firstNameCol, appendCursor));
     }
     var allOk = results.every(function(r) { return r.ok; });
     return _json({ ok: allOk, dryRun: dryRun, results: results });
@@ -114,7 +120,7 @@ function _normalizeForCompare(val) {
   return String(val);
 }
 
-function _applyOp(sheet, op, dryRun, firstNameCol) {
+function _applyOp(sheet, op, dryRun, firstNameCol, appendCursor) {
   var targetRow;
   if (op.action === 'update') {
     if (!op.row || op.row < DATA_START_ROW) {
@@ -122,8 +128,8 @@ function _applyOp(sheet, op, dryRun, firstNameCol) {
     }
     targetRow = op.row;
   } else if (op.action === 'append') {
-    targetRow = _findLastDataRow(sheet, firstNameCol) + 1;
-    if (targetRow < DATA_START_ROW) targetRow = DATA_START_ROW;
+    targetRow = appendCursor.next;
+    appendCursor.next += 1;
   } else {
     return { action: op.action, ok: false, error: 'unknown action' };
   }

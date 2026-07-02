@@ -918,11 +918,18 @@ with tab_post:
             st.warning("Review these ratings (non-standard / ambiguous) before you "
                        "paste:\n\n" + "\n".join(f"• {x}" for x in flags))
 
-        # --- Updates ---
-        st.markdown("**📈 Rating updates** — existing board players")
+        # --- Updates (editable before write, same as new players — Chris
+        # asked for parity 2026-07-02 after fixing a misread New★ by hand) ---
+        st.markdown("**📈 Rating updates** — review/edit before writing")
+        edited_upd_display = []
         if st.session_state["pe_upd_rows"]:
-            st.dataframe(pd.DataFrame(st.session_state["pe_upd_rows"]),
-                         use_container_width=True, hide_index=True)
+            upd_df = pd.DataFrame(st.session_state["pe_upd_rows"])
+            edited_upd = st.data_editor(
+                upd_df, use_container_width=True, hide_index=True,
+                key="pe_upd_editor",
+                disabled=[c for c in upd_df.columns if c != "New ★"],
+            )
+            edited_upd_display = edited_upd.fillna("").to_dict("records")
         else:
             st.caption("No rating updates on these pages.")
 
@@ -969,10 +976,15 @@ with tab_post:
 
                         st.write("Matching players…")
                         ops = []
-                        for r in upd_raw:
+                        # the editable updates table wins over the raw
+                        # extraction — rows align 1:1 by position
+                        for i, r in enumerate(upd_raw):
+                            edited_star = (edited_upd_display[i].get("New ★", "")
+                                           if i < len(edited_upd_display)
+                                           else r.get("new_star") or "")
                             ops.append(sheet_write.build_upsert_op(
                                 db_for_write, cols, first=r.get("first", ""), last=r.get("last", ""),
-                                event_name=pe_event, new_tier=(r.get("new_star") or "").strip(),
+                                event_name=pe_event, new_tier=str(edited_star).strip(),
                                 state=r.get("state", ""), hs=r.get("school", ""),
                                 team=r.get("_team_name", ""), pos=r.get("pos", ""),
                                 commit=r.get("commit", ""),
@@ -988,15 +1000,24 @@ with tab_post:
                                 by_initials=r.get("By", ""), date_added=r.get("Date Added", ""),
                                 notes=r.get("Notes", "")))
 
+                        # Chunked: one big request blew past the HTTP
+                        # timeout on a 113-op write (2026-07-02) while the
+                        # script kept running server-side. Real writes are
+                        # never auto-retried (double-append risk).
+                        _prog = st.empty()
                         st.write("Validating…")
-                        check = sheet_write.post_ops(ops, sw_url, sw_token, dry_run=True)
+                        check = sheet_write.post_ops_chunked(
+                            ops, sw_url, sw_token, dry_run=True,
+                            progress=lambda d, t: _prog.write(f"Validated {d}/{t}…"))
                         if not check.get("ok"):
                             wstatus.update(label="Failed", state="error")
                             st.error(f"Validation failed, nothing written: {check.get('error')}")
                             st.stop()
 
                         st.write(f"Writing {len(ops)} player(s)…")
-                        real = sheet_write.post_ops(ops, sw_url, sw_token, dry_run=False)
+                        real = sheet_write.post_ops_chunked(
+                            ops, sw_url, sw_token, dry_run=False,
+                            progress=lambda d, t: _prog.write(f"Written {d}/{t}…"))
                         if real.get("ok"):
                             n_new = sum(1 for r in real["results"] if r["action"] == "append")
                             n_upd = sum(1 for r in real["results"] if r["action"] == "update")
@@ -1015,7 +1036,14 @@ with tab_post:
                                     st.write(f"- {op.get('player')} (row {r.get('row')}): "
                                             f"{r.get('error')}")
                             else:
-                                st.error(f"Write failed: {real.get('error')}")
+                                done = real.get("written_before_failure", 0)
+                                st.error(
+                                    f"Write stopped at player {done + 1} of {len(ops)}: "
+                                    f"{real.get('error')}\n\n"
+                                    f"**The first {done} player(s) WERE written and "
+                                    f"verified.** Do not blindly re-click — remove the "
+                                    f"already-written rows from the tables above first, "
+                                    f"or you will double-add them.")
                         with st.expander("🔍 What was sent (debug)"):
                             st.write("Resolved columns for this write:")
                             st.json(cols)

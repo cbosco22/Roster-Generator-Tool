@@ -206,6 +206,44 @@ def build_note_update_op(existing, cols, note_text):
             'fields': {cols['notes']: new_notes}, 'player': existing['canonical_name']}
 
 
+def post_ops_chunked(ops, url, token, dry_run=True, chunk_size=10,
+                     timeout=120, progress=None):
+    """post_ops for big batches (post-event writes 100+ players at once).
+
+    Why this exists (root-caused live 2026-07-02, Chris's 113-op post-event
+    write): Code.gs re-scanned the whole ~4,700-row sheet per append and
+    read-back-verified every field serially, so one big request blew past
+    the client timeout while the script kept running server-side. Chunking
+    keeps each request small enough to finish; and real writes are NEVER
+    auto-retried on timeout - a timed-out real write may have SUCCEEDED
+    server-side, so a blind retry could double-append players (dry runs
+    stay retryable, they're read-only).
+
+    progress: optional callable(done_ops, total_ops) for UI updates.
+    Returns {'ok', 'results', 'error'?} aggregated across chunks; stops at
+    the first failed chunk (results has everything up to and incl. it).
+    """
+    all_results = []
+    total = len(ops)
+    for start in range(0, total, chunk_size):
+        chunk = ops[start:start + chunk_size]
+        try:
+            r = post_ops(chunk, url, token, dry_run=dry_run, timeout=timeout,
+                         retries=2 if dry_run else 0)
+        except Exception as e:
+            return {'ok': False, 'results': all_results,
+                    'error': f'{type(e).__name__}: {e}', 'failed_at': start,
+                    'written_before_failure': 0 if dry_run else start}
+        all_results.extend(r.get('results', []))
+        if progress:
+            progress(min(start + len(chunk), total), total)
+        if not r.get('ok'):
+            return {'ok': False, 'results': all_results,
+                    'error': r.get('error'), 'failed_at': start,
+                    'written_before_failure': 0 if dry_run else start}
+    return {'ok': True, 'results': all_results}
+
+
 def post_ops(ops, url, token, dry_run=True, timeout=45, retries=2):
     """Send a batch of ops to the deployed Apps Script web app. Defaults to
     dry_run=True — caller must explicitly opt into a real write.
