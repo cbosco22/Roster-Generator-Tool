@@ -68,19 +68,21 @@ def _norm(name):
     return re.sub(r"\s+", " ", (name or "").strip().lower())
 
 
-def search_pbr(session, name, school=None):
+def search_pbr(session, name):
     """
     POST the site's own "Find a Player" form. Returns a list of candidate
     rows: {"name", "state", "school", "class", "position", "commit", "profile_path"}.
 
-    Deliberately does NOT filter by state or grad year server-side, even
-    though the form supports both: a player's PBR class/state often
-    disagrees with what a roster/schedule source says (reclassification is
-    common in travel ball -- found live 2026-07-01, e.g. a kid listed as
-    2029 on a roster had a real, correct PBR profile filed under 2027).
-    Filtering server-side on a mismatched value silently returns zero
-    results before resolve_profile() ever gets a chance to cross-validate.
-    State/grad year are applied as *soft* scoring signals client-side in
+    Deliberately a pure NAME search -- no state, grad year, or school
+    server-side, even though the form supports all three: any of them can
+    disagree with what a roster/schedule source says, and a mismatched
+    server-side filter silently returns zero results before
+    resolve_profile() ever gets a chance to cross-validate. Both failure
+    modes found live on the same real player (Camden Kolenko): roster said
+    class 2029, PBR files him under 2027 (found 2026-07-01); roster said
+    "George Ranch High School", PBR files him under "George Ranch" (found
+    2026-07-02 -- school-as-filter zeroed the whole 20-player test batch).
+    State/grad year/school are all *soft* scoring signals client-side in
     resolve_profile() instead.
     """
     # player_position must always be present in the POST (even as "#") or the
@@ -88,8 +90,6 @@ def search_pbr(session, name, school=None):
     # browser submission against this script's request 2026-07-01.
     data = {"player_name": name, "player_state": "#", "player_class": "#",
             "player_school": "", "player_position": "#"}
-    if school:
-        data["player_school"] = school
 
     r = session.post(SEARCH_URL, data=data, timeout=15)
     r.raise_for_status()
@@ -128,7 +128,7 @@ def resolve_profile(session, name, grad_year=None, state=None, school=None):
     just flagged with a weaker reason string.
     Returns (profile_path, reason) -- profile_path is None on failure.
     """
-    candidates = search_pbr(session, name, school=school)
+    candidates = search_pbr(session, name)
     if not candidates:
         return None, "no_results"
 
@@ -144,6 +144,12 @@ def resolve_profile(session, name, grad_year=None, state=None, school=None):
             s += 2
         if state and c["state"].upper() == (state or "").upper():
             s += 1
+        # School names rarely match verbatim ("George Ranch High School"
+        # vs PBR's "George Ranch") -- containment either way is enough.
+        if school and c["school"]:
+            a, b = _norm(school), _norm(c["school"])
+            if a in b or b in a:
+                s += 1
         return s
 
     ranked = sorted(pool, key=score, reverse=True)
@@ -152,7 +158,7 @@ def resolve_profile(session, name, grad_year=None, state=None, school=None):
     if len(tied) > 1:
         return ranked[0]["profile_path"], "ambiguous_took_first"
 
-    max_possible = (2 if grad_year else 0) + (1 if state else 0)
+    max_possible = (2 if grad_year else 0) + (1 if state else 0) + (1 if school else 0)
     if max_possible and best_score == max_possible:
         reason = "matched"
     elif best_score > 0:
