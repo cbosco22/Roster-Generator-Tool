@@ -252,10 +252,35 @@ class StarGlyph(Flowable):
         c.drawPath(p, stroke=0, fill=1)
 
 
-def meas_chip_items(meas):
-    """PBR measurable dict -> ordered [(value, short-label)] for MeasChips."""
+MEAS_MAX_AGE_DAYS = 365  # Chris 2026-07-02: stale velo is worse than none
+
+
+def _meas_is_fresh(raw_label, dated):
+    """False only when the stat has a PBR 'best of' date OLDER than the
+    cutoff. Undated stats pass — can't age what has no date."""
+    if not dated:
+        return True
+    entry = dated.get(raw_label.strip().upper())
+    if not entry or not entry.get('date'):
+        return True
+    import datetime as _d
+    for fmt in ('%m/%d/%y', '%m/%d/%Y'):
+        try:
+            when = _d.datetime.strptime(entry['date'], fmt)
+            return (_d.datetime.now() - when).days <= MEAS_MAX_AGE_DAYS
+        except ValueError:
+            continue
+    return True  # unparsable date -> don't hide data over a format quirk
+
+
+def meas_chip_items(meas, dated=None):
+    """PBR measurable dict -> ordered [(value, short-label)] for MeasChips.
+    dated = the crawler's measurables_dated dict; stats with a PBR date
+    older than a year are dropped."""
     items = []
     for raw_label, value in (meas or {}).items():
+        if not _meas_is_fresh(raw_label, dated):
+            continue
         lab = MEAS_LABEL.get(raw_label.strip().upper())
         if lab is None:
             lab = raw_label.strip().upper()[:4]
@@ -1113,7 +1138,8 @@ def build_pdf(json_path, out_path, raw_sheet_text="", proof_only=False,
             'pbr_str': pbr_rank_str(p.get('name',''), p.get('pg_rank',''),
                                     grad_year=yr or None, state=state or None),
             'acad': (p.get('acad','') or p.get('academic','') or '').strip(),
-            'meas': meas_chip_items((crawl or {}).get('measurables')),
+            'meas': meas_chip_items((crawl or {}).get('measurables'),
+                                    (crawl or {}).get('measurables_dated')),
         }
 
     def _acad_chip_items(acad):
@@ -1331,6 +1357,13 @@ def build_pdf(json_path, out_path, raw_sheet_text="", proof_only=False,
         for p in players:
             p['_team'] = team['name']  # crawl_lookup disambiguator
             rows.append(data_row(p))
+            rh.append(ROW_H)
+        # One blank write-in row per team (Chris 2026-07-02: kids show up
+        # who aren't on the printed roster) — skipped when the team already
+        # fills the page, so the blank row never forces a second page
+        # (~19 player rows fit under the title/banner/header stack).
+        if len(players) <= 18:
+            rows.append([Paragraph('', sCell) for _ in cols])
             rh.append(ROW_H)
         tbl = Table(rows, colWidths=CW, rowHeights=rh, repeatRows=2)
         # column indices resolved from the active preset, not hardcoded

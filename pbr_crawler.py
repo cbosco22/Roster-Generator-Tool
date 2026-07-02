@@ -216,6 +216,26 @@ def fetch_profile(session, profile_path):
         measurables[label] = val_el.get_text(strip=True)
     out["measurables"] = measurables
 
+    # DATED stats from the public "best of" section (found live 2026-07-02):
+    #   <article class="stat-item"><div class="stat-v">21.3</div>
+    #   <div class="stat-label">Hand Speed (max)</div>
+    #   <div class="stat-date">1/03/26</div></article>
+    # Chris only wants stats from the last year on the PDF (kids improve
+    # fast; stale velo is worse than none) - the date is what enables that.
+    dated = {}
+    for art in soup.select("article.stat-item"):
+        v = art.select_one(".stat-v")
+        l = art.select_one(".stat-label")
+        d = art.select_one(".stat-date")
+        if not v or not l:
+            continue
+        label = re.sub(r"\s*\(max\)\s*$", "",
+                       re.sub(r"\s+", " ", l.get_text(" ", strip=True)).strip(),
+                       flags=re.I).upper()
+        dated[label] = {"value": v.get_text(strip=True),
+                        "date": d.get_text(strip=True) if d else ""}
+    out["measurables_dated"] = dated
+
     return out
 
 
