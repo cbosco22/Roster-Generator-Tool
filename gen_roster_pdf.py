@@ -1,18 +1,23 @@
 #!/usr/bin/env python3
-"""Navy Baseball Recruiting — GoodNotes Roster PDF Generator (v5, with cover page)
-LOCKED FORMAT — do not change without explicit instruction.
+"""Navy Baseball Recruiting — GoodNotes Roster PDF Generator (v6, column presets)
+Format redesigned 2026-07-02 per Chris's hand sketch (explicit instruction —
+this file was previously marked LOCKED against the v5 15-column layout, which
+survives as the 'classic' preset).
 
 Key features:
+- Column PRESETS (the product customization surface): 'navy' (default) =
+  Chris's sketch — # | First | Last | Pos+B/T | Class+Ht·Wt | School+hometown
+  | Measurables (green pills) | Acad/Rank | Cur★ | New★ | NOTES(+commit).
+  'classic' = the old 15-column table. Or pass columns=[keys] directly.
+- Measurables come from pbr_crawler.py output via crawl= (accepts the final
+  .json or a mid-run checkpoint .jsonl); the pills column drops itself when
+  no crawl data is loaded. Crawled ht/wt also backfill roster gaps.
 - Multi-page cover: event title, dates, teams by age division, Navy★ dots (C/1/2/3/4)
 - Org tier label (from travel_programs.json) shown on cover + each roster page
 - Division assigned from schedule_team_divs dict > team data > name inference
 - Teams sorted alphabetically within each age group on cover AND roster pages
-- Age group label shown above each team name on roster pages
 - Cover expands to as many pages as needed, legend always on last page
-- Event name + dates auto-parsed from raw event string
 - Roster rows: alternating gray/white, Cur★ cell yellow for DB players
-- Cols: # | First | Last | Pos | Ht | Wt | Class | School | St | Cur★ | New★ | PBR Rank | Commit | Acad | NOTES
-- Notes fixed 2.50", Commit 0.80", School gets remaining width
 - Commit: DB value takes priority, roster packet commit is fallback
 - Running header: NAVY BASEBALL RECRUITING left | event center | Page N right
 """
@@ -57,6 +62,175 @@ TIER_DOT_COLOR = {
 
 SHEET_ID = '1ecpbBbWaVaSlmz4qmHUWJw9Esj6P0x5R4y81QQYhMzE'
 _DB = None
+
+# ---- Crawled player data (pbr_crawler.py output) ------------------------
+# Loaded via init_crawl_data(); keyed by normalized player name (plus team /
+# grad-year disambiguators). Feeds the Measurables pill column and fills
+# ht/wt gaps. Missing data is normal — most kids have no PBR profile.
+_CRAWL = {}
+
+# Chip display order + short labels for PBR measurable card names — the
+# label set below is the actual card inventory observed live across the
+# first ~170 crawled Mattingly profiles (2026-07-02), not guessed.
+# Anything not listed still shows, after these, with its raw label squeezed.
+MEAS_LABEL = {
+    'FB MAX': 'FB', 'FB VELO': 'FB', 'FASTBALL': 'FB', 'MAX FB': 'FB',
+    '60 TIME': '60', '60 YD': '60',
+    'EXIT VELO': 'EV',
+    'INF VELO': 'IF', 'IF VELO': 'IF',
+    'OF VELO': 'OF',
+    'C VELO': 'C',
+    'POP TIME': 'POP',
+    'FB SPIN RATE': 'SPIN',
+    'SL VELO': 'SLV',
+    'BAT SPEED': 'BAT', 'HAND SPEED': 'HAND',
+}
+MEAS_ORDER = ['FB', '60', 'EV', 'IF', 'OF', 'C', 'POP', 'SPIN',
+              'CB', 'SL', 'SLV', 'CH', 'BAT', 'HAND']
+# A fixed 0.46" row fits two pill rows; more than this many chips would
+# bleed into the next player's row (seen live on a 8-card pitcher).
+MEAS_MAX_CHIPS = 6
+
+
+def _crawl_norm(s):
+    import re as _re
+    return _re.sub(r'\s+', ' ', (s or '').strip().lower())
+
+
+def init_crawl_data(path):
+    """Load pbr_crawler.py results — either the final output .json
+    ({"results": [...]}) or a live checkpoint .jsonl (one player per line),
+    so a PDF can be built mid-crawl from whatever's done so far."""
+    global _CRAWL
+    _CRAWL = {}
+    recs = []
+    with open(path) as f:
+        first = f.read(1)
+        f.seek(0)
+        if first == '{' and str(path).endswith('.jsonl'):
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                d = json.loads(line)
+                if d.get('matched'):
+                    recs.append(d['record'])
+        else:
+            recs = json.load(f).get('results', [])
+    for r in recs:
+        q = r.get('query', {})
+        nm = _crawl_norm(q.get('name'))
+        if not nm:
+            continue
+        # team-qualified key first (exact), then name+grad, then bare name —
+        # bare name is last-write-wins and only trusted when unambiguous.
+        _CRAWL[(nm, _crawl_norm(q.get('team')))] = r
+        _CRAWL[(nm, str(q.get('grad_year') or ''))] = r
+        _CRAWL.setdefault(nm, r)
+    print(f'[CRAWL] Loaded {len(recs)} crawled player profiles from {path}')
+    return len(recs)
+
+
+def crawl_lookup(name, team=None, grad_year=None):
+    nm = _crawl_norm(name)
+    if team is not None:
+        hit = _CRAWL.get((nm, _crawl_norm(team)))
+        if hit:
+            return hit
+    if grad_year:
+        hit = _CRAWL.get((nm, str(grad_year)))
+        if hit:
+            return hit
+    return _CRAWL.get(nm)
+
+
+class MeasChips(Flowable):
+    """The green measurable pills from Chris's sketch: rounded chips, bold
+    value + tiny unit label, wrapping to fit the column. Renders nothing
+    (zero height) when there are no measurables."""
+    CHIP_H = 9.5
+    GAP = 1.5
+    FILL = colors.HexColor('#C8E6C9')
+    EDGE = colors.HexColor('#81C784')
+    TXT = colors.HexColor('#1B5E20')
+
+    def __init__(self, items, max_w):
+        super().__init__()
+        self.items = items  # [(value, label), ...]
+        self.max_w = max_w
+        self._rows = None
+
+    def _chip_w(self, value, label):
+        from reportlab.pdfbase.pdfmetrics import stringWidth
+        return stringWidth(value, 'Helvetica-Bold', 6) + \
+            stringWidth(' ' + label, 'Helvetica', 4) + 5
+
+    def _layout(self):
+        rows, cur, cur_w = [], [], 0.0
+        for value, label in self.items:
+            w = self._chip_w(value, label)
+            if cur and cur_w + self.GAP + w > self.max_w:
+                rows.append(cur)
+                cur, cur_w = [], 0.0
+            cur.append((value, label, w))
+            cur_w += (self.GAP if len(cur) > 1 else 0) + w
+        if cur:
+            rows.append(cur)
+        return rows
+
+    MAX_ROWS = 2  # a fixed 0.46" roster row fits exactly two pill rows
+
+    def wrap(self, availWidth, availHeight):
+        # Chip count alone doesn't bound height -- wide values (velo ranges
+        # like "2.11-2.22") mean fewer chips per row. Drop lowest-priority
+        # chips (items is already priority-ordered) until the layout fits,
+        # rather than bleeding into the player below (seen live).
+        self._rows = self._layout()
+        while len(self._rows) > self.MAX_ROWS and self.items:
+            self.items = self.items[:-1]
+            self._rows = self._layout()
+        h = len(self._rows) * (self.CHIP_H + self.GAP) - self.GAP if self._rows else 0
+        return (self.max_w, max(h, 0))
+
+    def draw(self):
+        if not self._rows:
+            return
+        c = self.canv
+        n = len(self._rows)
+        y = (n - 1) * (self.CHIP_H + self.GAP)
+        for row in self._rows:
+            row_w = sum(w for _, _, w in row) + self.GAP * (len(row) - 1)
+            x = (self.max_w - row_w) / 2.0  # center each pill row in the cell
+            for value, label, w in row:
+                c.setFillColor(self.FILL)
+                c.setStrokeColor(self.EDGE)
+                c.setLineWidth(0.4)
+                c.roundRect(x, y, w, self.CHIP_H, 2.5, stroke=1, fill=1)
+                c.setFillColor(self.TXT)
+                c.setFont('Helvetica-Bold', 6)
+                tx = x + 2.5
+                c.drawString(tx, y + 2.6, value)
+                from reportlab.pdfbase.pdfmetrics import stringWidth
+                c.setFont('Helvetica', 4)
+                c.drawString(tx + stringWidth(value, 'Helvetica-Bold', 6) + 1,
+                             y + 2.6, label)
+                x += w + self.GAP
+            y -= self.CHIP_H + self.GAP
+
+
+def meas_chip_items(meas):
+    """PBR measurable dict -> ordered [(value, short-label)] for MeasChips."""
+    items = []
+    for raw_label, value in (meas or {}).items():
+        lab = MEAS_LABEL.get(raw_label.strip().upper())
+        if lab is None:
+            lab = raw_label.strip().upper()[:4]
+        v = str(value).strip()
+        if v:
+            items.append((v, lab))
+    order = {l: i for i, l in enumerate(MEAS_ORDER)}
+    items.sort(key=lambda it: order.get(it[1], 99))
+    return items[:MEAS_MAX_CHIPS]
 
 def init_db(raw_sheet_text):
     global _DB
@@ -649,9 +823,17 @@ def build_event_summary_pdf(summary_path, event_name, event_dates, all_teams,
 
 
 def build_pdf(json_path, out_path, raw_sheet_text="", proof_only=False,
-              divisions_pdf=None, division_pdfs=None, skip_cover=False):
+              divisions_pdf=None, division_pdfs=None, skip_cover=False,
+              preset='navy', columns=None, crawl=None):
+    """preset/columns pick the roster column layout ('navy' = Chris's
+    2026-07-02 sketch, 'classic' = the pre-redesign 15-column table;
+    columns=list-of-keys overrides either for full customization).
+    crawl = path to pbr_crawler.py output (.json) or checkpoint (.jsonl)
+    to feed the Measurables column."""
     if raw_sheet_text or _DB is None:
         init_db(raw_sheet_text)
+    if crawl:
+        init_crawl_data(crawl)
 
     with open(json_path) as f:
         data = json.load(f)
@@ -837,40 +1019,36 @@ def build_pdf(json_path, out_path, raw_sheet_text="", proof_only=False,
     sNL     = ParagraphStyle('NL', fontName='Helvetica', fontSize=5.5,
                               textColor=colors.HexColor('#BBBBBB'), alignment=TA_LEFT, leading=7)
 
-    # #/First/Last sized individually; everything Pos..Acad shares one even
-    # width, except School which is SCHOOL_EXTRA wider. NOTES stays fixed.
-    NUM_W, FIRST_W, LAST_W = 0.23*inch, 0.62*inch, 0.80*inch
-    SCHOOL_EXTRA = 0.25 * inch
-    # 11 columns Pos..Acad: 10 at even_w + School at even_w + SCHOOL_EXTRA
-    even_w   = (W - NOTES_W - NUM_W - FIRST_W - LAST_W - SCHOOL_EXTRA) / 11.0
-    school_w = even_w + SCHOOL_EXTRA
-    CW = [NUM_W, FIRST_W, LAST_W,             # #  First  Last
-          even_w, even_w, even_w, even_w,     # Pos Ht Wt Class
-          school_w,                           # School (+0.25")
-          even_w,                             # St
-          even_w, even_w,                     # Cur★ New★
-          even_w,                             # PBR Rank
-          even_w,                             # Commit
-          even_w,                             # Acad
-          NOTES_W]                            # NOTES
-    HEADERS  = ['#','First','Last','Pos','Ht','Wt','Class','School','St','Cur *','New *','PBR Rank','Commit','Acad','NOTES']
-    ROW_H    = 0.46*inch
-    HDR_H    = 0.26*inch
+    sPBR  = ParagraphStyle('PBR', fontName='Helvetica', fontSize=6,
+                           textColor=TEXT_DARK, alignment=TA_CENTER, leading=7)
+    sAcad = ParagraphStyle('AC', fontName='Helvetica', fontSize=4.5,
+                           textColor=TEXT_DARK, alignment=TA_CENTER, leading=5.5)
+    sSt   = ParagraphStyle('ST', fontName='Helvetica', fontSize=6,
+                           textColor=TEXT_DARK, alignment=TA_CENTER, leading=7)
 
-    def hdr_row():
-        return [Paragraph(h, sHdrSm if h=='Commit' else sHdr) for h in HEADERS]
+    def _esc(s):
+        return (str(s or '').replace('&', '&amp;').replace('<', '&lt;')
+                .replace('>', '&gt;'))
 
-    def data_row(p):
+    def _row_ctx(p):
+        """Everything any column renderer might need, computed once per player."""
         first, last = split_name(p.get('name',''))
         j   = str(p.get('jersey','')); j = '' if j in ('0','') else j
         pos = p.get('pos','')
-        ht  = ht_fmt(p.get('ht',''))
-        wt  = str(p.get('wt','')) if str(p.get('wt','0'))!='0' else ''
         yr  = str(p.get('grad','')) if str(p.get('grad','')) not in ('0','') else ''
-        sch = (p.get('hs','') or '').strip()
         state = (p.get('state','') or p.get('home_state','') or '').strip()
         db  = db_lookup(p.get('name',''))
-        cur = db['tier'] if db else ''
+        crawl = crawl_lookup(p.get('name',''), team=p.get('_team'), grad_year=yr or None)
+        # roster ht/wt first, crawled PBR values fill the gaps
+        ht = ht_fmt(p.get('ht','')) or ht_fmt((crawl or {}).get('height',''))
+        wt = str(p.get('wt','')) if str(p.get('wt','0')) != '0' else ''
+        wt = wt or str((crawl or {}).get('weight') or '').split('.')[0]
+        bt = (p.get('bt') or (p.get('_raw') or {}).get('H/T')
+              or (db.get('bt') if db else '') or '').strip()
+        hometown = (p.get('hometown') or '').strip()
+        if not hometown:
+            city = (p.get('city') or '').strip()
+            hometown = f'{city}, {state}' if city and state else (city or state)
         # Commit priority: PG roster packet → DB → PBR rankings
         pg_commit  = (p.get('commit') or '').strip()
         db_commit  = (db.get('commit') or '').strip() if db else ''
@@ -878,33 +1056,106 @@ def build_pdf(json_path, out_path, raw_sheet_text="", proof_only=False,
         if not pg_commit and not db_commit:
             _st_e, _nat_e = _pbr_match(p.get('name',''), grad_year=yr or None, state=state or None)
             pbr_commit = ((_st_e or _nat_e) or {}).get('commit', '') or ''
-        commit_val = pg_commit or db_commit or pbr_commit
-        # PBR rank string — cross-validated with grad year + state
-        pbr_str = pbr_rank_str(p.get('name',''), p.get('pg_rank',''), grad_year=yr or None, state=state or None)
-        sPBR = ParagraphStyle('PBR', fontName='Helvetica', fontSize=6,
-                              textColor=TEXT_DARK, alignment=TA_CENTER, leading=7)
-        acad = (p.get('acad','') or p.get('academic','') or '').strip()
-        sAcad = ParagraphStyle('AC', fontName='Helvetica', fontSize=4.5,
-                              textColor=TEXT_DARK, alignment=TA_CENTER, leading=5.5)
-        sSt = ParagraphStyle('ST', fontName='Helvetica', fontSize=6,
-                              textColor=TEXT_DARK, alignment=TA_CENTER, leading=7)
-        jlabel = f'#{j} ' if j else ''
-        # NOTES label = full player ID: "#22 First Last 'YY POS ST"
-        gy = f"'{yr[-2:]}" if yr else ''
-        nl_extra = ' '.join(x for x in (gy, pos, state) if x)
-        nl_label = f'{jlabel}{first} {last}' + (f' {nl_extra}' if nl_extra else '')
-        return [
-            Paragraph(j, sNum), Paragraph(first, sName), Paragraph(last, sName),
-            Paragraph(pos, sCell), Paragraph(ht, sCell), Paragraph(wt, sCell),
-            Paragraph(yr, sCell), Paragraph(sch, sSchl),
-            Paragraph(state, sSt),
-            Paragraph(cur, sStarHL if db else sCell),
-            Paragraph('', sCell),
-            Paragraph(pbr_str, sPBR),
-            Paragraph(commit_val, sCommit),
-            Paragraph(acad, sAcad),
-            Paragraph(nl_label, sNL),
-        ]
+        return {
+            'first': first, 'last': last, 'j': j, 'pos': pos, 'ht': ht, 'wt': wt,
+            'yr': yr, 'sch': (p.get('hs','') or '').strip(), 'state': state,
+            'db': db, 'cur': db['tier'] if db else '', 'bt': bt,
+            'hometown': hometown, 'commit': pg_commit or db_commit or pbr_commit,
+            'pbr_str': pbr_rank_str(p.get('name',''), p.get('pg_rank',''),
+                                    grad_year=yr or None, state=state or None),
+            'acad': (p.get('acad','') or p.get('academic','') or '').strip(),
+            'meas': meas_chip_items((crawl or {}).get('measurables')),
+        }
+
+    def _notes_cell(p, c):
+        jlabel = f"#{c['j']} " if c['j'] else ''
+        gy = f"'{c['yr'][-2:]}" if c['yr'] else ''
+        nl_extra = ' '.join(x for x in (gy, c['pos'], c['state']) if x)
+        label = _esc(f"{jlabel}{c['first']} {c['last']}" +
+                     (f' {nl_extra}' if nl_extra else ''))
+        if c['commit']:
+            label += (f'<br/><font color="#111111"><b>COMMITTED: '
+                      f'{_esc(c["commit"])}</b></font>')
+        return Paragraph(label, sNL)
+
+    # ---- Column registry -------------------------------------------------
+    # The customization surface: a preset is just an ordered list of keys.
+    # 'w' = fixed inches; 'wt' = share of the leftover width. cell(p, ctx)
+    # returns the flowable for that player's cell.
+    _MEAS_W = [0.0]  # resolved after widths are computed (chips need it)
+    COLUMNS = {
+        'num':    dict(hdr='#',     w=0.23*inch, cell=lambda p, c: Paragraph(c['j'], sNum)),
+        'first':  dict(hdr='First', w=0.62*inch, cell=lambda p, c: Paragraph(_esc(c['first']), sName)),
+        'last':   dict(hdr='Last',  w=0.80*inch, cell=lambda p, c: Paragraph(_esc(c['last']), sName)),
+        # sketch layout: Pos with B/T under it, Class with Ht·Wt under it
+        # (UTILITY abbreviated -- at this column width it wraps mid-word)
+        'pos_bt': dict(hdr='Pos', wt=0.9, cell=lambda p, c: Paragraph(
+            f"<b>{_esc('UTL' if c['pos'].strip().upper() == 'UTILITY' else c['pos'])}</b>" +
+            (f"<br/><font size=5 color=#555555>{_esc(c['bt'])}</font>" if c['bt'] else ''),
+            sCell)),
+        'class_htwt': dict(hdr='Class', wt=1.1, cell=lambda p, c: Paragraph(
+            f"<b>{_esc(c['yr'])}</b>" +
+            (f"<br/><font size=5.5>{_esc(' · '.join(x for x in (c['ht'], c['wt']) if x))}</font>"
+             if (c['ht'] or c['wt']) else ''),
+            sCell)),
+        'school': dict(hdr='School', wt=1.9, cell=lambda p, c: Paragraph(
+            _esc(c['sch']) +
+            (f"<br/><font color=#555555>{_esc(c['hometown'])}</font>" if c['hometown'] else ''),
+            sSchl)),
+        'meas':   dict(hdr='Measurables', wt=2.4,
+                       cell=lambda p, c: MeasChips(c['meas'], _MEAS_W[0])),
+        'acad_rank': dict(hdr='Acad / Rank', wt=1.5, cell=lambda p, c: Paragraph(
+            '<br/>'.join(x for x in (_esc(c['acad']), _esc(c['pbr_str']).replace('\n', '<br/>')) if x),
+            sAcad)),
+        'cur':    dict(hdr='Cur *', wt=0.7,
+                       cell=lambda p, c: Paragraph(c['cur'], sStarHL if c['db'] else sCell)),
+        'new':    dict(hdr='New *', wt=0.7, cell=lambda p, c: Paragraph('', sCell)),
+        'notes':  dict(hdr='NOTES', w=NOTES_W, cell=_notes_cell),
+        # classic (pre-2026-07-02) columns, still available as a preset
+        'pos':    dict(hdr='Pos',   wt=1.0, cell=lambda p, c: Paragraph(_esc(c['pos']), sCell)),
+        'ht':     dict(hdr='Ht',    wt=1.0, cell=lambda p, c: Paragraph(_esc(c['ht']), sCell)),
+        'wt_col': dict(hdr='Wt',    wt=1.0, cell=lambda p, c: Paragraph(_esc(c['wt']), sCell)),
+        'class':  dict(hdr='Class', wt=1.0, cell=lambda p, c: Paragraph(_esc(c['yr']), sCell)),
+        'school_only': dict(hdr='School', wt=1.786, cell=lambda p, c: Paragraph(_esc(c['sch']), sSchl)),
+        'st':     dict(hdr='St',    wt=1.0, cell=lambda p, c: Paragraph(_esc(c['state']), sSt)),
+        'pbr_rank': dict(hdr='PBR Rank', wt=1.0, cell=lambda p, c: Paragraph(
+            _esc(c['pbr_str']).replace('\n', '<br/>'), sPBR)),
+        'commit': dict(hdr='Commit', wt=1.0, hdr_small=True,
+                       cell=lambda p, c: Paragraph(_esc(c['commit']), sCommit)),
+        'acad':   dict(hdr='Acad',  wt=1.0, cell=lambda p, c: Paragraph(_esc(c['acad']), sAcad)),
+        'notes_classic': dict(hdr='NOTES', w=NOTES_W, cell=lambda p, c: _notes_cell(p, {**c, 'commit': ''})),
+    }
+    PRESETS = {
+        'navy':    ['num', 'first', 'last', 'pos_bt', 'class_htwt', 'school',
+                    'meas', 'acad_rank', 'cur', 'new', 'notes'],
+        'classic': ['num', 'first', 'last', 'pos', 'ht', 'wt_col', 'class',
+                    'school_only', 'st', 'cur', 'new', 'pbr_rank', 'commit',
+                    'acad', 'notes_classic'],
+    }
+    col_keys = list(columns) if columns else list(PRESETS[preset])
+    # No crawled data loaded -> a Measurables column would be all blanks;
+    # drop it and give its width back to the rest.
+    if 'meas' in col_keys and not _CRAWL:
+        col_keys.remove('meas')
+    cols = [COLUMNS[k] for k in col_keys]
+
+    fixed_w = sum(c['w'] for c in cols if 'w' in c)
+    total_wt = sum(c['wt'] for c in cols if 'wt' in c) or 1.0
+    unit = (W - fixed_w) / total_wt
+    CW = [c['w'] if 'w' in c else c['wt'] * unit for c in cols]
+    if 'meas' in col_keys:
+        _MEAS_W[0] = CW[col_keys.index('meas')] - 6  # minus cell padding
+    HEADERS = [c['hdr'] for c in cols]
+    ROW_H    = 0.46*inch
+    HDR_H    = 0.26*inch
+
+    def hdr_row():
+        return [Paragraph(c['hdr'], sHdrSm if c.get('hdr_small') else sHdr)
+                for c in cols]
+
+    def data_row(p):
+        ctx = _row_ctx(p)
+        return [c['cell'](p, ctx) for c in cols]
 
     def team_sort_key(t):
         div = _sched_divs.get(t['name']) or t.get('division') or t.get('age_group') or _infer_division(t['name'])
@@ -945,13 +1196,19 @@ def build_pdf(json_path, out_path, raw_sheet_text="", proof_only=False,
         # continuation page carries the column names AND a team-name indicator
         # for post-event identification.
         BANNER_H = 0.18*inch
-        banner_row = [Paragraph(team['name'], sBanner)] + [''] * (len(HEADERS) - 1)
+        banner_row = [Paragraph(team['name'], sBanner)] + [''] * (len(cols) - 1)
         rows = [banner_row, hdr_row()]
         rh   = [BANNER_H, HDR_H]
         for p in players:
+            p['_team'] = team['name']  # crawl_lookup disambiguator
             rows.append(data_row(p))
             rh.append(ROW_H)
         tbl = Table(rows, colWidths=CW, rowHeights=rh, repeatRows=2)
+        # column indices resolved from the active preset, not hardcoded
+        notes_i  = next((i for i, k in enumerate(col_keys) if k.startswith('notes')), None)
+        cur_i    = col_keys.index('cur') if 'cur' in col_keys else None
+        school_i = next((i for i, k in enumerate(col_keys) if k.startswith('school')), None)
+        last_i   = col_keys.index('last') if 'last' in col_keys else None
         ts = [
             # team banner (row 0)
             ('SPAN',(0,0),(-1,0)),
@@ -967,26 +1224,30 @@ def build_pdf(json_path, out_path, raw_sheet_text="", proof_only=False,
             ('ALIGN',(0,2),(-1,-1),'CENTER'),
             ('VALIGN',(0,2),(-1,-1),'MIDDLE'), ('TOPPADDING',(0,2),(-1,-1),0),
             ('BOTTOMPADDING',(0,2),(-1,-1),0), ('LEFTPADDING',(0,0),(-1,-1),3),
-            ('RIGHTPADDING',(0,0),(-1,-1),3), ('ALIGN',(14,2),(14,-1),'LEFT'),
-            ('VALIGN',(14,2),(14,-1),'TOP'), ('TOPPADDING',(14,2),(14,-1),3),
-            ('LEFTPADDING',(14,2),(14,-1),4), ('BOX',(0,0),(-1,-1),0.7,LINE_DARK),
-            ('LEFTPADDING',(7,2),(7,-1),1), ('RIGHTPADDING',(7,2),(7,-1),1),
+            ('RIGHTPADDING',(0,0),(-1,-1),3),
+            ('BOX',(0,0),(-1,-1),0.7,LINE_DARK),
             ('LINEBELOW',(0,0),(-1,-1),0.4,LINE_LITE),
-            # vertical column dividers — start at the header row (skip the banner)
-            ('LINEAFTER',(0,1),(0,-1),0.4,LINE_LITE), ('LINEAFTER',(1,1),(1,-1),0.4,LINE_LITE),
-            ('LINEAFTER',(2,1),(2,-1),0.7,LINE_DARK), ('LINEAFTER',(3,1),(3,-1),0.4,LINE_LITE),
-            ('LINEAFTER',(4,1),(4,-1),0.4,LINE_LITE), ('LINEAFTER',(5,1),(5,-1),0.4,LINE_LITE),
-            ('LINEAFTER',(6,1),(6,-1),0.4,LINE_LITE), ('LINEAFTER',(7,1),(7,-1),0.4,LINE_LITE),
-            ('LINEAFTER',(8,1),(8,-1),0.4,LINE_LITE), ('LINEAFTER',(9,1),(9,-1),0.4,LINE_LITE),
-            ('LINEAFTER',(10,1),(10,-1),0.4,LINE_LITE), ('LINEAFTER',(11,1),(11,-1),0.4,LINE_LITE),
-            ('LINEAFTER',(12,1),(12,-1),0.4,LINE_LITE), ('LINEAFTER',(13,1),(13,-1),0.7,LINE_DARK),
         ]
+        if notes_i is not None:
+            ts += [('ALIGN',(notes_i,2),(notes_i,-1),'LEFT'),
+                   ('VALIGN',(notes_i,2),(notes_i,-1),'TOP'),
+                   ('TOPPADDING',(notes_i,2),(notes_i,-1),3),
+                   ('LEFTPADDING',(notes_i,2),(notes_i,-1),4)]
+        if school_i is not None:
+            ts += [('LEFTPADDING',(school_i,2),(school_i,-1),1),
+                   ('RIGHTPADDING',(school_i,2),(school_i,-1),1)]
+        # vertical dividers — start at the header row (skip the banner);
+        # heavy after Last and before NOTES, light elsewhere
+        for i in range(len(cols) - 1):
+            heavy = (i == last_i) or (notes_i is not None and i == notes_i - 1)
+            ts.append(('LINEAFTER',(i,1),(i,-1), 0.7 if heavy else 0.4,
+                       LINE_DARK if heavy else LINE_LITE))
         for i, p in enumerate(players):
             ri = i + 2
             is_db = db_lookup(p.get('name','')) is not None
             ts.append(('BACKGROUND',(0,ri),(-1,ri), ROW_ALT if i%2==0 else WHITE))
-            if is_db:
-                ts.append(('BACKGROUND',(9,ri),(9,ri), DB_YELLOW))
+            if is_db and cur_i is not None:
+                ts.append(('BACKGROUND',(cur_i,ri),(cur_i,ri), DB_YELLOW))
         tbl.setStyle(TableStyle(ts))
         story.append(tbl)
         if ti < len(teams)-1:
