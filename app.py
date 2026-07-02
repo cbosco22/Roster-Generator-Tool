@@ -1116,6 +1116,33 @@ with tab_add:
         if ap_batch_rows:
             st.divider()
             st.markdown("**Review before adding**")
+
+            # Duplicate check, shown BEFORE the write - manual entry already
+            # warns about an existing match (line ~1240 below); the batch
+            # path never did, so a screenshot of a kid already on the board
+            # would silently become an "update" with no heads-up. Found by
+            # Chris 2026-07-02: added a second player who was already in the
+            # system, got no notice, just a generic "Done." This uses the
+            # same cached db + lookup() as manual entry, not a new check.
+            if XLSX_PATH.exists():
+                from db_loader import lookup as _ap_batch_lookup
+                ap_batch_db, _ = _load_db_and_cols(XLSX_PATH.stat().st_mtime)
+                ap_batch_dups = []
+                for r in ap_batch_rows:
+                    if not (r.get("First") and r.get("Last")):
+                        continue
+                    match = _ap_batch_lookup(ap_batch_db, f"{r['First']} {r['Last']}")
+                    if match:
+                        ap_batch_dups.append((r["First"], r["Last"], match))
+                if ap_batch_dups:
+                    dup_lines = "\n".join(
+                        f"- **{first} {last}** matches an existing player, "
+                        f"**{m['canonical_name']}** (Tier {m.get('tier') or '?'}, "
+                        f"{m.get('hs') or 'no school listed'}) — this will **update** "
+                        f"that player, not add a duplicate."
+                        for first, last, m in ap_batch_dups)
+                    st.warning("⚠️ Already on the board:\n\n" + dup_lines)
+
             ap_batch_df = st.data_editor(
                 pd.DataFrame(ap_batch_rows), use_container_width=True, hide_index=True,
                 num_rows="dynamic", key="ap_batch_editor",
@@ -1169,12 +1196,21 @@ with tab_add:
                         st.write(f"Writing {len(bops)} player(s)…")
                         breal = sheet_write.post_ops(bops, ap_sw_url, ap_sw_token, dry_run=False)
                         if breal.get("ok"):
-                            n_new = sum(1 for r in breal["results"] if r["action"] == "append")
-                            n_upd = sum(1 for r in breal["results"] if r["action"] == "update")
+                            new_names = [op.get('player') for op, r in zip(bops, breal["results"])
+                                        if r["action"] == "append"]
+                            upd_names = [op.get('player') for op, r in zip(bops, breal["results"])
+                                        if r["action"] == "update"]
                             bstatus.update(label="Done", state="complete")
                             st.success(f"✓ Written to Recruiting Sheet 2.0 — "
-                                      f"{n_new} new player(s), {n_upd} update(s), "
+                                      f"{len(new_names)} new player(s), {len(upd_names)} update(s), "
                                       "every field verified by reading it back.")
+                            # Named, not just counted - a coach re-adding someone already
+                            # on the board needs to see WHO got updated, not just a number
+                            # buried in one sentence (Chris 2026-07-02: got no notice a
+                            # screenshot matched an existing player).
+                            if upd_names:
+                                st.info("🔄 Updated existing profile(s) instead of adding "
+                                       "duplicates: " + ", ".join(upd_names))
                             st.session_state["ap_batch_rows"] = []
                             _load_db_and_cols.clear()
                         else:
