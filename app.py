@@ -20,7 +20,9 @@ import pickle
 from datetime import datetime
 from pathlib import Path
 
+import html
 import requests
+import pandas as pd
 import streamlit as st
 
 # Ensure local imports work no matter where streamlit is launched from
@@ -290,13 +292,22 @@ st.markdown(
       transform: translateY(-1px);
       box-shadow: 0 4px 10px rgba(20,35,59,0.12) !important;
     }
-    .stButton > button[kind="primary"] {
+    /* color was never set explicitly here - relied on inheritance for
+       white text, which silently broke wherever that assumption didn't
+       hold (found 2026-07-02: buttons rendered inside a popover, a
+       portaled/detached part of the DOM tree, rendered black text on the
+       navy background - unreadable). Force it instead of assuming it. */
+    .stButton > button[kind="primary"],
+    [data-testid^="stBaseButton-primary"] {
       background: #14233B !important;
+      color: #FFFFFF !important;
       border: none !important;
       box-shadow: 0 2px 8px rgba(20,35,59,0.25) !important;
     }
-    .stButton > button[kind="primary"]:hover {
+    .stButton > button[kind="primary"]:hover,
+    [data-testid^="stBaseButton-primary"]:hover {
       background: #1F3357 !important;
+      color: #FFFFFF !important;
       box-shadow: 0 6px 16px rgba(20,35,59,0.35) !important;
     }
 
@@ -390,8 +401,8 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-tab_field, tab_add, tab_post, tab_tourney, tab_sched, tab_admin = st.tabs(
-    ["🎯 Field Tool", "➕ Add Player", "📥 Post-Event", "🏟️ Tournament Builder",
+tab_field, tab_add, tab_board, tab_post, tab_tourney, tab_sched, tab_admin = st.tabs(
+    ["🎯 Field Tool", "➕ Add Player", "📋 Board", "📥 Post-Event", "🏟️ Tournament Builder",
      "🔄 Schedule Refresh", "⚙️  Admin"])
 
 
@@ -714,7 +725,6 @@ with tab_tourney:
 
     if "tb_pdf" in st.session_state:
         import csv as _csv
-        import pandas as pd
         st.divider()
         st.download_button("⬇️  Roster book (PDF)", data=st.session_state["tb_pdf"],
                            file_name=st.session_state["tb_pdfname"],
@@ -828,7 +838,6 @@ with tab_post:
         st.session_state["pe_write_preview"] = None
 
     if "pe_stats" in st.session_state:
-        import pandas as pd
         s = st.session_state["pe_stats"]
         st.divider()
         c1, c2, c3 = st.columns(3)
@@ -1286,6 +1295,224 @@ with tab_add:
                 except Exception as e:
                     ap_wstatus.update(label="Failed", state="error")
                     st.exception(e)
+
+
+# ---- Board ----
+# Browse the recruiting board one class + position group at a time, styled
+# to match a mock Chris built directly in Sheets, plus a per-player profile
+# card (click a row -> st.dialog modal, edit any field) - the thing that
+# used to require opening High School Players directly (or AppSheet).
+# Reuses db_loader.all_players() (same parsed data Field Tool/Add Player
+# already load, just deduped to one row per player), sheet_write.pos_group()
+# (the same RHP/LHP/INF/OF/C bucketing the sheet itself uses), and
+# sheet_write.build_profile_update_op()/build_note_update_op() - no new
+# data path, no new write path.
+_BOARD_POS_GROUPS = ['ALL', 'RHP', 'LHP', 'INF', 'OF', 'C']
+# Matches the live Big Board tab's own default (its FILTER formula's
+# threshold is "★ < 3") - a user-facing filter now instead of a hardcoded
+# tuple, since Chris wants the option to widen it.
+_BOARD_TIER_FILTER_OPTIONS = ['0.1', '1', '2', '3', '4', 'XX']
+_BOARD_TIER_FILTER_DEFAULT = ['0.1', '1', '2']
+_BOARD_TIER_FILTER_LABELS = {'0.1': '0.1 · Committed', '1': '1 · Offer',
+                             '2': '2 · High Follow', '3': '3 · Follow',
+                             '4': '4 · Need to see', 'XX': 'XX · Off list'}
+# Name-text color per tier, matching a real mock Chris built directly in
+# Sheets and told me to copy exactly: tier 1 names in green, everything
+# else plain. 0.1 (committed) gets navy+bold since it's the single most
+# important tier - not in Chris's original mock sample, but leaving it
+# plain would bury the most important row on the board.
+_BOARD_NAME_COLOR = {'0.1': '#1A3A6B', '1': '#2E7D32'}
+
+
+def _bd_write(ops, sw_url, sw_token, player_label):
+    """Dry-run-then-write, same pattern as every other write path in this
+    app (Add Player, Post-Event). Shared by the profile dialog's Save."""
+    if not ops:
+        st.info("Nothing changed.")
+        return
+    with st.status("Writing to Recruiting Sheet 2.0…", expanded=True) as wstatus:
+        try:
+            st.write("Validating…")
+            check = sheet_write.post_ops(ops, sw_url, sw_token, dry_run=True)
+            if not check.get("ok"):
+                wstatus.update(label="Failed", state="error")
+                st.error(f"Validation failed, nothing written: {check.get('error')}")
+                st.stop()
+
+            st.write("Writing…")
+            real = sheet_write.post_ops(ops, sw_url, sw_token, dry_run=False)
+            if real.get("ok"):
+                wstatus.update(label="Done", state="complete")
+                st.success(f"✓ Updated {player_label} in Recruiting Sheet 2.0, "
+                          "every field verified by reading it back.")
+                _load_db_and_cols.clear()
+            else:
+                wstatus.update(label="Failed", state="error")
+                bad = [(op, r) for op, r in zip(ops, real.get("results", [])) if not r.get("ok")]
+                for op, r in bad:
+                    st.error(f"{op.get('player')}: {r.get('error')}")
+            with st.expander("🔍 What was sent (debug)"):
+                st.json(ops)
+                st.json(real)
+        except requests.exceptions.RequestException as e:
+            wstatus.update(label="Failed", state="error")
+            st.error(f"Couldn't reach the Recruiting Sheet 2.0 write endpoint "
+                    f"after retrying — this is a network/timeout issue, not a "
+                    f"data problem. **Nothing was written** (this failed during "
+                    f"validation, before any real write is attempted). This is "
+                    f"most common right after a Code.gs redeploy — wait a few "
+                    f"seconds and click the write button again.\n\n`{e}`")
+        except Exception as e:
+            wstatus.update(label="Failed", state="error")
+            st.exception(e)
+
+
+@st.dialog("Player profile")
+def _bd_profile_dialog(p, cols, sw_url, sw_token):
+    """The 'little card' - opened by clicking a player's row button. Shows
+    and edits every field parse_xlsx() loads, not just tier/notes, per
+    Chris's explicit ask ("really all of them if we can")."""
+    st.markdown(f"### {p['canonical_name']}")
+    st.caption(f"{p.get('hs') or 'no school listed'} · {p.get('team') or 'no summer team listed'}")
+    if p.get('notes'):
+        st.caption("**Notes so far:**  \n" + p['notes'].replace('\n', '  \n'))
+
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        tier_default = p['tier'] if p['tier'] in _AP_TIER_OPTIONS else None
+        f_tier = st.pills("★", _AP_TIER_OPTIONS, default=tier_default, key=f"bdp_tier_{p['_row']}")
+        f_class = st.pills("Class", _ap_class_years(),
+                           default=p['class'] if p['class'] in _ap_class_years() else None,
+                           key=f"bdp_class_{p['_row']}")
+    with c2:
+        f_pos = st.pills("Pos", _AP_POS_OPTIONS, default=p['pos'] if p['pos'] in _AP_POS_OPTIONS else None,
+                         key=f"bdp_pos_{p['_row']}")
+        f_pos2 = st.selectbox("POS2", [""] + _AP_POS_OPTIONS,
+                              index=([""] + _AP_POS_OPTIONS).index(p['pos2']) if p.get('pos2') in _AP_POS_OPTIONS else 0,
+                              key=f"bdp_pos2_{p['_row']}")
+    with c3:
+        f_bt = st.pills("B/T", _AP_BT_OPTIONS, default=p['bt'] if p['bt'] in _AP_BT_OPTIONS else None,
+                        key=f"bdp_bt_{p['_row']}")
+
+    f_commit = st.text_input("Commit", value=p.get('commit') or '', key=f"bdp_commit_{p['_row']}")
+    f_hometown = st.text_input("Hometown", value=p.get('hometown') or '', key=f"bdp_hometown_{p['_row']}")
+    f_state = st.text_input("State", value=p.get('state') or '', key=f"bdp_state_{p['_row']}")
+    f_hs = st.text_input("High School", value=p.get('hs') or '', key=f"bdp_hs_{p['_row']}")
+    f_team = st.text_input("Summer Team", value=p.get('team') or '', key=f"bdp_team_{p['_row']}")
+    f_academic = st.text_input("Academic", value=p.get('academic') or '', key=f"bdp_academic_{p['_row']}")
+    f_email = st.text_input("Email", value=p.get('email') or '', key=f"bdp_email_{p['_row']}")
+    f_phone = st.text_input("Phone", value=p.get('phone') or '', key=f"bdp_phone_{p['_row']}")
+    f_comms = st.text_input("Comms", value=p.get('comms') or '', key=f"bdp_comms_{p['_row']}")
+    f_note = st.text_area("Add a note (appended, doesn't overwrite prior notes)",
+                          key=f"bdp_note_{p['_row']}")
+
+    if not (sw_url and sw_token):
+        st.info("Sheet write-back not configured — set `sheet_write_url` / "
+                "`sheet_write_token` in Streamlit secrets (see `apps_script/README.md`).")
+    elif st.button("💾 Save", type="primary", use_container_width=True, key=f"bdp_save_{p['_row']}"):
+        ops = []
+        # 'class' is a Python keyword, so it has to go through **{} rather
+        # than a normal kwarg like the rest of these.
+        profile_op = sheet_write.build_profile_update_op(
+            p, cols, **{
+                'tier': f_tier, 'commit': f_commit, 'pos': f_pos, 'pos2': f_pos2,
+                'bt': f_bt, 'class': f_class, 'hometown': f_hometown, 'state': f_state,
+                'hs': f_hs, 'team': f_team, 'academic': f_academic, 'email': f_email,
+                'phone': f_phone, 'comms': f_comms,
+            })
+        if profile_op:
+            ops.append(profile_op)
+        note_op = sheet_write.build_note_update_op(p, cols, f_note)
+        if note_op:
+            ops.append(note_op)
+        _bd_write(ops, sw_url, sw_token, p['canonical_name'])
+
+
+with tab_board:
+    st.subheader("Recruiting board")
+    st.caption("Same board as the sheet — click a player to view or edit their profile.")
+
+    if not XLSX_PATH.exists():
+        st.warning("Recruiting xlsx not loaded — go to **Admin** tab")
+    else:
+        from db_loader import all_players as _all_players
+
+        bd_db, bd_cols = _load_db_and_cols(XLSX_PATH.stat().st_mtime)
+        bd_players = _all_players(bd_db)
+        bd_sw_url = _get_secret("sheet_write_url")
+        bd_sw_token = _get_secret("sheet_write_token")
+
+        bd_classes = sorted({p['class'] for p in bd_players if p['class']}, reverse=True)
+
+        f1, f2 = st.columns(2)
+        with f1:
+            bd_class = st.selectbox("Class", bd_classes, key="bd_class")
+        with f2:
+            bd_pos = st.selectbox("Position", _BOARD_POS_GROUPS, key="bd_pos")
+        bd_tiers = st.multiselect("Show ratings", _BOARD_TIER_FILTER_OPTIONS,
+                                  default=_BOARD_TIER_FILTER_DEFAULT,
+                                  format_func=lambda t: _BOARD_TIER_FILTER_LABELS[t],
+                                  key="bd_tiers")
+
+        bd_filtered = [p for p in bd_players
+                       if p['class'] == bd_class
+                       and (bd_pos == 'ALL' or sheet_write.pos_group(p['pos']) == bd_pos)
+                       and p['tier'] in bd_tiers]
+        bd_filtered.sort(key=lambda p: ((float(p['tier']) if p['tier'] != 'XX' else 99),
+                                        p['last'], p['first']))
+
+        bd_show_bt = bd_pos != 'RHP' and bd_pos != 'LHP'  # pitchers: Pos already implies throwing hand
+        bd_show_pos = bd_pos == 'ALL'  # position is implied by the filter otherwise
+
+        if not bd_filtered:
+            st.caption(f"No {bd_pos} in the {bd_class} class at the selected rating(s) right now.")
+        else:
+            # st.columns()/st.container(horizontal=True) both fight a real
+            # phone viewport - columns stack vertically below Streamlit's
+            # mobile breakpoint (confirmed live at 390px), and hand-tuned
+            # pixel widths in a horizontal container just move the same
+            # problem into a "does this line wrap" guessing game. st.dataframe
+            # sidesteps both: it scrolls horizontally on its own when content
+            # doesn't fit (exactly what Chris asked for - "scrollable side to
+            # side if it doesn't fit"), and its native row-click selection
+            # replaces the per-row st.button used in the last attempt.
+            bd_rows = []
+            for p in bd_filtered:
+                row = {'★': 'C' if p['tier'] == '0.1' else p['tier'], 'NAME': p['canonical_name']}
+                if bd_show_pos:
+                    row['POS'] = p['pos']
+                if bd_show_bt:
+                    row['B/T'] = p['bt'] or ''
+                row['ST'] = p['state'] or ''
+                row['TEAM'] = p['team'] or ''
+                bd_rows.append(row)
+            bd_df = pd.DataFrame(bd_rows)
+
+            def _bd_row_style(row):
+                color = _BOARD_NAME_COLOR.get(bd_filtered[row.name]['tier'])
+                style = f'color:{color};font-weight:700;' if color else ''
+                return [style if col in ('★', 'NAME') else '' for col in bd_df.columns]
+
+            bd_col_config = {
+                '★': st.column_config.Column(width=40, alignment='center'),
+                'NAME': st.column_config.Column(width=170, alignment='left'),
+                'ST': st.column_config.Column(width=50, alignment='center'),
+                'TEAM': st.column_config.Column(width=160, alignment='left'),
+            }
+            if bd_show_pos:
+                bd_col_config['POS'] = st.column_config.Column(width=55, alignment='center')
+            if bd_show_bt:
+                bd_col_config['B/T'] = st.column_config.Column(width=55, alignment='center')
+
+            bd_event = st.dataframe(
+                bd_df.style.apply(_bd_row_style, axis=1), hide_index=True,
+                column_config=bd_col_config, on_select='rerun', selection_mode='single-row',
+                row_height=32, key=f'bd_table_{bd_class}_{bd_pos}_{"".join(sorted(bd_tiers))}',
+            )
+            if bd_event and bd_event.selection and bd_event.selection.rows:
+                bd_sel_idx = bd_event.selection.rows[0]
+                if bd_sel_idx < len(bd_filtered):
+                    _bd_profile_dialog(bd_filtered[bd_sel_idx], bd_cols, bd_sw_url, bd_sw_token)
 
 
 # ---- Admin ----

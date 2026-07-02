@@ -10,8 +10,14 @@ row 2026-06-30, do not guess, re-verify against row 3 of the live sheet if
 this ever looks wrong):
   [7]=First [8]=Last [9]=Class [10]=★/tier [11]=Commit [12]=Pos
   [16]=State [17]=High School [18]=Summer Team [22]=Seen
+These are resolved by header label via find_columns(), never hardcoded —
+the indices above are informational, not what the code actually reads.
 Row numbers (1-indexed, matching openpyxl/Sheets) are tracked per entry as
 '_row' — needed by sheet_write.py to target updates at the right row.
+
+all_players(db) returns a flat, deduped list of every entry parse_xlsx()
+already parsed — used by the Board tab. Don't build a second/parallel
+loader; the full field set (state, hs, team, notes, etc.) is already here.
 """
 
 NICKNAMES = {
@@ -126,7 +132,7 @@ def parse_xlsx(path, sheet_name='High School Players'):
     idx = {k: v - 1 for k, v in cols.items()}
     core = ['first', 'last', 'class', 'tier', 'commit', 'pos', 'pos2', 'bt',
             'hometown', 'state', 'hs', 'team', 'academic', 'email', 'phone',
-            'seen', 'comms']
+            'seen', 'comms', 'notes']
     max_idx = max(idx[k] for k in core)
 
     wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
@@ -151,13 +157,41 @@ def parse_xlsx(path, sheet_name='High School Players'):
                  'first':first,'last':last,'canonical_name':f"{first} {last}",
                  'hometown':vals['hometown'],'state':vals['state'],'hs':vals['hs'],
                  'team':vals['team'],'academic':vals['academic'],'email':vals['email'],
-                 'phone':vals['phone'],'seen':vals['seen'],'comms':vals['comms'],'_row':i}
+                 'phone':vals['phone'],'seen':vals['seen'],'comms':vals['comms'],
+                 'notes':vals['notes'],'_row':i}
         for v in _variants(first, last):
             db[v] = entry
     wb.close()
     unique = len(set(e['canonical_name'] for e in db.values()))
     print(f"[DB] Loaded {unique} players from xlsx ({len(db)} name variants)")
     return db
+
+
+def all_players(db):
+    """Flat, deduped list of player entries for browsing/filtering (the
+    Board tab) — same data parse_xlsx() already returns per name-variant
+    key, just collapsed to one entry per canonical player. Sorted by class
+    year (newest first), then tier (best first), then last name."""
+    seen, out = set(), []
+    for entry in db.values():
+        cn = entry['canonical_name']
+        if cn in seen:
+            continue
+        seen.add(cn)
+        out.append(entry)
+
+    def _tier_key(t):
+        try:
+            return float(t)
+        except (TypeError, ValueError):
+            return 99  # XX / blank sorts last
+
+    def _class_key(c):
+        return -int(c) if c and c.isdigit() else 0
+
+    out.sort(key=lambda e: (_class_key(e['class']), _tier_key(e['tier']),
+                            e['last'], e['first']))
+    return out
 
 def parse_sheet_content(raw_text):
     """Fallback for Drive markdown text — less complete, use only if no xlsx."""

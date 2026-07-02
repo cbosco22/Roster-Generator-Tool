@@ -34,6 +34,13 @@ the wrong field (Apps Script reported success while most fields were
 never actually visible anywhere in the row). Column position is not
 stable enough to hardcode while the sheet is still being cleaned up -
 resolve it fresh, every time, right before writing.
+
+build_profile_update_op() / build_note_update_op() are narrower siblings of
+build_upsert_op(), for the Board tab's profile-card edit: the caller
+already has the exact row (from db_loader.all_players()), so there's no
+fuzzy-lookup step, Seen is never touched (a Board edit isn't an event
+sighting), and notes append instead of overwrite (see each docstring for
+why).
 """
 import requests
 from datetime import date
@@ -49,7 +56,10 @@ _POS_GROUP_MAP = {
 }
 
 
-def _pos_group(pos):
+def pos_group(pos):
+    """Public on purpose - the Board tab (app.py) reuses this exact mapping
+    to bucket players into the same 5 position groups (RHP/LHP/INF/OF/C)
+    the live Big Board tab uses, instead of re-deriving its own copy."""
     return _POS_GROUP_MAP.get((pos or '').strip(), '')
 
 
@@ -105,7 +115,7 @@ def build_upsert_op(current_db, cols, *, first, last, event_name, new_tier=None,
             if val and val != existing.get(key):
                 fields[cols[key]] = val
                 if key == 'pos':
-                    fields[cols['pos_group']] = _pos_group(val)
+                    fields[cols['pos_group']] = pos_group(val)
                 if key in relabel_inputs:
                     relabel_inputs[key] = val
         if new_tier and new_tier != existing.get('tier'):
@@ -132,8 +142,68 @@ def build_upsert_op(current_db, cols, *, first, last, event_name, new_tier=None,
     for key, val in simple_vals.items():
         if val: fields[cols[key]] = val
     fields[cols['id']] = _id_label(first, last, new_tier, class_year, pos, state)
-    fields[cols['pos_group']] = _pos_group(pos)
+    fields[cols['pos_group']] = pos_group(pos)
     return {'action': 'append', 'fields': fields, 'player': f"{first} {last}"}
+
+
+_PROFILE_FIELDS = ('tier', 'commit', 'pos', 'pos2', 'bt', 'class', 'hometown',
+                   'state', 'hs', 'team', 'academic', 'email', 'phone', 'comms')
+
+
+def build_profile_update_op(existing, cols, **updates):
+    """General field-update op for the Board tab's profile-card edit —
+    unlike build_upsert_op(), this never touches Seen (Seen is an
+    event-exposure log - "saw him at WWBA 2026" - not a general edit log,
+    so a Board-side field edit shouldn't append a fake "event" to it).
+    Accepts any of _PROFILE_FIELDS as kwargs (e.g. tier=..., team=...,
+    hometown=...); only fields that are non-empty AND differ from the
+    current value get written. `existing` comes straight from
+    db_loader.parse_xlsx()'s db (the coach picked this exact player off a
+    rendered row, not a fuzzy name lookup). Recomputes the ID label via
+    _id_label() whenever tier/class/pos/state changes, same as every
+    other write path. Returns None if nothing actually changed."""
+    fields = {}
+    relabel = {'tier': existing.get('tier'), 'class': existing.get('class'),
+              'pos': existing.get('pos'), 'state': existing.get('state')}
+    for key, val in updates.items():
+        if key not in _PROFILE_FIELDS:
+            raise ValueError(f"build_profile_update_op: unknown field {key!r}")
+        val = val.strip() if isinstance(val, str) else val
+        if not val or val == existing.get(key):
+            continue
+        fields[cols[key]] = val
+        if key == 'pos':
+            fields[cols['pos_group']] = pos_group(val)
+        if key in relabel:
+            relabel[key] = val
+    if not fields:
+        return None
+    fields[cols['id']] = _id_label(existing['first'], existing['last'], relabel['tier'],
+                                   relabel['class'], relabel['pos'], relabel['state'])
+    return {'action': 'update', 'row': existing['_row'], 'fields': fields,
+            'player': existing['canonical_name']}
+
+
+def build_note_update_op(existing, cols, note_text):
+    """Append a dated note to Notes — deliberately additive, unlike
+    build_upsert_op()'s notes handling (which overwrites: appropriate
+    there because a post-event note IS that round's complete summary).
+    A Board-side "add a note" is a different action - a quick comment on
+    top of whatever's already there - so it must never blow away prior
+    notes. Requires `existing['notes']` (parse_xlsx() now parses it -
+    added specifically so this diff/append is possible; it used to be
+    write-only). Dedupe-guarded the same way Seen is, in case of a
+    double-submit. Returns None if there's nothing new to write."""
+    note_text = (note_text or '').strip()
+    if not note_text:
+        return None
+    prior = (existing.get('notes') or '').strip()
+    if prior.endswith(note_text):
+        return None  # this exact note is already the most recent entry
+    stamped = f"[{today_str()}] {note_text}"
+    new_notes = f"{prior}\n{stamped}" if prior else stamped
+    return {'action': 'update', 'row': existing['_row'],
+            'fields': {cols['notes']: new_notes}, 'player': existing['canonical_name']}
 
 
 def post_ops(ops, url, token, dry_run=True, timeout=45, retries=2):
