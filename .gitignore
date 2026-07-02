@@ -26,3 +26,4 @@ pbr_crawler_output.json
 # commit was a permanent snapshot in git history. Keep data/pbr_rankings.pkl
 # tracked (public ranking data, lower sensitivity, no live-sync source yet).
 data/recruiting.xlsx
+data/college_logos/

@@ -145,20 +145,17 @@ def crawl_lookup(name, team=None, grad_year=None):
 
 
 class MeasChips(Flowable):
-    """The green measurable pills from Chris's sketch: rounded chips, bold
-    value + tiny unit label, wrapping to fit the column. Renders nothing
-    (zero height) when there are no measurables."""
+    """Stat pills: rounded chips, bold value + tiny unit label, wrapping to
+    fit the column. Outline-only style per Chris 2026-07-02 ("black text
+    with no background and just a gray little border around the pill" —
+    replaced the original green fill). Renders nothing (zero height) when
+    there are no items. Also used for academics (GPA/SAT/ACT)."""
     CHIP_H = 9.5
     GAP = 1.5
-    FILL = colors.HexColor('#C8E6C9')
-    EDGE = colors.HexColor('#81C784')
-    TXT = colors.HexColor('#1B5E20')
-
-    def __init__(self, items, max_w):
-        super().__init__()
-        self.items = items  # [(value, label), ...]
-        self.max_w = max_w
-        self._rows = None
+    FILL = colors.white
+    EDGE = colors.HexColor('#AAAAAA')
+    TXT = colors.HexColor('#111111')
+    LBL = colors.HexColor('#777777')
 
     def _chip_w(self, value, label):
         from reportlab.pdfbase.pdfmetrics import stringWidth
@@ -179,6 +176,14 @@ class MeasChips(Flowable):
         return rows
 
     MAX_ROWS = 2  # a fixed 0.46" roster row fits exactly two pill rows
+
+    def __init__(self, items, max_w, max_rows=None):
+        super().__init__()
+        self.items = items  # [(value, label), ...]
+        self.max_w = max_w
+        if max_rows is not None:
+            self.MAX_ROWS = max_rows
+        self._rows = None
 
     def wrap(self, availWidth, availHeight):
         # Chip count alone doesn't bound height -- wide values (velo ranges
@@ -204,18 +209,52 @@ class MeasChips(Flowable):
             for value, label, w in row:
                 c.setFillColor(self.FILL)
                 c.setStrokeColor(self.EDGE)
-                c.setLineWidth(0.4)
+                c.setLineWidth(0.5)
                 c.roundRect(x, y, w, self.CHIP_H, 2.5, stroke=1, fill=1)
                 c.setFillColor(self.TXT)
                 c.setFont('Helvetica-Bold', 6)
                 tx = x + 2.5
                 c.drawString(tx, y + 2.6, value)
                 from reportlab.pdfbase.pdfmetrics import stringWidth
+                c.setFillColor(self.LBL)
                 c.setFont('Helvetica', 4)
                 c.drawString(tx + stringWidth(value, 'Helvetica-Bold', 6) + 1,
                              y + 2.6, label)
                 x += w + self.GAP
             y -= self.CHIP_H + self.GAP
+
+
+class StarGlyph(Flowable):
+    """A filled five-pointed star drawn as a vector path — used in the
+    Cur/New column headers. Deliberately not a font glyph: ZapfDingbats
+    renders as .notdef squares in some viewers (confirmed via Quick Look),
+    and a unicode star needs an embedded TTF that Streamlit Cloud lacks."""
+    def __init__(self, size=6.5, color=colors.white):
+        super().__init__()
+        self.size = size
+        self.color = color
+
+    def wrap(self, availWidth, availHeight):
+        return (self.size, self.size)
+
+    def draw(self):
+        import math
+        c = self.canv
+        r_out = self.size / 2.0
+        r_in = r_out * 0.42
+        cx = cy = r_out
+        pts = []
+        for i in range(10):
+            ang = math.pi / 2 + i * math.pi / 5
+            r = r_out if i % 2 == 0 else r_in
+            pts.append((cx + r * math.cos(ang), cy + r * math.sin(ang)))
+        p = c.beginPath()
+        p.moveTo(*pts[0])
+        for x, y in pts[1:]:
+            p.lineTo(x, y)
+        p.close()
+        c.setFillColor(self.color)
+        c.drawPath(p, stroke=0, fill=1)
 
 
 def meas_chip_items(meas):
@@ -1025,6 +1064,14 @@ def build_pdf(json_path, out_path, raw_sheet_text="", proof_only=False,
                            textColor=TEXT_DARK, alignment=TA_CENTER, leading=5.5)
     sSt   = ParagraphStyle('ST', fontName='Helvetica', fontSize=6,
                            textColor=TEXT_DARK, alignment=TA_CENTER, leading=7)
+    sRank = ParagraphStyle('RK', fontName='Helvetica-Bold', fontSize=5.5,
+                           textColor=TEXT_DARK, alignment=TA_CENTER, leading=6.5)
+    sCmtTag = ParagraphStyle('CT', fontName='Helvetica-Bold', fontSize=4.5,
+                             textColor=TEXT_MED, alignment=TA_CENTER, leading=5.5)
+    sCmtSchool = ParagraphStyle('CS', fontName='Helvetica-Bold', fontSize=6.5,
+                                textColor=TEXT_DARK, alignment=TA_CENTER, leading=7.5)
+    sCmtDate = ParagraphStyle('CD', fontName='Helvetica', fontSize=4.5,
+                              textColor=TEXT_MED, alignment=TA_CENTER, leading=5.5)
 
     def _esc(s):
         return (str(s or '').replace('&', '&amp;').replace('<', '&lt;')
@@ -1061,22 +1108,94 @@ def build_pdf(json_path, out_path, raw_sheet_text="", proof_only=False,
             'yr': yr, 'sch': (p.get('hs','') or '').strip(), 'state': state,
             'db': db, 'cur': db['tier'] if db else '', 'bt': bt,
             'hometown': hometown, 'commit': pg_commit or db_commit or pbr_commit,
+            'commit_date': (p.get('commit_date') or '').strip(),
             'pbr_str': pbr_rank_str(p.get('name',''), p.get('pg_rank',''),
                                     grad_year=yr or None, state=state or None),
             'acad': (p.get('acad','') or p.get('academic','') or '').strip(),
             'meas': meas_chip_items((crawl or {}).get('measurables')),
         }
 
+    def _acad_chip_items(acad):
+        """Free-text Academic field -> [(value,label)] chips, by value range:
+        floats <= 5 are GPA, 700-1600 ints are SAT, 15-36 ints are ACT.
+        Explicit labels in the text win over ranges."""
+        import re as _re
+        s = acad or ''
+        items = []
+        for m in _re.finditer(r'\d+(?:\.\d+)?', s):
+            v = m.group()
+            try:
+                fv = float(v)
+            except ValueError:
+                continue
+            # label immediately AFTER the number wins ("1260 SAT"), then
+            # immediately before ("GPA 4.0") -- a wide window grabbed the
+            # NEIGHBORING value's label on real input ("...GPA 1260 SAT...")
+            after = s[m.end():m.end()+6].upper()
+            before = s[max(0, m.start()-6):m.start()].upper()
+            label = next((l for l in ('GPA', 'SAT', 'ACT') if l in after), None) \
+                or next((l for l in ('GPA', 'SAT', 'ACT') if l in before), None)
+            if not label:  # unlabeled: classify by value range
+                if '.' in v and fv <= 5:
+                    label = 'GPA'
+                elif v.isdigit() and 700 <= fv <= 1600:
+                    label = 'SAT'
+                elif v.isdigit() and 15 <= fv <= 36:
+                    label = 'ACT'
+            if label:
+                items.append((v, label))
+        seen = set()
+        return [(v, l) for v, l in items
+                if l not in seen and not seen.add(l)]
+
+    _AR_W = [0.0]  # acad/rank column chip width, resolved after widths
+
+    def _acad_rank_cell(p, c):
+        flows = []
+        chips = _acad_chip_items(c['acad'])
+        if chips:
+            flows.append(MeasChips(chips, _AR_W[0]))
+        elif c['acad']:
+            flows.append(Paragraph(_esc(c['acad']), sAcad))
+        if c['pbr_str']:
+            # ranks read as one wrapped line ("#296 Nat'l · #24 MA · #220 PG")
+            flows.append(Paragraph(_esc(c['pbr_str'].replace('\n', ' · ')), sRank))
+        return flows or Paragraph('', sAcad)
+
+    def _commit_block(c):
+        """The sketch's right-edge NOTES block: COMMITTED / school logo /
+        date. Logo resolved via college_logos (None -> text fallback)."""
+        import college_logos
+        flows = [Paragraph('COMMITTED', sCmtTag)]
+        lp = college_logos.logo_path(c['commit'])
+        if lp:
+            from reportlab.platypus import Image as RLImage
+            flows.append(RLImage(lp, width=0.30*inch, height=0.30*inch))
+        else:
+            flows.append(Paragraph(_esc(c['commit']), sCmtSchool))
+        if c['commit_date']:
+            flows.append(Paragraph(_esc(c['commit_date']), sCmtDate))
+        return flows
+
     def _notes_cell(p, c):
         jlabel = f"#{c['j']} " if c['j'] else ''
         gy = f"'{c['yr'][-2:]}" if c['yr'] else ''
         nl_extra = ' '.join(x for x in (gy, c['pos'], c['state']) if x)
-        label = _esc(f"{jlabel}{c['first']} {c['last']}" +
-                     (f' {nl_extra}' if nl_extra else ''))
-        if c['commit']:
-            label += (f'<br/><font color="#111111"><b>COMMITTED: '
-                      f'{_esc(c["commit"])}</b></font>')
-        return Paragraph(label, sNL)
+        label = Paragraph(_esc(f"{jlabel}{c['first']} {c['last']}" +
+                               (f' {nl_extra}' if nl_extra else '')), sNL)
+        if not c['commit']:
+            return label
+        block_w = 0.62 * inch
+        t = Table([[label, _commit_block(c)]],
+                  colWidths=[NOTES_W - 7 - block_w, block_w],
+                  rowHeights=[ROW_H - 4])
+        t.setStyle(TableStyle([
+            ('VALIGN', (0,0), (0,0), 'TOP'), ('VALIGN', (1,0), (1,0), 'MIDDLE'),
+            ('ALIGN', (1,0), (1,0), 'CENTER'),
+            ('LEFTPADDING', (0,0), (-1,-1), 0), ('RIGHTPADDING', (0,0), (-1,-1), 0),
+            ('TOPPADDING', (0,0), (-1,-1), 0), ('BOTTOMPADDING', (0,0), (-1,-1), 0),
+        ]))
+        return t
 
     # ---- Column registry -------------------------------------------------
     # The customization surface: a preset is just an ordered list of keys.
@@ -1102,14 +1221,15 @@ def build_pdf(json_path, out_path, raw_sheet_text="", proof_only=False,
             _esc(c['sch']) +
             (f"<br/><font color=#555555>{_esc(c['hometown'])}</font>" if c['hometown'] else ''),
             sSchl)),
-        'meas':   dict(hdr='Measurables', wt=2.4,
+        'meas':   dict(hdr='Measurables', wt=2.3,
                        cell=lambda p, c: MeasChips(c['meas'], _MEAS_W[0])),
-        'acad_rank': dict(hdr='Acad / Rank', wt=1.5, cell=lambda p, c: Paragraph(
-            '<br/>'.join(x for x in (_esc(c['acad']), _esc(c['pbr_str']).replace('\n', '<br/>')) if x),
-            sAcad)),
-        'cur':    dict(hdr='Cur *', wt=0.7,
+        'acad_rank': dict(hdr='Acad / Rank', wt=2.0, cell=_acad_rank_cell),
+        # real star icon under the label (vector StarGlyph) -- Chris liked
+        # the old Sheets look where Cur and New matched, star below the word
+        'cur':    dict(hdr='Cur', hdr_star=True, wt=0.7,
                        cell=lambda p, c: Paragraph(c['cur'], sStarHL if c['db'] else sCell)),
-        'new':    dict(hdr='New *', wt=0.7, cell=lambda p, c: Paragraph('', sCell)),
+        'new':    dict(hdr='New', hdr_star=True, wt=0.7,
+                       cell=lambda p, c: Paragraph('', sCell)),
         'notes':  dict(hdr='NOTES', w=NOTES_W, cell=_notes_cell),
         # classic (pre-2026-07-02) columns, still available as a preset
         'pos':    dict(hdr='Pos',   wt=1.0, cell=lambda p, c: Paragraph(_esc(c['pos']), sCell)),
@@ -1145,13 +1265,18 @@ def build_pdf(json_path, out_path, raw_sheet_text="", proof_only=False,
     CW = [c['w'] if 'w' in c else c['wt'] * unit for c in cols]
     if 'meas' in col_keys:
         _MEAS_W[0] = CW[col_keys.index('meas')] - 6  # minus cell padding
+    if 'acad_rank' in col_keys:
+        _AR_W[0] = CW[col_keys.index('acad_rank')] - 6
     HEADERS = [c['hdr'] for c in cols]
     ROW_H    = 0.46*inch
     HDR_H    = 0.26*inch
 
     def hdr_row():
-        return [Paragraph(c['hdr'], sHdrSm if c.get('hdr_small') else sHdr)
-                for c in cols]
+        out = []
+        for c in cols:
+            para = Paragraph(c['hdr'], sHdrSm if c.get('hdr_small') else sHdr)
+            out.append([para, StarGlyph()] if c.get('hdr_star') else para)
+        return out
 
     def data_row(p):
         ctx = _row_ctx(p)
