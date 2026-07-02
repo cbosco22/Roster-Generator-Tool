@@ -68,20 +68,26 @@ def _norm(name):
     return re.sub(r"\s+", " ", (name or "").strip().lower())
 
 
-def search_pbr(session, name, grad_year=None, state=None, school=None):
+def search_pbr(session, name, school=None):
     """
     POST the site's own "Find a Player" form. Returns a list of candidate
     rows: {"name", "state", "school", "class", "position", "commit", "profile_path"}.
+
+    Deliberately does NOT filter by state or grad year server-side, even
+    though the form supports both: a player's PBR class/state often
+    disagrees with what a roster/schedule source says (reclassification is
+    common in travel ball -- found live 2026-07-01, e.g. a kid listed as
+    2029 on a roster had a real, correct PBR profile filed under 2027).
+    Filtering server-side on a mismatched value silently returns zero
+    results before resolve_profile() ever gets a chance to cross-validate.
+    State/grad year are applied as *soft* scoring signals client-side in
+    resolve_profile() instead.
     """
     # player_position must always be present in the POST (even as "#") or the
     # site's search silently returns zero results -- found by diffing a real
     # browser submission against this script's request 2026-07-01.
     data = {"player_name": name, "player_state": "#", "player_class": "#",
             "player_school": "", "player_position": "#"}
-    if state and state.upper() in STATE_CODES:
-        data["player_state"] = str(STATE_CODES[state.upper()])
-    if grad_year:
-        data["player_class"] = str(grad_year)
     if school:
         data["player_school"] = school
 
@@ -110,32 +116,50 @@ def search_pbr(session, name, grad_year=None, state=None, school=None):
 
 def resolve_profile(session, name, grad_year=None, state=None, school=None):
     """
-    Cross-validates candidates the same way _pbr_match() does in
-    gen_roster_pdf.py: grad year + state must agree with what we already
-    know about the player, to avoid the "John Smith problem".
+    Scores candidates by grad year + state agreement (same intent as
+    _pbr_match() in gen_roster_pdf.py -- avoid the "John Smith problem")
+    but as a *soft* ranking signal, not a hard requirement: unlike
+    gen_roster_pdf.py's lookup (which only ever checks a value already
+    known to be correct), here the grad_year/state we're cross-checking
+    against comes from a roster/schedule source that can itself disagree
+    with PBR's own records (see search_pbr()'s docstring). A player who
+    scores 0 (no grad_year/state match, or none provided) can still be the
+    right, unique match -- so a unique exact-name hit is still returned,
+    just flagged with a weaker reason string.
     Returns (profile_path, reason) -- profile_path is None on failure.
     """
-    candidates = search_pbr(session, name, grad_year=grad_year, state=state, school=school)
+    candidates = search_pbr(session, name, school=school)
     if not candidates:
         return None, "no_results"
 
     target = _norm(name)
     exact = [c for c in candidates if _norm(c["name"]) == target]
     pool = exact or candidates
+    if not pool:
+        return None, "no_results"
 
-    def _valid(c):
-        yr_ok = (not grad_year) or (str(c["class"]) == str(grad_year))
-        st_ok = (not state) or (c["state"].upper() == state.upper())
-        return yr_ok and st_ok
+    def score(c):
+        s = 0
+        if grad_year and str(c["class"]) == str(grad_year):
+            s += 2
+        if state and c["state"].upper() == (state or "").upper():
+            s += 1
+        return s
 
-    valid = [c for c in pool if _valid(c)]
-    if len(valid) == 1:
-        return valid[0]["profile_path"], "matched"
-    if len(valid) > 1:
-        return valid[0]["profile_path"], "ambiguous_took_first"
-    if len(pool) == 1 and not (grad_year or state):
-        return pool[0]["profile_path"], "matched_no_context"
-    return None, "no_confident_match"
+    ranked = sorted(pool, key=score, reverse=True)
+    best_score = score(ranked[0])
+    tied = [c for c in ranked if score(c) == best_score]
+    if len(tied) > 1:
+        return ranked[0]["profile_path"], "ambiguous_took_first"
+
+    max_possible = (2 if grad_year else 0) + (1 if state else 0)
+    if max_possible and best_score == max_possible:
+        reason = "matched"
+    elif best_score > 0:
+        reason = "matched_partial"
+    else:
+        reason = "matched_name_only"
+    return ranked[0]["profile_path"], reason
 
 
 def fetch_profile(session, profile_path):
