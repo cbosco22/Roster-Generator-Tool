@@ -145,22 +145,24 @@ def crawl_lookup(name, team=None, grad_year=None):
 
 
 class MeasChips(Flowable):
-    """Stat pills: rounded chips, bold value + tiny unit label, wrapping to
-    fit the column. Outline-only style per Chris 2026-07-02 ("black text
-    with no background and just a gray little border around the pill" —
-    replaced the original green fill). Renders nothing (zero height) when
-    there are no items. Also used for academics (GPA/SAT/ACT)."""
-    CHIP_H = 9.5
+    """Stat pills: rounded chips, value + tiny unit label, wrapping to fit
+    the column. Style per Chris's two review rounds (2026-07-02): outline
+    only, NO fill at all (transparent, so gray alternating rows show
+    through), unbolded values, small — the data should blend into the row,
+    not jump off the page. Renders nothing (zero height) when there are no
+    items. Also used for academics (GPA/SAT/ACT)."""
+    CHIP_H = 8.5
     GAP = 1.5
-    FILL = colors.white
     EDGE = colors.HexColor('#AAAAAA')
     TXT = colors.HexColor('#111111')
     LBL = colors.HexColor('#777777')
+    VAL_FONT = ('Helvetica', 5.5)
+    LBL_FONT = ('Helvetica', 3.5)
 
     def _chip_w(self, value, label):
         from reportlab.pdfbase.pdfmetrics import stringWidth
-        return stringWidth(value, 'Helvetica-Bold', 6) + \
-            stringWidth(' ' + label, 'Helvetica', 4) + 5
+        return stringWidth(value, *self.VAL_FONT) + \
+            stringWidth(label, *self.LBL_FONT) + 6
 
     def _layout(self):
         rows, cur, cur_w = [], [], 0.0
@@ -207,19 +209,18 @@ class MeasChips(Flowable):
             row_w = sum(w for _, _, w in row) + self.GAP * (len(row) - 1)
             x = (self.max_w - row_w) / 2.0  # center each pill row in the cell
             for value, label, w in row:
-                c.setFillColor(self.FILL)
                 c.setStrokeColor(self.EDGE)
                 c.setLineWidth(0.5)
-                c.roundRect(x, y, w, self.CHIP_H, 2.5, stroke=1, fill=1)
+                c.roundRect(x, y, w, self.CHIP_H, 2.5, stroke=1, fill=0)
                 c.setFillColor(self.TXT)
-                c.setFont('Helvetica-Bold', 6)
+                c.setFont(*self.VAL_FONT)
                 tx = x + 2.5
-                c.drawString(tx, y + 2.6, value)
+                c.drawString(tx, y + 2.4, value)
                 from reportlab.pdfbase.pdfmetrics import stringWidth
                 c.setFillColor(self.LBL)
-                c.setFont('Helvetica', 4)
-                c.drawString(tx + stringWidth(value, 'Helvetica-Bold', 6) + 1,
-                             y + 2.6, label)
+                c.setFont(*self.LBL_FONT)
+                c.drawString(tx + stringWidth(value, *self.VAL_FONT) + 1,
+                             y + 2.4, label)
                 x += w + self.GAP
             y -= self.CHIP_H + self.GAP
 
@@ -1031,7 +1032,9 @@ def build_pdf(json_path, out_path, raw_sheet_text="", proof_only=False,
         topMargin=0.50*inch, bottomMargin=0.30*inch,
     )
     W = doc.width
-    NOTES_W = 2.50 * inch
+    # 2.50 -> 2.40 (2026-07-02): the 0.10" moved to the Acad column so all
+    # three GPA/SAT/ACT chips fit two pill rows instead of dropping the ACT
+    NOTES_W = 2.40 * inch
 
     sTeam   = ParagraphStyle('TM', fontName='Helvetica-Bold', fontSize=20,
                               textColor=TEXT_DARK, alignment=TA_CENTER, spaceBefore=4, spaceAfter=16)
@@ -1064,14 +1067,16 @@ def build_pdf(json_path, out_path, raw_sheet_text="", proof_only=False,
                            textColor=TEXT_DARK, alignment=TA_CENTER, leading=5.5)
     sSt   = ParagraphStyle('ST', fontName='Helvetica', fontSize=6,
                            textColor=TEXT_DARK, alignment=TA_CENTER, leading=7)
-    sRank = ParagraphStyle('RK', fontName='Helvetica-Bold', fontSize=5.5,
-                           textColor=TEXT_DARK, alignment=TA_CENTER, leading=6.5)
-    sCmtTag = ParagraphStyle('CT', fontName='Helvetica-Bold', fontSize=4.5,
-                             textColor=TEXT_MED, alignment=TA_CENTER, leading=5.5)
+    # rank stands out on its own (Chris: "I like when the ranking stands
+    # out", split back from the combined Acad/Rank column 2026-07-02)
+    sRank = ParagraphStyle('RK', fontName='Helvetica-Bold', fontSize=7,
+                           textColor=TEXT_DARK, alignment=TA_CENTER, leading=8.5)
+    sCmtTag = ParagraphStyle('CT', fontName='Helvetica-Bold', fontSize=3.6,
+                             textColor=TEXT_MED, alignment=TA_CENTER, leading=4.6)
     sCmtSchool = ParagraphStyle('CS', fontName='Helvetica-Bold', fontSize=6.5,
                                 textColor=TEXT_DARK, alignment=TA_CENTER, leading=7.5)
-    sCmtDate = ParagraphStyle('CD', fontName='Helvetica', fontSize=4.5,
-                              textColor=TEXT_MED, alignment=TA_CENTER, leading=5.5)
+    sCmtDate = ParagraphStyle('CD', fontName='Helvetica', fontSize=3.6,
+                              textColor=TEXT_MED, alignment=TA_CENTER, leading=4.6)
 
     def _esc(s):
         return (str(s or '').replace('&', '&amp;').replace('<', '&lt;')
@@ -1148,19 +1153,16 @@ def build_pdf(json_path, out_path, raw_sheet_text="", proof_only=False,
         return [(v, l) for v, l in items
                 if l not in seen and not seen.add(l)]
 
-    _AR_W = [0.0]  # acad/rank column chip width, resolved after widths
+    _AR_W = [0.0]  # acad column chip width, resolved after widths
 
-    def _acad_rank_cell(p, c):
-        flows = []
+    def _acad_cell(p, c):
         chips = _acad_chip_items(c['acad'])
         if chips:
-            flows.append(MeasChips(chips, _AR_W[0]))
-        elif c['acad']:
-            flows.append(Paragraph(_esc(c['acad']), sAcad))
-        if c['pbr_str']:
-            # ranks read as one wrapped line ("#296 Nat'l · #24 MA · #220 PG")
-            flows.append(Paragraph(_esc(c['pbr_str'].replace('\n', ' · ')), sRank))
-        return flows or Paragraph('', sAcad)
+            return MeasChips(chips, _AR_W[0])
+        return Paragraph(_esc(c['acad']), sAcad)
+
+    def _rank_cell(p, c):
+        return Paragraph(_esc(c['pbr_str']).replace('\n', '<br/>'), sRank)
 
     def _commit_block(c):
         """The sketch's right-edge NOTES block: COMMITTED / school logo /
@@ -1170,7 +1172,7 @@ def build_pdf(json_path, out_path, raw_sheet_text="", proof_only=False,
         lp = college_logos.logo_path(c['commit'])
         if lp:
             from reportlab.platypus import Image as RLImage
-            flows.append(RLImage(lp, width=0.30*inch, height=0.30*inch))
+            flows.append(RLImage(lp, width=0.34*inch, height=0.34*inch))
         else:
             flows.append(Paragraph(_esc(c['commit']), sCmtSchool))
         if c['commit_date']:
@@ -1212,18 +1214,19 @@ def build_pdf(json_path, out_path, raw_sheet_text="", proof_only=False,
             f"<b>{_esc('UTL' if c['pos'].strip().upper() == 'UTILITY' else c['pos'])}</b>" +
             (f"<br/><font size=5 color=#555555>{_esc(c['bt'])}</font>" if c['bt'] else ''),
             sCell)),
-        'class_htwt': dict(hdr='Class', wt=1.1, cell=lambda p, c: Paragraph(
+        'class_htwt': dict(hdr='Class', wt=1.3, cell=lambda p, c: Paragraph(
             f"<b>{_esc(c['yr'])}</b>" +
-            (f"<br/><font size=5.5>{_esc(' · '.join(x for x in (c['ht'], c['wt']) if x))}</font>"
+            (f"<br/><font size=5.5>{_esc('·'.join(x for x in (c['ht'], c['wt']) if x))}</font>"
              if (c['ht'] or c['wt']) else ''),
             sCell)),
-        'school': dict(hdr='School', wt=1.9, cell=lambda p, c: Paragraph(
+        'school': dict(hdr='School', wt=1.6, cell=lambda p, c: Paragraph(
             _esc(c['sch']) +
             (f"<br/><font color=#555555>{_esc(c['hometown'])}</font>" if c['hometown'] else ''),
             sSchl)),
-        'meas':   dict(hdr='Measurables', wt=2.3,
+        'meas':   dict(hdr='Measurables', wt=1.9,
                        cell=lambda p, c: MeasChips(c['meas'], _MEAS_W[0])),
-        'acad_rank': dict(hdr='Acad / Rank', wt=2.0, cell=_acad_rank_cell),
+        'acad_chips': dict(hdr='Acad', wt=2.0, cell=_acad_cell),
+        'rank':   dict(hdr='Rank', wt=1.3, cell=_rank_cell),
         # real star icon under the label (vector StarGlyph) -- Chris liked
         # the old Sheets look where Cur and New matched, star below the word
         'cur':    dict(hdr='Cur', hdr_star=True, wt=0.7,
@@ -1247,7 +1250,7 @@ def build_pdf(json_path, out_path, raw_sheet_text="", proof_only=False,
     }
     PRESETS = {
         'navy':    ['num', 'first', 'last', 'pos_bt', 'class_htwt', 'school',
-                    'meas', 'acad_rank', 'cur', 'new', 'notes'],
+                    'meas', 'acad_chips', 'rank', 'cur', 'new', 'notes'],
         'classic': ['num', 'first', 'last', 'pos', 'ht', 'wt_col', 'class',
                     'school_only', 'st', 'cur', 'new', 'pbr_rank', 'commit',
                     'acad', 'notes_classic'],
@@ -1265,8 +1268,8 @@ def build_pdf(json_path, out_path, raw_sheet_text="", proof_only=False,
     CW = [c['w'] if 'w' in c else c['wt'] * unit for c in cols]
     if 'meas' in col_keys:
         _MEAS_W[0] = CW[col_keys.index('meas')] - 6  # minus cell padding
-    if 'acad_rank' in col_keys:
-        _AR_W[0] = CW[col_keys.index('acad_rank')] - 6
+    if 'acad_chips' in col_keys:
+        _AR_W[0] = CW[col_keys.index('acad_chips')] - 6
     HEADERS = [c['hdr'] for c in cols]
     ROW_H    = 0.46*inch
     HDR_H    = 0.26*inch

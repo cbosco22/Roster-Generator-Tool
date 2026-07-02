@@ -2,10 +2,13 @@
 PNG on disk, for the roster PDF's COMMITTED block (Chris's sketch shows a
 big school logo next to "COMMITTED" at the right edge of NOTES).
 
-Source: ESPN's public college-football team API (largest school list with
-logos in one call). The team list is cached to data/college_logos/teams.json
-and each downloaded logo to data/college_logos/<id>.png, so PDF builds are
-offline-safe after first use. No match -> None, caller falls back to text.
+Source: ESPN's public team APIs — college BASEBALL first (437 teams, i.e.
+every D1 baseball program: the actual commit universe, incl. baseball-only
+schools like Dallas Baptist that the football list lacks), college football
+second for anything else. Team lists are cached to
+data/college_logos/teams.json and each downloaded logo to
+data/college_logos/<league>_<id>.png, so PDF builds are offline-safe after
+first use. No match -> None, caller falls back to text.
 """
 import json
 import os
@@ -15,8 +18,12 @@ import requests
 
 _DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                     'data', 'college_logos')
-_TEAMS_URL = ('https://site.api.espn.com/apis/site/v2/sports/football/'
-              'college-football/teams?limit=1000')
+_TEAMS_URLS = [
+    ('bb', 'https://site.api.espn.com/apis/site/v2/sports/baseball/'
+           'college-baseball/teams?limit=1000'),
+    ('fb', 'https://site.api.espn.com/apis/site/v2/sports/football/'
+           'college-football/teams?limit=1000'),
+]
 _teams_cache = None
 
 
@@ -36,22 +43,29 @@ def _load_teams():
         with open(cache) as f:
             _teams_cache = json.load(f)
         return _teams_cache
-    r = requests.get(_TEAMS_URL, timeout=20)
-    r.raise_for_status()
     teams = []
-    for entry in r.json()['sports'][0]['leagues'][0]['teams']:
-        t = entry['team']
-        logos = t.get('logos') or []
-        if not logos:
-            continue
-        teams.append({
-            'id': t['id'],
-            'names': sorted({n for n in [
+    seen_names = set()
+    for league, url in _TEAMS_URLS:  # baseball first: it wins duplicates
+        r = requests.get(url, timeout=20)
+        r.raise_for_status()
+        for entry in r.json()['sports'][0]['leagues'][0]['teams']:
+            t = entry['team']
+            logos = t.get('logos') or []
+            names = sorted({n for n in [
                 t.get('displayName'), t.get('shortDisplayName'),
                 t.get('name'), t.get('nickname'), t.get('location'),
-                t.get('abbreviation')] if n}),
-            'logo': logos[0]['href'],
-        })
+                t.get('abbreviation')] if n})
+            if not logos or not names:
+                continue
+            key = _norm(names[0])
+            if key in seen_names:
+                continue
+            seen_names.add(key)
+            teams.append({
+                'id': f"{league}_{t['id']}",
+                'names': names,
+                'logo': logos[0]['href'],
+            })
     with open(cache, 'w') as f:
         json.dump(teams, f)
     _teams_cache = teams
