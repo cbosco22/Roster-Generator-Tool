@@ -35,8 +35,14 @@ SUPABASE_URL = os.environ.get("SUPABASE_URL", "https://bcdoidnfbrsfeulyhwhi.supa
 SUPABASE_ANON_KEY = os.environ.get("SUPABASE_ANON_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJjZG9pZG5mYnJzZmV1bHlod2hpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI3NzM2OTEsImV4cCI6MjA5ODM0OTY5MX0.aXLapvAxINhebAjiKY9wTYka9XxoJn827T5-CaiBPbc")  # <-- paste anon public key
 
 
-def push_event(name, csv_text, supabase_url=None, anon_key=None, timeout=30):
-    """Create or update an event by name. Returns {'action','id','name'}."""
+def push_event(name, csv_text, roster_json=None, supabase_url=None, anon_key=None, timeout=30):
+    """Create or update an event by name. Returns {'action','id','name'}.
+
+    roster_json: optional JSON text of the event's full team rosters
+    ({"teams":[{"name","players":[...]}]}). Stored on the event row so the
+    Event Day app can cross-reference every roster against the LIVE
+    recruiting board (kids added to the board mid-event light up on their
+    team without a CSV rebuild). Omitted -> any existing roster is kept."""
     url = (supabase_url or SUPABASE_URL).rstrip("/")
     key = anon_key or SUPABASE_ANON_KEY
     if not key:
@@ -69,24 +75,27 @@ def push_event(name, csv_text, supabase_url=None, anon_key=None, timeout=30):
     write_headers = {**headers, "Prefer": "return=representation"}
 
     # 2) Update in place if it exists, otherwise create it.
-    if existing:
-        event_id = existing[0]["id"]
-        r = requests.patch(
-            endpoint,
-            headers=write_headers,
-            params={"id": f"eq.{event_id}"},
-            json={"csv": csv_text},
-            timeout=timeout,
-        )
-        action = "updated"
-    else:
-        r = requests.post(
-            endpoint,
-            headers=write_headers,
-            json={"name": name, "csv": csv_text},
-            timeout=timeout,
-        )
-        action = "created"
+    # The roster column may not exist yet (its ALTER in supabase/schema.sql
+    # hasn't been run) - never let that break the schedule push itself:
+    # retry once without roster and report the miss instead of raising.
+    roster_skipped = False
+
+    def _write(body):
+        if existing:
+            return requests.patch(endpoint, headers=write_headers,
+                                  params={"id": f"eq.{existing[0]['id']}"},
+                                  json=body, timeout=timeout)
+        return requests.post(endpoint, headers=write_headers,
+                             json={"name": name, **body}, timeout=timeout)
+
+    body = {"csv": csv_text}
+    if roster_json is not None:
+        body["roster"] = roster_json
+    r = _write(body)
+    if not r.ok and roster_json is not None and "roster" in r.text:
+        roster_skipped = True
+        r = _write({"csv": csv_text})
+    action = "updated" if existing else "created"
 
     if not r.ok:
         raise RuntimeError(f"Push failed ({r.status_code}): {r.text}")
@@ -94,7 +103,13 @@ def push_event(name, csv_text, supabase_url=None, anon_key=None, timeout=30):
     row = r.json()
     if isinstance(row, list):
         row = row[0] if row else {}
-    return {"action": action, "id": row.get("id"), "name": name}
+    out = {"action": action, "id": row.get("id"), "name": name}
+    if roster_skipped:
+        out["roster_skipped"] = ("events.roster column missing - run the "
+                                 "ALTER line at the bottom of "
+                                 "supabase/schema.sql in the Supabase SQL "
+                                 "editor to enable live board cross-reference")
+    return out
 
 
 def fetch_event_csv(name, supabase_url=None, anon_key=None, timeout=30):

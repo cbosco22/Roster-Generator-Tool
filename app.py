@@ -702,16 +702,30 @@ with tab_tourney:
                 st.session_state["tb_csvname"] = (os.path.basename(csv_path)
                                                   if csv_path else None)
                 tstatus.update(label="Done", state="complete")
-                # Auto-push schedule to Event Day app
+                # Auto-push schedule to Event Day app, with the full roster
+                # JSON alongside so the app can cross-reference every team
+                # against the LIVE board (mid-event adds light up without a
+                # CSV rebuild). Multiple roster files merge into one team list.
                 if _HAVE_PUSH and (tb_event or "").strip() and st.session_state.get("tb_csv"):
                     try:
+                        _roster_json = None
+                        try:
+                            _teams = []
+                            for _rp in roster_paths:
+                                _teams.extend(json.loads(Path(_rp).read_text()).get("teams", []))
+                            if _teams:
+                                _roster_json = json.dumps({"teams": _teams})
+                        except Exception:
+                            _roster_json = None  # roster is a bonus, never block the push
                         _r = _push_event(
                             (tb_event or "").strip(),
                             st.session_state["tb_csv"],
+                            roster_json=_roster_json,
                         )
                         st.session_state["tb_push_status"] = (
                             "✅ Pushed to Event Day",
-                            f"**{_r['name']}** — {_r['action']} live for all coaches.",
+                            f"**{_r['name']}** — {_r['action']} live for all coaches."
+                            + (f"\n\n⚠️ {_r['roster_skipped']}" if _r.get("roster_skipped") else ""),
                         )
                     except Exception as _pe:
                         st.session_state["tb_push_status"] = (
