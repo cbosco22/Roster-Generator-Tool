@@ -1104,10 +1104,10 @@ with tab_post:
                                 st.error(
                                     f"Write stopped at player {done + 1} of {len(ops)}: "
                                     f"{real.get('error')}\n\n"
-                                    f"**The first {done} player(s) WERE written and "
-                                    f"verified.** Do not blindly re-click — remove the "
-                                    f"already-written rows from the tables above first, "
-                                    f"or you will double-add them.")
+                                    f"**Safe to just click Write again** — players "
+                                    f"already written are recognized and skipped "
+                                    f"automatically, so a retry can never double-add "
+                                    f"anyone.")
                         with st.expander("🔍 What was sent (debug)"):
                             st.write("Resolved columns for this write:")
                             st.json(cols)

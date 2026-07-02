@@ -51,6 +51,12 @@ function doPost(e) {
 
     var ops = body.ops || [];
     var results = [];
+    // Idempotency (2026-07-02, "the guarantee"): each op carries a content
+    // hash (op_id). Applied op_ids are remembered for 6h - a retried or
+    // re-imported op that already ran is SKIPPED, so clients may retry any
+    // failure blindly without double-appending players. A genuinely edited
+    // op (e.g. corrected rating) hashes differently and still applies.
+    var cache = CacheService.getScriptCache();
     // Find the last data row ONCE per request and count appends forward
     // from there. The old per-append scan re-read the whole ~4,700-row
     // name column for every appended player - with a 75-player post-event
@@ -58,7 +64,15 @@ function doPost(e) {
     var appendCursor = { next: _findLastDataRow(sheet, firstNameCol) + 1 };
     if (appendCursor.next < DATA_START_ROW) appendCursor.next = DATA_START_ROW;
     for (var i = 0; i < ops.length; i++) {
-      results.push(_applyOp(sheet, ops[i], dryRun, firstNameCol, appendCursor));
+      var op = ops[i];
+      var ckey = op.op_id ? ('op_' + op.op_id) : null;
+      if (ckey && !dryRun && cache.get(ckey)) {
+        results.push({ action: op.action, ok: true, skipped_duplicate: true });
+        continue;
+      }
+      var res = _applyOp(sheet, op, dryRun, firstNameCol, appendCursor);
+      if (res.ok && ckey && !dryRun) cache.put(ckey, '1', 21600);
+      results.push(res);
     }
     var allOk = results.every(function(r) { return r.ok; });
     return _json({ ok: allOk, dryRun: dryRun, results: results });

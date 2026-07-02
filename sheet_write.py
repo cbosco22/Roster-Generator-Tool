@@ -206,6 +206,17 @@ def build_note_update_op(existing, cols, note_text):
             'fields': {cols['notes']: new_notes}, 'player': existing['canonical_name']}
 
 
+def _op_id(op):
+    """Content hash for server-side idempotency: identical op resent (retry,
+    re-import after a failure) -> skipped by Code.gs; an EDITED op (e.g. a
+    corrected rating) hashes differently and still applies."""
+    import hashlib
+    import json as _json
+    payload = _json.dumps({k: op.get(k) for k in ('action', 'player', 'row', 'fields')},
+                          sort_keys=True, default=str)
+    return hashlib.sha1(payload.encode()).hexdigest()
+
+
 def post_ops_chunked(ops, url, token, dry_run=True, chunk_size=10,
                      timeout=120, progress=None):
     """post_ops for big batches (post-event writes 100+ players at once).
@@ -224,6 +235,8 @@ def post_ops_chunked(ops, url, token, dry_run=True, chunk_size=10,
     the first failed chunk (results has everything up to and incl. it).
     """
     import time as _t
+    for op in ops:
+        op.setdefault('op_id', _op_id(op))
     all_results = []
     total = len(ops)
     for start in range(0, total, chunk_size):
@@ -232,8 +245,10 @@ def post_ops_chunked(ops, url, token, dry_run=True, chunk_size=10,
                            # flaky response-echo redirect (404 seen live)
         chunk = ops[start:start + chunk_size]
         try:
+            # retries are safe on real writes too now: every op carries an
+            # op_id and Code.gs skips ones it already applied (2026-07-02)
             r = post_ops(chunk, url, token, dry_run=dry_run, timeout=timeout,
-                         retries=2 if dry_run else 0)
+                         retries=2)
         except Exception as e:
             return {'ok': False, 'results': all_results,
                     'error': f'{type(e).__name__}: {e}', 'failed_at': start,
