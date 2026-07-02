@@ -34,9 +34,10 @@ def _bar_color(minutes):
     return colors.HexColor('#C62828')
 
 
-def draw_venue_page(c, event_name, hub, venues, W=None, H=None):
+def draw_venue_page(c, event_name, hub, venues, W=None, H=None, map_img=None):
     """Draw the venue page on an open reportlab canvas (one full page,
-    caller does showPage)."""
+    caller does showPage). map_img: optional PIL image (venue_map.py) drawn
+    between the header and the table — pin numbers match table rows."""
     if W is None or H is None:
         W, H = letter
     M = 0.55 * inch
@@ -57,6 +58,18 @@ def draw_venue_page(c, event_name, hub, venues, W=None, H=None):
     vs = sorted(venues, key=lambda v: v.get('drive_min', 999))
     max_min = max((v.get('drive_min', 0) for v in vs), default=1) or 1
 
+    map_h = 0.0
+    if map_img is not None:
+        # shorter map when the venue list is long, so page one stays page one
+        map_h = (3.1 if len(vs) <= 11 else 2.4) * inch
+        map_w = W - 2 * M
+        from reportlab.lib.utils import ImageReader
+        c.drawImage(ImageReader(map_img), M, H - 1.38 * inch - map_h,
+                    width=map_w, height=map_h, preserveAspectRatio=False)
+        c.setStrokeColor(LINE_LITE)
+        c.setLineWidth(0.8)
+        c.rect(M, H - 1.38 * inch - map_h, map_w, map_h, stroke=1, fill=0)
+
     # column layout
     x_num, x_venue, x_city, x_addr = M, M + 0.32 * inch, M + 2.55 * inch, M + 3.85 * inch
     x_bar = W - M - 2.05 * inch
@@ -64,7 +77,7 @@ def draw_venue_page(c, event_name, hub, venues, W=None, H=None):
     x_time = W - M
 
     # table header
-    y = H - 1.62 * inch
+    y = H - 1.62 * inch - (map_h + 0.24 * inch if map_h else 0)
     c.setFillColor(TEXT_MED)
     c.setFont('Helvetica-Bold', 8)
     for x, label in [(x_num, '#'), (x_venue, 'VENUE'), (x_city, 'CITY'),
@@ -74,7 +87,7 @@ def draw_venue_page(c, event_name, hub, venues, W=None, H=None):
     c.setLineWidth(0.6)
     c.line(M, y - 5, W - M, y - 5)
 
-    row_h = 0.42 * inch
+    row_h = (0.42 if len(vs) <= 12 else 0.34) * inch  # long lists compress
     y -= row_h
     for i, v in enumerate(vs):
         if i % 2 == 0:
