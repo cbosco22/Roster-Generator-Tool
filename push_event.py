@@ -61,11 +61,14 @@ def push_event(name, csv_text, roster_json=None, supabase_url=None, anon_key=Non
     endpoint = f"{url}/rest/v1/events"
 
     # 1) Look for an existing event with this exact name.
-    #    Quoting the value keeps names with spaces/commas/apostrophes safe.
+    # NO embedded quotes: PostgREST's quoted-literal parsing broke on names
+    # containing "/" (a real event name with dates, 2026-07-02) - the lookup
+    # silently returned 0 rows, so pushes re-CREATED the event instead of
+    # updating it. requests URL-encodes spaces/slashes fine unquoted.
     r = requests.get(
         endpoint,
         headers=headers,
-        params={"name": f'eq."{name}"', "select": "id"},
+        params={"name": "eq." + name, "select": "id"},
         timeout=timeout,
     )
     if not r.ok:
@@ -128,7 +131,7 @@ def fetch_event_csv(name, supabase_url=None, anon_key=None, timeout=30):
     r = requests.get(
         f"{url}/rest/v1/events",
         headers=headers,
-        params={"name": f'eq."{name}"', "select": "id,csv"},
+        params={"name": "eq." + name, "select": "id,csv"},
         timeout=timeout,
     )
     if not r.ok:
