@@ -117,6 +117,28 @@ def scrape_team(session, team_url, team_name=""):
     return {"name": team_name, "url": team_url, "players": players}
 
 
+def scrape_team_divisions(event_url):
+    """Light pass over the /teams accordion only: {team name: division}.
+    For patching an already-scraped event's divisions without re-pulling
+    every roster page."""
+    session = requests.Session()
+    teams_url, _, _ = _event_teams_url(event_url)
+    soup = BeautifulSoup(_get(session, teams_url), "html.parser")
+    divs = {}
+    for panel in soup.select('#teamsAccordion > div.panel'):
+        head = panel.select_one('.panel-heading')
+        heading = _clean(head.get_text(' ')) if head else ''
+        m = re.search(r'\b(\d{1,2}U)\b', heading)
+        division = m.group(1) if m else ''
+        if not division:
+            continue
+        for a in panel.select('a[href*="/team/details/"]'):
+            name = _clean(a.get_text(" "))
+            if name:
+                divs[name] = division
+    return divs
+
+
 def scrape_event(event_url, log=print):
     session = requests.Session()
     teams_url, base_url, host = _event_teams_url(event_url)
@@ -131,22 +153,56 @@ def scrape_event(event_url, log=print):
     event_name = _clean((title.get_text() if title else "")
                         .split(" - Baseball Tournaments")[0])
 
-    team_links = []
+    # The /teams page is a per-division accordion (div.panel: heading =
+    # "17U Session 1: July 6-11, 2026 145", body id="division-NNN" with the
+    # team links). That heading is the REAL age bracket — stamp it on every
+    # team instead of guessing later from team names (_infer_division gave
+    # Boston Classic "a ton of random age groups" + Unknowns, Chris 2026-07-03).
+    team_links = []          # (href, name, division)
     seen = set()
-    for a in soup.select('a[href*="/team/details/"]'):
-        href = urljoin(teams_url, a["href"])
-        name = _clean(a.get_text(" "))
-        if href not in seen and name:
-            seen.add(href)
-            team_links.append((href, name))
-    log(f"{event_name or event_url}: {len(team_links)} teams")
+    divs = {}                # team name -> division (for schedule_team_divs)
+
+    def _age_group(heading):
+        m = re.search(r'\b(\d{1,2}U)\b', heading or '')
+        if m:
+            return m.group(1)
+        # no NNU token: keep the heading minus dates/trailing team count
+        h = re.sub(r'(Session\s*\d+:?\s*)?[A-Z][a-z]+ \d{1,2}\s*-\s*\d{1,2},?\s*\d{4}', '',
+                   heading or '').strip()
+        return re.sub(r'\s*\d+\s*$', '', h).strip()
+
+    for panel in soup.select('#teamsAccordion > div.panel'):
+        head = panel.select_one('.panel-heading')
+        division = _age_group(_clean(head.get_text(' ')) if head else '')
+        for a in panel.select('a[href*="/team/details/"]'):
+            href = urljoin(teams_url, a["href"])
+            name = _clean(a.get_text(" "))
+            if href not in seen and name:
+                seen.add(href)
+                team_links.append((href, name, division))
+                if division:
+                    divs[name] = division
+    # fallback: page without the accordion layout — flat link scan, no divisions
+    if not team_links:
+        for a in soup.select('a[href*="/team/details/"]'):
+            href = urljoin(teams_url, a["href"])
+            name = _clean(a.get_text(" "))
+            if href not in seen and name:
+                seen.add(href)
+                team_links.append((href, name, ""))
+    n_div = len(set(d for _, _, d in team_links if d))
+    log(f"{event_name or event_url}: {len(team_links)} teams"
+        + (f" in {n_div} division(s)" if n_div else " (no division panels found)"))
 
     teams = []
-    def _one(url, name):
+    def _one(url, name, division):
         time.sleep(THROTTLE_SEC)
-        return scrape_team(session, url, team_name=name)
+        t = scrape_team(session, url, team_name=name)
+        if division:
+            t["division"] = division
+        return t
     with ThreadPoolExecutor(max_workers=WORKERS) as ex:
-        futures = {ex.submit(_one, u, n): u for u, n in team_links}
+        futures = {ex.submit(_one, u, n, d): u for u, n, d in team_links}
         for i, fut in enumerate(as_completed(futures)):
             t = fut.result()
             teams.append(t)
@@ -160,7 +216,7 @@ def scrape_event(event_url, log=print):
         "scrapedAt": _dt.datetime.now(_dt.timezone.utc).isoformat(),
         "dates": None,
         "source": None,
-        "schedule_team_divs": {},
+        "schedule_team_divs": divs,
         "teams": teams,
     }
 
