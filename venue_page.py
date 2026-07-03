@@ -76,49 +76,72 @@ def draw_venue_page(c, event_name, hub, venues, W=None, H=None, map_img=None):
         c.rect(mx, H - 1.38 * inch - map_h_draw, map_w, map_h_draw, stroke=1, fill=0)
         map_h = map_h_draw
 
-    # column layout
-    x_num, x_venue, x_city, x_addr = M, M + 0.32 * inch, M + 2.55 * inch, M + 3.85 * inch
-    x_bar = W - M - 2.05 * inch
-    bar_w_max = 1.55 * inch
-    x_time = W - M
+    y_top = H - 1.62 * inch - (map_h + 0.24 * inch if map_h else 0)
+    y_floor = 0.75 * inch  # keep clear of the hub footnote
+    # Big events (Boston Classic: 23 sites) overflow a single column below
+    # the map — split into two columns when one can't fit. Two-column rows
+    # drop CITY/ADDRESS (pin # + venue + drive bar is what a coach uses;
+    # addresses stay on the schedule CSV).
+    row_h_1 = (0.42 if len(vs) <= 12 else 0.34) * inch
+    two_col = len(vs) > int((y_top - y_floor) / row_h_1) - 1
 
-    # table header
-    y = H - 1.62 * inch - (map_h + 0.24 * inch if map_h else 0)
-    c.setFillColor(TEXT_MED)
-    c.setFont('Helvetica-Bold', 8)
-    for x, label in [(x_num, '#'), (x_venue, 'VENUE'), (x_city, 'CITY'),
-                     (x_addr, 'ADDRESS'), (x_bar, 'DRIVE TIME')]:
-        c.drawString(x, y, label)
-    c.setStrokeColor(LINE_LITE)
-    c.setLineWidth(0.6)
-    c.line(M, y - 5, W - M, y - 5)
-
-    row_h = (0.42 if len(vs) <= 12 else 0.34) * inch  # long lists compress
-    y -= row_h
-    for i, v in enumerate(vs):
-        if i % 2 == 0:
-            c.setFillColor(ROW_ALT)
-            c.rect(M - 6, y - 10, W - 2 * M + 12, row_h - 2, stroke=0, fill=1)
-        mins = v.get('drive_min', 0)
-        c.setFillColor(TEXT_DARK)
-        c.setFont('Helvetica-Bold', 9)
-        c.drawString(x_num, y, str(i + 1))
-        c.drawString(x_venue, y, v['venue'][:34])
-        c.setFont('Helvetica', 9)
-        c.drawString(x_city, y, v.get('city', '')[:18])
+    def _rows(x0, x1, rows, start_i, compact):
+        x_num, x_venue = x0, x0 + 0.30 * inch
+        if compact:
+            bar_w = 0.85 * inch
+            x_bar = x1 - 1.35 * inch
+            venue_chars = 24
+        else:
+            bar_w = 1.55 * inch
+            x_bar = x1 - 2.05 * inch
+            venue_chars = 34
+        x_time = x1
+        y = y_top
         c.setFillColor(TEXT_MED)
-        c.setFont('Helvetica', 8)
-        c.drawString(x_addr, y, v.get('address', '')[:40])
-        # drive-time bar + label
-        c.setFillColor(BAR_BG)
-        c.roundRect(x_bar, y - 2, bar_w_max, 8, 2, stroke=0, fill=1)
-        c.setFillColor(_bar_color(mins))
-        c.roundRect(x_bar, y - 2, bar_w_max * min(1.0, mins / max_min), 8, 2,
-                    stroke=0, fill=1)
-        c.setFillColor(TEXT_DARK)
-        c.setFont('Helvetica-Bold', 9)
-        c.drawRightString(x_time, y, f"~{mins} min")
+        c.setFont('Helvetica-Bold', 8)
+        hdr = [(x_num, '#'), (x_venue, 'VENUE')]
+        if not compact:
+            hdr += [(x0 + 2.55 * inch, 'CITY'), (x0 + 3.85 * inch, 'ADDRESS')]
+        hdr += [(x_bar, 'DRIVE')]
+        for x, label in hdr:
+            c.drawString(x, y, label)
+        c.setStrokeColor(LINE_LITE)
+        c.setLineWidth(0.6)
+        c.line(x0, y - 5, x1, y - 5)
+        row_h = 0.30 * inch if compact else row_h_1
         y -= row_h
+        for i, v in enumerate(rows):
+            if i % 2 == 0:
+                c.setFillColor(ROW_ALT)
+                c.rect(x0 - 4, y - 8, x1 - x0 + 8, row_h - 2, stroke=0, fill=1)
+            mins = v.get('drive_min', 0)
+            c.setFillColor(TEXT_DARK)
+            c.setFont('Helvetica-Bold', 9 if not compact else 8)
+            c.drawString(x_num, y, str(start_i + i + 1))
+            c.drawString(x_venue, y, v['venue'][:venue_chars])
+            if not compact:
+                c.setFont('Helvetica', 9)
+                c.drawString(x0 + 2.55 * inch, y, v.get('city', '')[:18])
+                c.setFillColor(TEXT_MED)
+                c.setFont('Helvetica', 8)
+                c.drawString(x0 + 3.85 * inch, y, v.get('address', '')[:40])
+            c.setFillColor(BAR_BG)
+            c.roundRect(x_bar, y - 2, bar_w, 8, 2, stroke=0, fill=1)
+            c.setFillColor(_bar_color(mins))
+            c.roundRect(x_bar, y - 2, bar_w * min(1.0, mins / max_min), 8, 2,
+                        stroke=0, fill=1)
+            c.setFillColor(TEXT_DARK)
+            c.setFont('Helvetica-Bold', 9 if not compact else 8)
+            c.drawRightString(x_time, y, f"~{mins}m" if compact else f"~{mins} min")
+            y -= row_h
+
+    if two_col:
+        half = (len(vs) + 1) // 2
+        col_w = (W - 2 * M - 0.35 * inch) / 2.0
+        _rows(M, M + col_w, vs[:half], 0, compact=True)
+        _rows(M + col_w + 0.35 * inch, W - M, vs[half:], half, compact=True)
+    else:
+        _rows(M, W - M, vs, 0, compact=False)
 
     # hub footnote
     c.setFillColor(TEXT_MED)

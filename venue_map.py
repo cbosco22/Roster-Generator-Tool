@@ -15,6 +15,7 @@ import io
 import json
 import math
 import os
+import re
 import time
 
 import requests
@@ -22,6 +23,55 @@ import requests
 _UA = {"User-Agent": "navy-baseball-roster-tool/1.0 (bosco.chris01@gmail.com)"}
 _CACHE = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                       "data", "geocode_cache.json")
+
+# Venues at an event are drivable from the hub. Any geocode farther than
+# this is a wrong match, whatever query produced it — found live 2026-07-03:
+# "St. Johns HS" (Shrewsbury, MA) resolved to St. Johns, MICHIGAN because
+# the street address ("314-347 Main Street…", a range Nominatim can't parse)
+# failed and the fallback geocoded the bare venue name with no locality.
+MAX_VENUE_KM = 250
+
+
+def _dist_km(a, b):
+    lat1, lon1, lat2, lon2 = map(math.radians, (a[0], a[1], b[0], b[1]))
+    h = (math.sin((lat2 - lat1) / 2) ** 2 +
+         math.cos(lat1) * math.cos(lat2) * math.sin((lon2 - lon1) / 2) ** 2)
+    return 6371 * 2 * math.asin(math.sqrt(h))
+
+
+def _addr_state(addr):
+    m = re.search(r',\s*([A-Z]{2})(?:\s+\d{5})?\s*$', addr or '')
+    return m.group(1) if m else None
+
+
+def venue_geocode(v, hub_ll=None):
+    """Geocode one venue dict ({'venue','address','city'?}) with a
+    plausibility guard: every candidate query carries a locality (city or
+    the address's own state — NEVER a bare venue name), and any hit farther
+    than MAX_VENUE_KM from the hub is rejected as a wrong match."""
+    addr = (v.get("address") or "").strip()
+    name = (v.get("venue") or "").strip()
+    city = (v.get("city") or "").strip()
+    state = _addr_state(addr)
+    cands = []
+    if addr:
+        cands.append(", ".join(x for x in (addr, city) if x))
+        # street-number ranges ("314-347 Main St") break Nominatim; retry
+        # with the first number alone
+        a2 = re.sub(r'^(\d+)\s*[-–]\s*\d+\s', r'\1 ', addr)
+        if a2 != addr:
+            cands.append(", ".join(x for x in (a2, city) if x))
+    if name and city:
+        cands.append(f"{name}, {city}")
+    if name and state:
+        cands.append(f"{name}, {state}")
+    if city:
+        cands.append(city)
+    for q in cands:
+        ll = geocode(q)
+        if ll and (hub_ll is None or _dist_km(ll, hub_ll) <= MAX_VENUE_KM):
+            return ll
+    return None
 
 
 def geocode(address):
@@ -196,21 +246,11 @@ def venue_map_for(hub, venues, height_px=680, min_aspect=1.35, max_aspect=2.35):
         pts.append({"lat": ll[0], "lon": ll[1], "label": "",
                     "name": hub.get("name", "")[:22]})
     ordered = sorted(venues, key=lambda v: v.get("drive_min", 999))
+    hub_ll = ll
     for i, v in enumerate(ordered):
-        # street address first; when Nominatim can't resolve it (3 of 11 real
-        # GA school addresses missed), fall back to the venue NAME + city —
-        # schools/parks are OSM POIs and resolve by name reliably
-        ll = None
-        for q in (", ".join(x for x in (v.get("address", ""), v.get("city", "")) if x),
-                  ", ".join(x for x in (v.get("venue", ""), v.get("city", "")) if x),
-                  # last resort: pin the CITY. Approximate, but for "which
-                  # venues are near each other" a city-center pin beats a
-                  # missing one (2 of 11 real venues resolved no other way).
-                  v.get("city", "")):
-            if q:
-                ll = geocode(q)
-                if ll:
-                    break
+        # drive_minutes() already geocoded most venues — reuse its result
+        ll = (v["lat"], v["lon"]) if v.get("lat") is not None else \
+            venue_geocode(v, hub_ll)
         if ll:
             pts.append({"lat": ll[0], "lon": ll[1], "label": str(i + 1),
                         "name": _short_name(v.get("venue", ""))})
@@ -232,13 +272,7 @@ def drive_minutes(hub, venues):
     if not hub_ll:
         return venues
     for v in venues:
-        ll = None
-        for q in (", ".join(x for x in (v.get("address", ""),) if x),
-                  v.get("venue", "")):
-            if q:
-                ll = geocode(q)
-                if ll:
-                    break
+        ll = venue_geocode(v, hub_ll)
         if not ll:
             continue
         v["lat"], v["lon"] = ll
