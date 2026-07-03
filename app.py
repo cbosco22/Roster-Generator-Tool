@@ -982,6 +982,41 @@ with tab_tourney:
 
 # ---- Schedule Refresh ----
 # ---- Post-Event ----
+def _pe_autosave(by, event):
+    """Coach-proof the Post-Event flow: everything extracted lives only in
+    st.session_state, which dies on ANY app restart (redeploy, reboot, iPad
+    Safari suspending the tab, dropped websocket). Found live 2026-07-03:
+    a coach lost a 40+ player Hoover batch to exactly this, mid-entry.
+    Snapshot the tables to disk right after extraction/import; the tab
+    offers a one-tap Restore when the session comes back empty."""
+    try:
+        snap = {
+            "by": by, "event": event,
+            "saved_at": __import__("datetime").datetime.now().isoformat(timespec="seconds"),
+            "new_rows": st.session_state.get("pe_new_rows", []),
+            "upd_rows": st.session_state.get("pe_upd_rows", []),
+            "upd_raw": st.session_state.get("pe_upd_raw", []),
+            "stats": st.session_state.get("pe_stats", {}),
+        }
+        p = Path(__file__).parent / "data" / f"pe_autosave_{(by or 'XX').strip()}.json"
+        p.parent.mkdir(exist_ok=True)
+        p.write_text(json.dumps(snap))
+    except Exception:
+        pass  # autosave must never break the real flow
+
+
+def _pe_autosaves():
+    out = []
+    for p in sorted((Path(__file__).parent / "data").glob("pe_autosave_*.json")):
+        try:
+            d = json.loads(p.read_text())
+            if d.get("new_rows") or d.get("upd_rows"):
+                out.append((p, d))
+        except Exception:
+            continue
+    return out
+
+
 with tab_post:
     st.subheader("Post-event ratings")
 
@@ -1088,6 +1123,11 @@ with tab_post:
                 pstatus.update(label="Done", state="complete")
             except Exception as e:
                 pstatus.update(label="Error", state="error")
+                st.error("**Reading the pages failed — nothing was lost.** Your "
+                         "photos are still selected above; tap **Extract & split** "
+                         "again (the reader service hiccups sometimes). If the same "
+                         "page fails twice, retake that photo with the full table "
+                         "visible and text CB.")
                 st.exception(e)
                 st.stop()
 
@@ -1101,6 +1141,7 @@ with tab_post:
         st.session_state["pe_upd_raw"] = result["updates"]
         st.session_state["pe_stats"] = result["stats"]
         st.session_state["pe_write_preview"] = None
+        _pe_autosave(pe_by, pe_event)
 
     # --- Resume from downloaded CSVs (no re-extraction) ---
     # Born 2026-07-02: a flaky write after a 41-page read meant re-reading
@@ -1160,7 +1201,35 @@ with tab_post:
             st.session_state["pe_stats"] = {"new_players": len(_new_rows),
                                             "updates": len(_upd_rows), "skipped": 0}
             st.session_state["pe_write_preview"] = None
+            _pe_autosave(pe_by, pe_event)
             st.rerun()
+
+    # --- Crash recovery: offer any autosaved batch when the session is empty.
+    # An app restart mid-entry used to silently eat all extracted work; now
+    # it's one tap to get it back (see _pe_autosave docstring).
+    if "pe_stats" not in st.session_state:
+        for _p, _snap in _pe_autosaves():
+            _n = len(_snap.get("new_rows", [])) + len(_snap.get("upd_rows", []))
+            _c1, _c2, _c3 = st.columns([4, 1, 1])
+            _c1.warning(f"**Unfinished batch found** — {_snap.get('by','?')}, "
+                        f"{_snap.get('event') or 'no event set'}: {_n} player(s), "
+                        f"saved {_snap.get('saved_at','')}. The app restarted "
+                        f"before this was written.")
+            if _c2.button("Restore", key=f"pe_restore_{_p.name}", type="primary"):
+                st.session_state["pe_new_rows"] = _snap.get("new_rows", [])
+                st.session_state["pe_upd_rows"] = _snap.get("upd_rows", [])
+                st.session_state["pe_upd_raw"] = _snap.get("upd_raw", [])
+                st.session_state["pe_stats"] = _snap.get("stats", {}) or {
+                    "new_players": len(_snap.get("new_rows", [])),
+                    "updates": len(_snap.get("upd_rows", [])), "skipped": 0}
+                st.session_state["pe_write_preview"] = None
+                st.rerun()
+            if _c3.button("Discard", key=f"pe_discard_{_p.name}"):
+                try:
+                    _p.unlink()
+                except Exception:
+                    pass
+                st.rerun()
 
     if st.session_state.get("pe_import_holds"):
         st.warning("Imported with holds (nothing invalid will be written):\n\n" +
@@ -1241,6 +1310,11 @@ with tab_post:
                         disabled=not (upd_raw or edited_rows)):
                 with st.status("Writing to Recruiting Sheet 2.0…", expanded=True) as wstatus:
                     try:
+                        # snapshot the EDITED tables first — a restart during
+                        # the write must not cost the coach his corrections
+                        st.session_state["pe_new_rows"] = edited_rows or st.session_state.get("pe_new_rows", [])
+                        st.session_state["pe_upd_rows"] = edited_upd_display or st.session_state.get("pe_upd_rows", [])
+                        _pe_autosave(pe_by, pe_event)
                         st.write("Loading current sheet…")
                         db_for_write = parse_xlsx(str(XLSX_PATH))
                         cols = find_columns(str(XLSX_PATH))
@@ -1282,7 +1356,18 @@ with tab_post:
                             progress=lambda d, t: _prog.write(f"Validated {d}/{t}…"))
                         if not check.get("ok"):
                             wstatus.update(label="Failed", state="error")
-                            st.error(f"Validation failed, nothing written: {check.get('error')}")
+                            _fa = check.get("failed_at", 0)
+                            _who = ", ".join(
+                                (o.get("player") or "?") for o in ops[_fa:_fa + 10])
+                            st.error(
+                                f"**Nothing was written** — validation stopped on this "
+                                f"group of players: {_who}.\n\n"
+                                f"Error: `{check.get('error')}`\n\n"
+                                f"**What to do:** your work is saved (it survives an app "
+                                f"restart — reopen this tab and tap Restore). Check those "
+                                f"players' rows in the tables above for anything odd, "
+                                f"then click Write again. If it keeps failing, use the "
+                                f"Manual fallback at the bottom and text CB.")
                             st.stop()
 
                         st.write(f"Writing {len(ops)} player(s)…")
@@ -1296,6 +1381,11 @@ with tab_post:
                             st.success(f"✓ Written to Recruiting Sheet 2.0 — "
                                       f"{n_new} new player(s), {n_upd} update(s), "
                                       f"every field verified by reading it back.")
+                            try:  # batch landed — retire its crash-recovery snapshot
+                                (Path(__file__).parent / "data" /
+                                 f"pe_autosave_{(pe_by or 'XX').strip()}.json").unlink()
+                            except Exception:
+                                pass
                         else:
                             wstatus.update(label="Failed", state="error")
                             bad = [(op, r) for op, r in zip(ops, real.get("results", []))
@@ -1332,6 +1422,10 @@ with tab_post:
                                 f"seconds and click the write button again.\n\n`{e}`")
                     except Exception as e:
                         wstatus.update(label="Failed", state="error")
+                        st.error("**Nothing is lost** — this batch is saved and will "
+                                 "offer a one-tap Restore if the app restarts. Try "
+                                 "Write again; if it keeps failing, use the Manual "
+                                 "fallback below and text CB.")
                         st.exception(e)
 
         # --- Manual fallback: copy/paste tables, same shape as the old
