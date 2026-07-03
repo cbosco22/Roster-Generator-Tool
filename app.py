@@ -631,6 +631,12 @@ with tab_tourney:
 
     ol_url = st.text_input("Event link", key="ol_url",
                            placeholder="https://events.fivetool.org/events/…")
+    ol_name = st.text_input("Event name (optional)", key="ol_name",
+                            placeholder="Leave blank to use the site's own name",
+                            help="Scraped names run long ('Boston Classic - 7/6 "
+                                 "07/06/2026 - 07/11/2026 - Prospect Select "
+                                 "Baseball…'). Whatever you type here becomes the "
+                                 "name everywhere: Event Day, the PDF cover, the CSV.")
     olc1, olc2, olc3, olc4 = st.columns(4)
     ol_crawl = olc1.checkbox("PBR measurables", value=True, key="ol_crawl",
                              help="Crawls every rostered player's public PBR "
@@ -668,6 +674,7 @@ with tab_tourney:
             try:
                 _res = _one_link.run(
                     ol_url.strip(), crawl=ol_crawl, push=ol_push,
+                    event_name=(ol_name or "").strip() or None,
                     venue_map=ol_map,
                     preset=("classic" if ol_preset == "Classic" else "navy"),
                     log=st.write)
@@ -1756,9 +1763,16 @@ with tab_board:
 
         f1, f2 = st.columns(2)
         with f1:
-            bd_class = st.selectbox("Class", bd_classes, key="bd_class")
+            # default to 2027 (Chris 2026-07-03), not just the newest class
+            bd_class = st.selectbox("Class", bd_classes,
+                                    index=bd_classes.index('2027') if '2027' in bd_classes else 0,
+                                    key="bd_class")
         with f2:
-            bd_pos = st.selectbox("Position", _BOARD_POS_GROUPS, key="bd_pos")
+            # multi-select but still a dropdown-style control (st.multiselect),
+            # NOT pills — Chris 2026-07-03. Empty selection = all positions.
+            bd_pos_sel = st.multiselect("Position", [g for g in _BOARD_POS_GROUPS if g != 'ALL'],
+                                        default=[], placeholder="All positions",
+                                        key="bd_pos_sel")
         bd_tiers = st.multiselect("Show ratings", _BOARD_TIER_FILTER_OPTIONS,
                                   default=_BOARD_TIER_FILTER_DEFAULT,
                                   format_func=lambda t: _BOARD_TIER_FILTER_LABELS[t],
@@ -1766,16 +1780,19 @@ with tab_board:
 
         bd_filtered = [p for p in bd_players
                        if p['class'] == bd_class
-                       and (bd_pos == 'ALL' or sheet_write.pos_group(p['pos']) == bd_pos)
+                       and (not bd_pos_sel or sheet_write.pos_group(p['pos']) in bd_pos_sel)
                        and p['tier'] in bd_tiers]
         bd_filtered.sort(key=lambda p: ((float(p['tier']) if p['tier'] != 'XX' else 99),
                                         p['last'], p['first']))
 
-        bd_show_bt = bd_pos != 'RHP' and bd_pos != 'LHP'  # pitchers: Pos already implies throwing hand
-        bd_show_pos = bd_pos == 'ALL'  # position is implied by the filter otherwise
+        # pitchers-only selection: Pos already implies throwing hand
+        bd_show_bt = not (bd_pos_sel and set(bd_pos_sel) <= {'RHP', 'LHP'})
+        # position column matters unless exactly one group is selected
+        bd_show_pos = len(bd_pos_sel) != 1
 
         if not bd_filtered:
-            st.caption(f"No {bd_pos} in the {bd_class} class at the selected rating(s) right now.")
+            bd_pos_label = '/'.join(bd_pos_sel) if bd_pos_sel else 'players'
+            st.caption(f"No {bd_pos_label} in the {bd_class} class at the selected rating(s) right now.")
         else:
             # st.dataframe's row selection only responds to its own checkbox
             # column - confirmed live 2026-07-02 by clicking directly on a
