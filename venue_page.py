@@ -109,12 +109,16 @@ def draw_venue_page(c, event_name, hub, venues, W=None, H=None, map_img=None):
         c.setLineWidth(0.6)
         c.line(x0, y - 5, x1, y - 5)
         row_h = 0.30 * inch if compact else row_h_1
+        # very long lists (PG metro events: 40+ venues) compress further so
+        # both columns still land above the footnote
+        if rows and y_top - (len(rows) + 1) * row_h < y_floor:
+            row_h = max(0.20 * inch, (y_top - y_floor) / (len(rows) + 1))
         y -= row_h
         for i, v in enumerate(rows):
             if i % 2 == 0:
                 c.setFillColor(ROW_ALT)
                 c.rect(x0 - 4, y - 8, x1 - x0 + 8, row_h - 2, stroke=0, fill=1)
-            mins = v.get('drive_min', 0)
+            mins = v.get('drive_min')  # None = venue never geocoded/routed
             c.setFillColor(TEXT_DARK)
             c.setFont('Helvetica-Bold', 9 if not compact else 8)
             c.drawString(x_num, y, str(start_i + i + 1))
@@ -125,14 +129,20 @@ def draw_venue_page(c, event_name, hub, venues, W=None, H=None, map_img=None):
                 c.setFillColor(TEXT_MED)
                 c.setFont('Helvetica', 8)
                 c.drawString(x0 + 3.85 * inch, y, v.get('address', '')[:40])
-            c.setFillColor(BAR_BG)
-            c.roundRect(x_bar, y - 2, bar_w, 8, 2, stroke=0, fill=1)
-            c.setFillColor(_bar_color(mins))
-            c.roundRect(x_bar, y - 2, bar_w * min(1.0, mins / max_min), 8, 2,
-                        stroke=0, fill=1)
-            c.setFillColor(TEXT_DARK)
-            c.setFont('Helvetica-Bold', 9 if not compact else 8)
-            c.drawRightString(x_time, y, f"~{mins}m" if compact else f"~{mins} min")
+            if mins is None:
+                # not geocoded — an honest dash beats a fake "~0 min"
+                c.setFillColor(TEXT_MED)
+                c.setFont('Helvetica-Bold', 9 if not compact else 8)
+                c.drawRightString(x_time, y, "—")
+            else:
+                c.setFillColor(BAR_BG)
+                c.roundRect(x_bar, y - 2, bar_w, 8, 2, stroke=0, fill=1)
+                c.setFillColor(_bar_color(mins))
+                c.roundRect(x_bar, y - 2, bar_w * min(1.0, mins / max_min), 8, 2,
+                            stroke=0, fill=1)
+                c.setFillColor(TEXT_DARK)
+                c.setFont('Helvetica-Bold', 9 if not compact else 8)
+                c.drawRightString(x_time, y, f"~{mins}m" if compact else f"~{mins} min")
             y -= row_h
 
     if two_col:

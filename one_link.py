@@ -153,9 +153,15 @@ def run(url, outdir=None, event_name=None, crawl=True, push=True,
         log('[6/6] Pushing to Event Day (schedule + roster)…')
         try:
             from push_event import push_event
+            # home-page location = "City, ST" pulled off the hub address tail
+            loc = None
+            hub_addr = ((sched.get('hub') or {}).get('address') or '')
+            m = re.search(r'(\w[\w.\' ]*?),?\s*([A-Z]{2})\s*\d{5}?\s*$', hub_addr)
+            if m:
+                loc = f"{m.group(1).split()[-1]}, {m.group(2)}"
             r = push_event(name, csv_text,
                            roster_json=json.dumps({'teams': data['teams']}),
-                           schedule_url=base_link)
+                           schedule_url=base_link, location=loc)
             what = 'schedule + roster' if csv_text else 'roster (no games posted yet)'
             msg = f'      {r["action"]} — {what} live for all coaches'
             if r.get('roster_skipped'):

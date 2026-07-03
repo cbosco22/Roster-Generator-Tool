@@ -44,6 +44,36 @@ def _addr_state(addr):
     return m.group(1) if m else None
 
 
+def venues_from_games(games, region):
+    """Derive the venue list from schedule game locations when the source
+    (Perfect Game) publishes no venue addresses. 'Field 1 @ East Cobb
+    Complex' -> complex name; region ('GA', 'Marietta, GA') anchors the
+    geocode query and the hub-distance guard rejects wrong-state matches.
+    Venue names like 'Etowah High School - GA' / 'Mt. Zion High School -
+    Jonesboro' carry their locality after ' - '."""
+    counts = {}
+    for g in games:
+        loc = (g.get("location") or "").strip()
+        if not loc:
+            continue
+        m = re.search(r'@\s*(.+)$', loc)
+        name = (m.group(1) if m else loc).strip()
+        counts[name] = counts.get(name, 0) + 1
+    venues = []
+    for name, n in sorted(counts.items(), key=lambda kv: -kv[1]):
+        loc_hint = region
+        base = name
+        if ' - ' in name:
+            base, tail = [x.strip() for x in name.rsplit(' - ', 1)]
+            if re.fullmatch(r'[A-Z]{2}', tail):
+                loc_hint = tail
+            elif tail:
+                loc_hint = f"{tail}, {region}"
+        venues.append({"venue": name, "address": f"{base}, {loc_hint}",
+                       "games": n})
+    return venues
+
+
 def venue_geocode(v, hub_ll=None):
     """Geocode one venue dict ({'venue','address','city'?}) with a
     plausibility guard: every candidate query carries a locality (city or
@@ -74,8 +104,29 @@ def venue_geocode(v, hub_ll=None):
     return None
 
 
+def _census_geocode(address):
+    """US Census geocoder — free, no key, street addresses only. Fallback for
+    the many real street addresses OSM has no interpolation for (found live
+    2026-07-03: '4617 Lee Waters Road Marietta, GA', the East Cobb Complex,
+    misses on Nominatim but matches exactly on Census)."""
+    try:
+        r = requests.get(
+            "https://geocoding.geo.census.gov/geocoder/locations/onelineaddress",
+            params={"address": address, "benchmark": "Public_AR_Current",
+                    "format": "json"}, headers=_UA, timeout=25)
+        r.raise_for_status()
+        m = r.json().get("result", {}).get("addressMatches", [])
+        if m:
+            c = m[0]["coordinates"]
+            return [float(c["y"]), float(c["x"])]
+    except Exception:
+        pass
+    return None
+
+
 def geocode(address):
-    """address -> (lat, lon) or None. Disk-cached; 1 req/sec when live."""
+    """address -> (lat, lon) or None. Nominatim first, US Census geocoder as
+    the street-address fallback. Disk-cached; 1 req/sec when live."""
     cache = {}
     if os.path.exists(_CACHE):
         with open(_CACHE) as f:
@@ -93,6 +144,8 @@ def geocode(address):
         val = [float(hits[0]["lat"]), float(hits[0]["lon"])] if hits else None
     except Exception:
         return None  # transient failure: don't cache, don't crash the build
+    if val is None and re.match(r'^\d+\s', address.strip()):
+        val = _census_geocode(address)
     os.makedirs(os.path.dirname(_CACHE), exist_ok=True)
     cache[key] = val
     with open(_CACHE, "w") as f:
@@ -270,11 +323,25 @@ def drive_minutes(hub, venues):
     fail to geocode get no drive_min and sort last in the table."""
     hub_ll = geocode(hub.get("address") or hub.get("name", ""))
     if not hub_ll:
+        # last resort: the hub's own city — approximate drive times beat a
+        # map with no pins at all (a failed hub used to zero the whole page)
+        m = re.search(r'([A-Za-z. ]+,?\s*[A-Z]{2})(?:\s+\d{5})?\s*$',
+                      hub.get("address") or "")
+        if m:
+            hub_ll = geocode(m.group(1))
+    if not hub_ll:
         return venues
+    hub_name = re.sub(r'[^a-z0-9]', '', (hub.get("name") or "").lower())
     for v in venues:
         ll = venue_geocode(v, hub_ll)
         if not ll:
-            continue
+            # the venue that IS the hub (PG names the complex, not an
+            # address: 'East Cobb Complex', 116 games) sits at the hub
+            vn = re.sub(r'[^a-z0-9]', '', (v.get("venue") or "").lower())
+            if hub_name and vn and (vn in hub_name or hub_name in vn):
+                ll = hub_ll
+            else:
+                continue
         v["lat"], v["lon"] = ll
         if abs(ll[0] - hub_ll[0]) < 1e-6 and abs(ll[1] - hub_ll[1]) < 1e-6:
             v["drive_min"] = 0
