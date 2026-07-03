@@ -43,12 +43,33 @@ def _get(session, url):
     return r.text
 
 
+# FiveTool built the platform; Prospect Select and PBR run the same code on
+# their own hosts (verified live 2026-07-02: identical /schedule_ajax,
+# window.EVENT_ID, team-detail pages). PBR (prepbaseballreport) is
+# Cloudflare-walled to plain requests, so it needs the browser path.
+_PLATFORM_HOSTS = {
+    "events.fivetool.org": "/events/",
+    "play.ps-baseball.com": "/public/events/",
+    "tournaments.prepbaseballreport.com": "/public/events/",
+}
+
+
+def _platform_host(url):
+    from urllib.parse import urlparse
+    return urlparse(url).netloc.lower()
+
+
 def _event_teams_url(url):
-    """Normalize any event page URL to its /teams page."""
-    m = re.match(r"(https?://events\.fivetool\.org/events/[^/?#]+)", url.strip())
+    """Normalize any FiveTool-platform event URL to its /teams page.
+    Returns (teams_url, base_url, host)."""
+    host = _platform_host(url)
+    prefix = _PLATFORM_HOSTS.get(host)
+    if not prefix:
+        raise ValueError(f"Not a FiveTool-platform event URL: {url}")
+    m = re.match(rf"(https?://{re.escape(host)}{re.escape(prefix)}[^/?#]+)", url.strip())
     if not m:
-        raise ValueError(f"Not a FiveTool event URL: {url}")
-    return m.group(1) + "/teams", m.group(1)
+        raise ValueError(f"Not a recognizable event URL for {host}: {url}")
+    return m.group(1) + "/teams", m.group(1), host
 
 
 def _clean(s):
@@ -98,7 +119,7 @@ def scrape_team(session, team_url, team_name=""):
 
 def scrape_event(event_url, log=print):
     session = requests.Session()
-    teams_url, base_url = _event_teams_url(event_url)
+    teams_url, base_url, host = _event_teams_url(event_url)
     html = _get(session, teams_url)
     soup = BeautifulSoup(html, "html.parser")
 
@@ -159,7 +180,7 @@ def scrape_schedule(event_url, log=print, venue_addresses=True):
     gen_schedule_csv.build_schedule_csv() consumes them unchanged.
     """
     session = requests.Session()
-    _, base_url = _event_teams_url(event_url)
+    _, base_url, host = _event_teams_url(event_url)
     page = _get(session, base_url + "/schedule/all")
     csrf = re.search(r'name="csrf-token" content="([^"]+)"', page)
     event_id = re.search(r'window\.EVENT_ID\s*=\s*"(\d+)"', page)
@@ -167,7 +188,7 @@ def scrape_schedule(event_url, log=print, venue_addresses=True):
         raise RuntimeError("schedule page missing csrf/event id - layout changed?")
     hh = {**HEADERS, "X-CSRF-TOKEN": csrf.group(1),
           "X-Requested-With": "XMLHttpRequest", "Content-Type": "application/json"}
-    r = session.post("https://events.fivetool.org/schedule_ajax", headers=hh,
+    r = session.post(f"https://{host}/schedule_ajax", headers=hh,
                      json={"event_id": event_id.group(1), "event_price_id": "0",
                            "event_registration_item_id": 0, "schedule_id": 0,
                            "data_type": "schedules"}, timeout=40)
@@ -209,7 +230,7 @@ def scrape_schedule(event_url, log=print, venue_addresses=True):
         for loc, fid in field_ids.items():
             time.sleep(0.3)
             try:
-                vr = session.post("https://events.fivetool.org/venue_by_field",
+                vr = session.post(f"https://{host}/venue_by_field",
                                   headers=hh, json={"field_id": fid,
                                                     "event_id": event_id.group(1)},
                                   timeout=20)

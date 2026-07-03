@@ -641,13 +641,25 @@ with tab_tourney:
     ol_push = olc3.checkbox("Push to Event Day", value=True, key="ol_push")
     ol_preset = olc4.selectbox("PDF layout", ["Navy", "Classic"], key="ol_preset")
 
-    _ol_supported = "fivetool.org" in (ol_url or "").lower()
-    if ol_url and not _ol_supported:
-        st.info("One-link currently automates **FiveTool** events end to end. "
-                "Perfect Game / PBR / Prospect Select links: use the manual "
-                "upload below for rosters (PG schedules already refresh with "
-                "one tap inside Event Day). Send me one sample event link per "
-                "site and their adapters get built next.")
+    _olu = (ol_url or "").lower()
+    _ol_full = ("fivetool.org" in _olu) or ("ps-baseball.com" in _olu)
+    _ol_pbr = "prepbaseballreport.com" in _olu
+    _ol_pg = "perfectgame.org" in _olu
+    _ol_supported = _ol_full
+    if ol_url and _ol_pbr:
+        st.info("**PBR tournament** — same platform as FiveTool, but PBR puts "
+                "it behind Cloudflare, so the automated pull needs your signed-in "
+                "Chrome (the browser-assisted run). Schedules still refresh with "
+                "one tap inside Event Day.")
+    elif ol_url and _ol_pg:
+        st.info("**Perfect Game** — team lists and schedules pull automatically, "
+                "but PG renders rosters in-page (JavaScript), so the roster pull "
+                "needs the browser-assisted run. PG schedules already refresh with "
+                "one tap inside Event Day; use Manual upload below for the roster "
+                "book meanwhile.")
+    elif ol_url and not _ol_supported:
+        st.info("Paste a **FiveTool** or **Prospect Select** event link for the "
+                "full automatic run. Other sites: use Manual upload below.")
 
     if st.button("🚀 Build everything", type="primary", use_container_width=True,
                  disabled=not (ol_url and _ol_supported), key="ol_go"):
