@@ -11,10 +11,43 @@ Used by coaches AP, CB, TR, CR, AM on iPads (GoodNotes) and iPhones.
 ## Repo & Deploy Info
 - **GitHub:** cbosco22/Roster-Generator-Tool
 - **Deploy:** Streamlit Cloud — push to `main` → reboot Streamlit app → hard refresh browser
+- **⚠️ DEPLOY RULE (2026-07-03, hard-learned):** every push to main RESTARTS the live
+  app and kills every coach's session mid-entry. A coach lost a 40+ player post-event
+  batch to four pushes landing in his working window (confirmed in Streamlit Cloud
+  logs). **Commit locally freely; push main ONLY on Chris's explicit "deploy",**
+  ideally confirmed no coach is mid-entry. Post-Event now autosaves batches to disk
+  with a one-tap Restore as the net — but autosaves do NOT survive a redeploy (fresh
+  container), so the rule stands regardless.
 - **Python path:** Scripts expect `/home/claude/` in sys.path (for pbr_rankings.pkl etc.)
 - **PBR rankings pickle:** `pbr_rankings.pkl` at `/home/claude/` and `data/` — 799 national + ~12,341 state rankings, classes 2027-2028, May 2026 vintage
 
 ---
+
+## 2026-07-03 changes (committed; nav regroup NOT yet deployed)
+- **Nav regrouped + app renamed "Navy Baseball"** (commit 5becafd, awaiting deploy):
+  top-level sections Event Tools (Field Tool, New Event, Post-Event) / Players
+  (Add Player, Board) / Admin. All `with tab_x:` blocks untouched.
+- **Post-Event crash recovery**: every extracted batch autosaves to
+  `data/pe_autosave_<BY>.json` (after extract, import, and at write-click with edits);
+  empty session → per-batch Restore/Discard banner; verified write retires its
+  snapshot. All failure messages rewritten in coach language. Direct write path now
+  quarantines unreadable ★ (same policy as CSV import — a literal '/' hit the sheet
+  live before this).
+- **Real age brackets**: `fivetool_scrape.scrape_event` stamps `team['division']` +
+  `schedule_team_divs` from the /teams accordion (every platform host);
+  `scrape_team_divisions()` re-patches an existing event. `_infer_division` is
+  last-resort only — never trust it for real events.
+- **Venue maps hardened**: `venue_map.venue_geocode()` is the only sanctioned venue
+  geocoder (locality always attached, >250km-from-hub rejected — "St. Johns HS"
+  pinned in Michigan once); US Census geocoder backs up Nominatim for street
+  addresses; `venues_from_games()` derives venues from PG's "<field> @ <complex>"
+  locations; venue page splits to 2 columns / compresses rows for 40+ venue events;
+  non-geocoded venues show a dash.
+- **Manual upload = one-link parity**: PBR-measurables checkbox (run_event `crawl=`
+  param, checkpointed in events/<slug>/), optional hub address → venue map page,
+  roster book auto-attached to Event Day, persistent event dir.
+- **one_link**: optional event_name override (long scraped names), pushes 'City, ST'
+  location for the Event Day home page (push_event `location=`).
 
 ## App Tabs (Current, order matches the live tab bar)
 1. **Field Tool** — at-event use, live tagging interface
@@ -370,9 +403,12 @@ Build these in order:
      - **Not yet resolved — needs Chris:** which players actually get crawled. Working assumption is players Chris has already starred ★1/★2 on the board (matches `app.py`'s existing `tier_label` mapping: "1"→"Tier 1", "2"→"Tier 2") who are on a roster for tomorrow's event — cross-referenced from the event schedule's Navy Players list. Confirm before wiring up the real trigger.
      - **Still to build:** the "DB Builder" Streamlit tab (ingest crawler JSON → `players.parquet`, with field provenance), and the actual event-trigger wiring (which players list feeds the crawler nightly).
 
-2. **PDF visual redesign** — Chris has a sketch of the new layout
-   - Will incorporate richer scraped data (velocity, stats, etc.)
-   - Wait for sketch before building
+2. ~~PDF visual redesign~~ — done: the 'navy' preset (sketch-based row layout with
+   measurable chips from the crawl) is the default for one-link and manual builds.
+   Public-data crawler (item 1) is likewise DONE for the public path: `pbr_crawler.py`
+   is wired into one_link + run_event, checkpointed per event. Still open on item 1:
+   the login-gated academics/contacts pass (needs Chris's sessions + his approval for
+   add-to-dashboard clicks — see memory pbr-crawler-progress).
 
 3. **Roster preview + column presets**
    - In-app table preview before PDF generation
@@ -391,7 +427,7 @@ Build these in order:
 7. ~~Recruiting Tools page redesign~~ — done 2026-06-30 (Event Day brand lockup)
 8. ~~Google Sheet write-back~~ — done 2026-06-30: `sheet_write.py` + `apps_script/Code.gs`, used by both Post-Event and Add Player
 9. **Extension download + scrape-instructions page** — inside the existing app
-10. **Capabilities one-pager PDF** — for sharing with other programs
+10. ~~Capabilities one-pager PDF~~ — done 2026-07-03: `Navy_Baseball_Recruiting_Tools_OnePager.pdf` on Chris's Desktop (regenerate on request — it was built by script, not saved in the repo)
 11. **App consolidation** — Chris wants one umbrella app: Big Board view, full player list, schedule, instead of 3 separate apps (this Streamlit tool, navy-event-day, and a legacy AppSheet recruiting-board app). Lean toward expanding this app with Big Board/Player List tabs and retiring AppSheet; keep navy-event-day separate (built for one-handed mobile use at a tournament, which Streamlit doesn't do well).
    - 2026-06-30 update: Chris is now thinking even bigger than this — one site for the *whole* coaching staff (recruiting + visit scheduling + budget + full depth chart, which currently all live as different tabs in the recruiting spreadsheet), plus folding in a separate player-analysis website he built independently. This item may get superseded by that larger scope — ask Chris before assuming which version is current.
    - **2026-07-01: first real step shipped — Board tab.** Browse/filter/sort (class, position, tier, state, name search) + tier update + note, reusing `db_loader.all_players()` and `sheet_write.build_tier_update_op()`/`build_note_update_op()`. Explicitly NOT done: AppSheet isn't retired (coaches still use it daily — that's Chris's call, after this is verified in real use), and the calendar/questionnaire-status/interactive-lineup pieces of the bigger vision (2026-06-30 update above) are separate, not-yet-scoped passes. Nav regroup into Event Tools / Players sections (see App Tabs above) is the next planned step, deferred on purpose so this shipped first.
