@@ -1320,30 +1320,56 @@ with tab_post:
                         cols = find_columns(str(XLSX_PATH))
 
                         st.write("Matching players…")
+                        # Invalid ★ never reaches the sheet as junk — the CSV
+                        # import already held these back, but the direct write
+                        # path didn't (a literal '/' landed in the ★ column
+                        # live, 2026-07-03). Same policy as import: updates
+                        # with an unreadable New★ are skipped (current rating
+                        # kept); new players go in UNRATED with a verify note.
+                        _VALID = {"", "0.1", "1", "2", "3", "4", "XX"}
+                        def _tidy(v):
+                            return str(v or "").strip().rstrip("!")
+                        held = []
                         ops = []
                         # the editable updates table wins over the raw
                         # extraction — rows align 1:1 by position
                         for i, r in enumerate(upd_raw):
-                            edited_star = (edited_upd_display[i].get("New ★", "")
-                                           if i < len(edited_upd_display)
-                                           else r.get("new_star") or "")
+                            edited_star = _tidy(edited_upd_display[i].get("New ★", "")
+                                                if i < len(edited_upd_display)
+                                                else r.get("new_star") or "")
+                            if edited_star not in _VALID:
+                                held.append(f"{r.get('first','')} {r.get('last','')} — "
+                                            f"New★ read as '{edited_star}': update "
+                                            f"SKIPPED (current rating kept)")
+                                continue
                             ops.append(sheet_write.build_upsert_op(
                                 db_for_write, cols, first=r.get("first", ""), last=r.get("last", ""),
-                                event_name=pe_event, new_tier=str(edited_star).strip(),
+                                event_name=pe_event, new_tier=edited_star,
                                 state=r.get("state", ""), hs=r.get("school", ""),
                                 team=r.get("_team_name", ""), pos=r.get("pos", ""),
                                 commit=r.get("commit", ""),
                                 notes=r.get("notes_handwritten", "")))
                         for r in edited_rows:
+                            star = _tidy(r.get("★", ""))
+                            notes = r.get("Notes", "")
+                            if star not in _VALID:
+                                held.append(f"{r.get('First','')} {r.get('Last','')} — "
+                                            f"★ read as '{star}': added UNRATED, verify")
+                                notes = (f"[★ unclear: read as '{star}' — verify] "
+                                         + (notes or "")).strip()
+                                star = ""
                             ops.append(sheet_write.build_upsert_op(
                                 db_for_write, cols, first=r.get("First", ""), last=r.get("Last", ""),
                                 event_name=(r.get("Seen") or pe_event),
-                                new_tier=str(r.get("★", "") or "").strip(),
+                                new_tier=star,
                                 state=r.get("State", ""), hs=r.get("High School", ""),
                                 team=r.get("Summer Team", ""), pos=r.get("Pos", ""),
                                 commit=r.get("Commit", ""), class_year=r.get("Class", ""),
                                 by_initials=r.get("By", ""), date_added=r.get("Date Added", ""),
-                                notes=r.get("Notes", "")))
+                                notes=notes))
+                        if held:
+                            st.warning("Held back (nothing invalid gets written):\n\n" +
+                                       "\n".join(f"• {x}" for x in held))
 
                         # Chunked: one big request blew past the HTTP
                         # timeout on a 113-op write (2026-07-02) while the
