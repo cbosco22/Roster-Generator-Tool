@@ -222,3 +222,39 @@ def venue_map_for(hub, venues, height_px=680, min_aspect=1.35, max_aspect=2.35):
     aspect = max(min_aspect, min(max_aspect, (span_x / 0.86) / (span_y / 0.76)))
     return build_map_image(pts, width_px=int(height_px * aspect),
                            height_px=height_px)
+
+
+def drive_minutes(hub, venues):
+    """Fill each venue's drive_min from the hub by real road routing
+    (OSRM public server; geocodes are Nominatim, disk-cached). Venues that
+    fail to geocode get no drive_min and sort last in the table."""
+    hub_ll = geocode(hub.get("address") or hub.get("name", ""))
+    if not hub_ll:
+        return venues
+    for v in venues:
+        ll = None
+        for q in (", ".join(x for x in (v.get("address", ""),) if x),
+                  v.get("venue", "")):
+            if q:
+                ll = geocode(q)
+                if ll:
+                    break
+        if not ll:
+            continue
+        v["lat"], v["lon"] = ll
+        if abs(ll[0] - hub_ll[0]) < 1e-6 and abs(ll[1] - hub_ll[1]) < 1e-6:
+            v["drive_min"] = 0
+            continue
+        try:
+            r = requests.get(
+                f"https://router.project-osrm.org/route/v1/driving/"
+                f"{hub_ll[1]},{hub_ll[0]};{ll[1]},{ll[0]}",
+                params={"overview": "false"}, headers=_UA, timeout=20)
+            r.raise_for_status()
+            routes = r.json().get("routes") or []
+            if routes:
+                v["drive_min"] = int(round(routes[0]["duration"] / 60.0))
+        except Exception:
+            pass
+        time.sleep(0.4)  # be polite to the public router
+    return venues

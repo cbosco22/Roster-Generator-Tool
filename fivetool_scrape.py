@@ -144,6 +144,100 @@ def scrape_event(event_url, log=print):
     }
 
 
+
+
+def scrape_schedule(event_url, log=print, venue_addresses=True):
+    """Scrape the event's full schedule server-side -> {'games': [...],
+    'venues': [{'venue','address','games'}], 'hub': {'name','address'}}.
+
+    How (found by watching the page's own network traffic, 2026-07-02):
+    the /schedule/all page is a Vue shell; games come from
+    POST /schedule_ajax with the CSRF token from the page's meta tag and
+    the event id from `window.EVENT_ID = "NNNN"` in the page source.
+    Venue street addresses come from POST /venue_by_field per field id.
+    games match the Chrome-extension schedule shape exactly, so
+    gen_schedule_csv.build_schedule_csv() consumes them unchanged.
+    """
+    session = requests.Session()
+    _, base_url = _event_teams_url(event_url)
+    page = _get(session, base_url + "/schedule/all")
+    csrf = re.search(r'name="csrf-token" content="([^"]+)"', page)
+    event_id = re.search(r'window\.EVENT_ID\s*=\s*"(\d+)"', page)
+    if not csrf or not event_id:
+        raise RuntimeError("schedule page missing csrf/event id - layout changed?")
+    hh = {**HEADERS, "X-CSRF-TOKEN": csrf.group(1),
+          "X-Requested-With": "XMLHttpRequest", "Content-Type": "application/json"}
+    r = session.post("https://events.fivetool.org/schedule_ajax", headers=hh,
+                     json={"event_id": event_id.group(1), "event_price_id": "0",
+                           "event_registration_item_id": 0, "schedule_id": 0,
+                           "data_type": "schedules"}, timeout=40)
+    r.raise_for_status()
+    data = r.json()
+    if not isinstance(data, dict) or not data.get("schedules"):
+        return {"games": [], "venues": [], "hub": None}
+
+    games, field_ids, venue_game_counts = [], {}, {}
+    for day in data["schedules"].values():
+        date = day.get("date", "")
+        raw_teams = day.get("teams") or []
+        # PHP serialization quirk: a day's games arrive as a LIST when keys
+        # are contiguous and as a DICT otherwise (seen live on day 2+)
+        if isinstance(raw_teams, dict):
+            raw_teams = list(raw_teams.values())
+        for g in raw_teams:
+            if not isinstance(g, dict):
+                continue
+            loc = _clean(g.get("location", ""))
+            games.append({
+                "game": str(g.get("game_number", "")),
+                "date": date,
+                "time": _clean(g.get("time", "")),
+                "location": loc,
+                "division": _clean(g.get("division", "")),
+                "team1": _clean(g.get("team_name_1", "")),
+                "team2": _clean(g.get("team_name_2", "")),
+                "score": "",
+            })
+            if g.get("field_id"):
+                field_ids.setdefault(loc, g["field_id"])
+            venue_game_counts[loc] = venue_game_counts.get(loc, 0) + 1
+    log(f"schedule: {len(games)} games across {len(data['schedules'])} days, "
+        f"{len(field_ids)} fields")
+
+    venues, seen_names = [], set()
+    if venue_addresses:
+        for loc, fid in field_ids.items():
+            time.sleep(0.3)
+            try:
+                vr = session.post("https://events.fivetool.org/venue_by_field",
+                                  headers=hh, json={"field_id": fid,
+                                                    "event_id": event_id.group(1)},
+                                  timeout=20)
+                soup = BeautifulSoup(vr.json().get("html", ""), "html.parser")
+                name_el = soup.select_one("h2")
+                vname = _clean(name_el.get_text()) if name_el else loc
+                txt = _clean(soup.get_text(" ", strip=True))
+                m = re.search(r"(\d+[^|]*?\b[A-Z]{2}\s+\d{5})", txt)
+                addr = _clean(m.group(1)) if m else ""
+                if vname in seen_names:
+                    for v in venues:
+                        if v["venue"] == vname:
+                            v["games"] += venue_game_counts.get(loc, 0)
+                else:
+                    seen_names.add(vname)
+                    venues.append({"venue": vname, "address": addr,
+                                   "games": venue_game_counts.get(loc, 0)})
+            except Exception:
+                if loc not in seen_names:
+                    seen_names.add(loc)
+                    venues.append({"venue": loc, "address": "",
+                                   "games": venue_game_counts.get(loc, 0)})
+    # hub = the venue hosting the most games (the event's home complex)
+    hub = max(venues, key=lambda v: v.get("games", 0)) if venues else None
+    return {"games": games, "venues": venues,
+            "hub": {"name": hub["venue"], "address": hub["address"]} if hub else None}
+
+
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("url", help="FiveTool event URL (any page of the event)")
