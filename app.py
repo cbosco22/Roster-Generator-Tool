@@ -426,7 +426,7 @@ st.markdown(
       </div>
       <div style="color:#FFFFFF;font-size:28px;font-weight:600;line-height:1.15;margin-top:4px;
                   font-family:'Fraunces',Georgia,serif;letter-spacing:-0.01em;">
-        ⚓ Recruiting Tools
+        ⚓ Navy Baseball
       </div>
       <div style="color:#A9B4C6;font-size:13px;margin-top:5px;
                   font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">
@@ -440,9 +440,18 @@ st.markdown(
 # Schedule Refresh tab retired 2026-07-02: Event Day's own one-tap Refresh
 # handles Perfect Game AND FiveTool in-app now (api/refresh.py), with a
 # what-changed summary. schedule_refresh.py stays importable as a fallback.
-tab_field, tab_add, tab_board, tab_post, tab_tourney, tab_admin = st.tabs(
-    ["🎯 Field Tool", "➕ Add Player", "📋 Board", "📥 Post-Event", "🏟️ New Event",
-     "⚙️  Admin"])
+#
+# Nav regrouped 2026-07-03 (planned since 7/1, deferred until Board shipped):
+# two top-level sections — Event Tools and Players — with Admin top-level.
+# The `with tab_x:` blocks below are untouched; only the tab objects' parents
+# changed, so every widget key and flow stays identical.
+sec_events, sec_players, tab_admin = st.tabs(
+    ["🏟️ Event Tools", "👥 Players", "⚙️  Admin"])
+with sec_events:
+    tab_field, tab_tourney, tab_post = st.tabs(
+        ["🎯 Field Tool", "⚡ New Event", "📥 Post-Event"])
+with sec_players:
+    tab_add, tab_board = st.tabs(["➕ Add Player", "📋 Board"])
 
 
 # ---- Field Tool ----
