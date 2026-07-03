@@ -776,6 +776,14 @@ with tab_tourney:
                                 "event takes hours). Checkpointed per event name, so "
                                 "a re-run resumes instead of starting over. Leave off "
                                 "to build the book now and re-run with it on later.")
+    tb_hub = st.text_input("Event hub address (optional — adds the venue map page)",
+                           key="tb_hub",
+                           placeholder="e.g. 4617 Lee Waters Road, Marietta, GA",
+                           help="PG doesn't publish venue addresses, so the map needs "
+                                "a starting point: the main complex's street address "
+                                "(it's on the PG event page header, next to the dates). "
+                                "Venues come off the schedule's own field names and are "
+                                "pinned with drive times from here.")
 
     tb_go = st.button("🏟️ Build tournament", type="primary",
                       use_container_width=True,
@@ -842,6 +850,50 @@ with tab_tourney:
                     outdir=tdir, div_pdf=divpdf_path, division_pdfs=division_pdfs,
                     crawl=tb_crawl, log=st.write,
                 )
+                # Venue map page (PG path): venues derived from the schedule's
+                # own '<field> @ <complex>' locations, hub typed above. Same
+                # page every one-link book opens with.
+                if (tb_hub or "").strip() and sched_paths:
+                    try:
+                        tstatus.update(label="🗺️ Building the venue map "
+                                             "(geocoding — a minute or two)…")
+                        import re as _re2
+                        from venue_map import (venues_from_games, drive_minutes,
+                                               venue_map_for)
+                        from venue_page import draw_venue_page
+                        _games = []
+                        for _sp in sched_paths:
+                            _sd = json.loads(Path(_sp).read_text())
+                            _games.extend(_sd.get("games") or _sd.get("schedule") or [])
+                        _stm = _re2.search(r'\b([A-Z]{2})\b\s*\d{5}?\s*$',
+                                           tb_hub.strip())
+                        _region = _stm.group(1) if _stm else ""
+                        _hub = {"name": tb_hub.split(",")[0].strip(),
+                                "address": tb_hub.strip()}
+                        _venues = drive_minutes(_hub, venues_from_games(_games, _region))
+                        if any(v.get("lat") is not None for v in _venues):
+                            from reportlab.pdfgen import canvas as _rc
+                            import pypdf as _pypdf
+                            _img = venue_map_for(_hub, _venues)
+                            _vp = os.path.join(tdir, "_venues.pdf")
+                            _c = _rc.Canvas(_vp)
+                            draw_venue_page(_c, tb_event or "Event", _hub,
+                                            _venues, map_img=_img)
+                            _c.showPage(); _c.save()
+                            _w = _pypdf.PdfWriter()
+                            for _pg in _pypdf.PdfReader(_vp).pages:
+                                _w.add_page(_pg)
+                            for _pg in _pypdf.PdfReader(pdf_path).pages:
+                                _w.add_page(_pg)
+                            with open(pdf_path, "wb") as _f:
+                                _w.write(_f)
+                            os.remove(_vp)
+                            _n_ok = sum(1 for v in _venues if v.get("lat") is not None)
+                            st.write(f"venue map: {_n_ok}/{len(_venues)} venues pinned")
+                        else:
+                            st.write("venue map skipped — hub/venues didn't geocode")
+                    except Exception as _me:
+                        st.write(f"venue map skipped ({_me}) — book still complete")
                 st.session_state["tb_pdf"] = Path(pdf_path).read_bytes()
                 st.session_state["tb_pdfname"] = os.path.basename(pdf_path)
                 st.session_state["tb_csv"] = (Path(csv_path).read_text()
