@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<style>
+  :root{
+    --navy-0:#06152C;--navy-1:#0B2348;
+    --gold:#C9A85C;--gold-deep:#A98634;--cream:#F5F2EA;--ink:#0B2348;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  html,body{width:1080px;height:1350px;}
+  .card{
+    position:relative;width:1080px;height:1350px;overflow:hidden;
+    background:
+      radial-gradient(140% 100% at 50% 0%, #FBF9F3 0%, rgba(251,249,243,0) 60%),
+      linear-gradient(170deg,#F7F4EC 0%,#EFEADE 100%);
+    background-color:#F3EFE5;
+    font-family:'Oswald',sans-serif;color:var(--ink);
+  }
+  .card::before{
+    content:"";position:absolute;inset:0;
+    background-image:radial-gradient(rgba(11,35,72,0.055) 1px, transparent 1.4px);
+    background-size:6px 6px;opacity:.55;
+  }
+  .rule{position:absolute;inset:30px;border:1px solid rgba(11,35,72,0.22);pointer-events:none;}
+
+  .wrap{position:relative;z-index:2;height:100%;display:flex;flex-direction:column;align-items:center;text-align:center;padding:96px 90px 0;}
+
+  .mark{height:120px;width:auto;}
+
+  .kicker{margin-top:96px;font-weight:600;font-size:24px;letter-spacing:.5em;text-transform:uppercase;color:var(--gold-deep);}
+
+  .year{
+    margin-top:6px;
+    font-family:'Anton',sans-serif;font-size:410px;line-height:.95;
+    color:var(--ink);letter-spacing:-.005em;transform:skewX(-4deg);
+  }
+  .under{margin-top:2px;font-family:'Anton',sans-serif;font-size:56px;text-transform:uppercase;color:var(--gold-deep);transform:skewX(-4deg);}
+
+  .sub{margin-top:40px;max-width:760px;font-weight:300;font-size:29px;line-height:1.4;color:#3E5375;}
+  .sub b{font-weight:600;color:var(--ink);}
+
+  .strip{margin-top:52px;display:flex;align-items:center;gap:0;border-top:1.5px solid rgba(11,35,72,0.25);border-bottom:1.5px solid rgba(11,35,72,0.25);}
+  .strip .s{padding:22px 44px;text-align:center;}
+  .strip .s + .s{border-left:1.5px solid rgba(11,35,72,0.25);}
+  .strip .v{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:54px;line-height:.9;color:var(--ink);}
+  .strip .k{margin-top:7px;font-weight:500;font-size:15px;letter-spacing:.12em;text-transform:uppercase;color:#6B7C97;}
+
+  .spacer{flex:1;}
+
+  .band{
+    position:absolute;bottom:0;left:0;width:100%;background:var(--navy-0);
+    display:flex;align-items:center;justify-content:space-between;
+    padding:26px 90px;z-index:3;
+  }
+  .band .wm{font-family:'Anton',sans-serif;font-size:34px;letter-spacing:.02em;text-transform:uppercase;color:var(--cream);transform:skewX(-7deg);}
+  .band .wm span{color:var(--gold);}
+  .band .tag{font-weight:300;font-size:17px;letter-spacing:.14em;text-transform:uppercase;color:#9FB1CC;}
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="rule"></div>
+    <div class="wrap">
+      <img class="mark" src="nstar_markonly.png" alt="Navy">
+      <div class="kicker">The Legacy</div>
+      <div class="year">1893</div>
+      <div class="under">131 seasons. And counting.</div>
+      <p class="sub">One of the longest continuously running programs in college baseball — <b>on the field since 1893.</b></p>
+      <div class="strip">
+        <div class="s"><div class="v">11</div><div class="k">NCAA Tournament<br>appearances</div></div>
+        <div class="s"><div class="v">2</div><div class="k">Elite Eight runs<br>'54 &amp; '86</div></div>
+        <div class="s"><div class="v">43</div><div class="k">Wins in 2016 —<br>program record</div></div>
+      </div>
+      <div class="spacer"></div>
+    </div>
+    <div class="band">
+      <div class="wm">Navy <span>Baseball</span></div>
+      <div class="tag">Since 1893 &nbsp;·&nbsp; And counting</div>
+    </div>
+  </div>
+</body>
+</html>

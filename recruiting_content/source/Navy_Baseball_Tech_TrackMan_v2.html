@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<style>
+  :root{
+    --navy-0:#06152C;--navy-1:#0B2348;--navy-2:#163765;
+    --gold:#C9A85C;--gold-br:#E6CF8B;--cream:#F5F2EA;--steel:#90A6C6;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  html,body{width:1080px;height:1350px;}
+  .card{
+    position:relative;width:1080px;height:1350px;overflow:hidden;
+    background:
+      radial-gradient(150% 110% at 100% 0%, #16386B 0%, rgba(22,56,107,0) 55%),
+      linear-gradient(200deg, #0B2348 0%, #071B38 60%, #06152C 100%);
+    font-family:'Oswald',sans-serif;color:var(--cream);
+  }
+  .card::before{
+    content:"";position:absolute;inset:0;
+    background-image:radial-gradient(rgba(255,255,255,0.05) 1px, transparent 1.4px);
+    background-size:7px 7px;mix-blend-mode:overlay;opacity:.45;
+  }
+  /* radar arcs backdrop — the TrackMan motif */
+  .radar{position:absolute;right:-320px;top:-320px;width:900px;height:900px;z-index:1;opacity:.5;}
+  .radar circle{fill:none;stroke:rgba(144,166,198,0.22);stroke-width:1.5;}
+  .radar .sweep{stroke:rgba(201,168,92,0.55);stroke-width:2;}
+
+  .rail{position:absolute;left:64px;top:0;bottom:0;width:4px;z-index:2;
+    background:linear-gradient(180deg, rgba(201,168,92,0) 6%, var(--gold) 30%, var(--gold) 70%, rgba(201,168,92,0) 94%);}
+  .railtxt{
+    position:absolute;left:88px;top:96px;z-index:3;
+    writing-mode:vertical-rl;transform:rotate(180deg);
+    font-weight:600;font-size:19px;letter-spacing:.42em;text-transform:uppercase;color:var(--gold-br);
+  }
+  .brandmark{position:absolute;top:78px;right:84px;height:112px;width:auto;z-index:6;
+    filter:drop-shadow(0 2px 10px rgba(0,0,0,0.35));}
+
+  .wrap{position:relative;z-index:4;height:100%;padding:218px 92px 74px 172px;display:flex;flex-direction:column;}
+
+  h1{font-family:'Anton',sans-serif;font-weight:400;text-transform:uppercase;font-size:118px;line-height:.9;color:#fff;transform:skewX(-5deg);transform-origin:left;}
+  h1 .g{color:var(--gold);}
+  .sub{margin-top:26px;max-width:780px;font-weight:300;font-size:29px;line-height:1.34;color:#D7E0EE;}
+  .sub b{font-weight:600;color:#fff;}
+
+  /* readout panel — terminal-style tracked metrics */
+  .readout{margin-top:82px;border:1px solid rgba(201,168,92,0.35);border-radius:10px;overflow:hidden;background:rgba(6,17,36,0.55);}
+  .readout .bar{display:flex;align-items:center;gap:10px;background:rgba(22,55,101,0.5);padding:16px 24px;border-bottom:1px solid rgba(201,168,92,0.25);}
+  .readout .bar .dot{width:12px;height:12px;border-radius:50%;background:var(--gold);}
+  .readout .bar .t{font-weight:600;font-size:17px;letter-spacing:.22em;text-transform:uppercase;color:var(--gold-br);}
+  .readout .row{display:flex;align-items:center;justify-content:space-between;padding:24px 28px;border-bottom:1px solid rgba(144,166,198,0.14);}
+  .readout .row:last-child{border-bottom:none;}
+  .readout .m{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:36px;letter-spacing:.02em;color:#fff;text-transform:uppercase;}
+  .readout .m span{display:block;font-family:'Oswald';font-weight:300;font-size:17px;letter-spacing:.06em;color:var(--steel);text-transform:none;margin-top:4px;}
+  .readout .st{display:flex;align-items:center;gap:12px;font-weight:600;font-size:18px;letter-spacing:.18em;text-transform:uppercase;color:var(--gold-br);}
+  .readout .st svg{color:var(--gold);}
+
+  .note{margin-top:54px;display:flex;align-items:flex-start;gap:20px;}
+  .note .mk{flex:0 0 auto;margin-top:7px;}
+  .note .tx{font-weight:300;font-size:27px;line-height:1.32;color:#DCE4F0;}
+  .note .tx b{font-weight:600;color:#fff;}
+  .note .tx em{font-style:normal;font-weight:600;color:var(--gold-br);}
+
+  .spacer{flex:1;}
+
+  .foot{display:flex;align-items:flex-end;justify-content:space-between;border-top:1px solid rgba(201,168,92,0.28);padding-top:22px;}
+  .foot .wm{font-family:'Anton',sans-serif;font-size:38px;letter-spacing:.02em;text-transform:uppercase;color:var(--cream);transform:skewX(-7deg);}
+  .foot .wm span{color:var(--gold);}
+  .foot .meta{text-align:right;font-weight:300;font-size:17px;line-height:1.4;color:var(--steel);letter-spacing:.04em;}
+  .foot .meta b{display:block;font-weight:600;color:#C4D0E2;letter-spacing:.1em;text-transform:uppercase;font-size:15px;}
+</style>
+</head>
+<body>
+  <div class="card">
+    <svg class="radar" viewBox="0 0 900 900">
+      <circle cx="450" cy="450" r="160"/>
+      <circle cx="450" cy="450" r="270"/>
+      <circle cx="450" cy="450" r="380"/>
+      <circle class="sweep" cx="450" cy="450" r="330"/>
+    </svg>
+    <div class="rail"></div>
+    <div class="railtxt">The Facilities</div>
+    <img class="brandmark" src="nstar_markonly.png" alt="Navy">
+
+    <div class="wrap">
+      <h1>Tracked.<br><span class="g">Every pitch.</span></h1>
+      <p class="sub">Navy trains with <b>TrackMan</b> — the same radar-based ball-tracking system MLB clubs develop with.</p>
+
+      <div class="readout">
+        <div class="bar"><span class="dot"></span><span class="t">TrackMan &nbsp;·&nbsp; Live Session</span></div>
+        <div class="row">
+          <div class="m">Velocity &amp; Spin Rate<span>Every bullpen, every arm</span></div>
+          <div class="st"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>Tracked</div>
+        </div>
+        <div class="row">
+          <div class="m">Movement Profile<span>Break, tilt &amp; release, mapped</span></div>
+          <div class="st"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>Tracked</div>
+        </div>
+        <div class="row">
+          <div class="m">Exit Velo &amp; Launch Angle<span>Every swing in BP</span></div>
+          <div class="st"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>Tracked</div>
+        </div>
+      </div>
+
+      <div class="note">
+        <svg class="mk" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#C9A85C" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4l8 8-8 8"/><path d="M13 4l8 8-8 8"/></svg>
+        <div class="tx"><b>No more guessing.</b> Every session generates real numbers — <em>and your coaches build your development plan around them.</em></div>
+      </div>
+
+      <div class="spacer"></div>
+
+      <div class="foot">
+        <div class="wm">Navy <span>Baseball</span></div>
+        <div class="meta">
+          <b>Data-driven.</b>
+          Player by player.
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

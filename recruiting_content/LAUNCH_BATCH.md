@@ -63,11 +63,11 @@ Built after launch-batch review, covering the rest of Wednesday ("USNA Life") an
 **12. Hands On. Every Day.** — `exports/Navy_Baseball_Coaches_Work.png`
 > Hands on. Every day. Development doesn't happen by accident — Navy's staff is in the cage, on the mound, and in the film room with players every single day. ⚓ #NavyBaseball
 
-**13. See The Spin Rate.** — `exports/Navy_Baseball_Tech_TrackMan.png`
-> See the spin rate. Navy trains with TrackMan — the same radar-based ball-tracking tech MLB teams use to develop pitchers and hitters. ⚓ #NavyBaseball
+**13. Tracked. Every Pitch.** — `exports/Navy_Baseball_Tech_TrackMan.png` *(v2 Data Card)*
+> Tracked. Every pitch. Navy trains with TrackMan — the same radar-based ball-tracking tech MLB clubs develop with. Velocity, spin, movement, exit velo — no more guessing. ⚓ #NavyBaseball
 
-**14. Every Swing. Broken Down.** — `exports/Navy_Baseball_Tech_TruMedia.png`
-> Every swing, broken down. Navy runs video and analytics through TruMedia — the same platform pro front offices and top college programs use to scout, prep, and develop. ⚓ #NavyBaseball
+**14. Every Swing. On Film.** — `exports/Navy_Baseball_Tech_TruMedia.png` *(v2 Statement)*
+> Every swing. On film. Navy runs video and analytics through TruMedia — the same platform pro front offices use to scout, prep, and develop. Every at-bat clipped, searchable, and reviewed with your coaches. ⚓ #NavyBaseball
 
 **15. $5M. Breaking Ground.** — `exports/Navy_Baseball_Renovation.png`
 > $5M. Breaking ground. Right after this season, Navy Baseball's home gets a full facilities overhaul — new locker room, wardroom, nutrition center, coaches' offices, fan suites, and a modern press box. Targeting the 2027 home opener. ⚓ #NavyBaseball
@@ -77,6 +77,51 @@ Built after launch-batch review, covering the rest of Wednesday ("USNA Life") an
 
 **17. 11 Titles. 16 Years.** — `exports/Navy_Baseball_Patriot_League.png`
 > 11 titles. 16 years. Navy hasn't just competed in the Patriot League — it's owned it. Eleven conference championships since 2009, and the reigning 2024 champs. ⚓ #NavyBaseball
+
+---
+
+# Third Batch — Monday "Pitch" Backlog (13 graphics, built in the v2 design system)
+
+Days 24–37 of `POSTING_QUEUE.md`. Built 2026-07-03 in the reworked design system (`DESIGN_SYSTEM.md`) — Statements, Cover Stories, Data Cards, a Gold Standard, and Sheets, so the feed stays varied.
+
+**18. $0 — What Four Years Costs** — `exports/Navy_Baseball_Money_Zero.png` *(Statement)*
+> What four years costs at Navy: $0. A comparable private degree runs $350,000+. Here, they pay you. ⚓ #NavyBaseball
+
+**19. Academics G1 — Engineering & Weapons** — `exports/Navy_Baseball_Academics_G1.png` *(Sheet)*
+> Group 1: Engineering & Weapons. Mechanical, aerospace, nuclear, naval architecture, and more — the STEM core behind Navy's most technical communities. Top 5 in the nation for undergrad engineering. ⚓ #NavyBaseball
+
+**20. Or Branch Out. Completely.** — `exports/Navy_Baseball_LifeAfter_BranchOut.png` *(Cover Story)*
+> Or branch out. Completely. Airline captains — carriers prize Navy aviators. CEOs and founders — grad Ross Perot built billions. Senators, Governors — even a President. Five years in, a lifetime of options. ⚓ #NavyBaseball
+
+**21. The Degree Out-Earns** — `exports/Navy_Baseball_Money_MidCareer.png` *(Data Card)*
+> The degree out-earns. $131K median mid-career salary for Navy grads vs. ~$90K national average — ranked #2 in the nation for alumni earning potential (PayScale). ⚓ #NavyBaseball
+
+**22. Academics G2 — Math & Science** — `exports/Navy_Baseball_Academics_G2.png` *(Sheet)*
+> Group 2: Math & Science. Quantitative Economics — the Academy's business & finance path — plus Computer Science, Cyber Operations, and more. Numbers people, welcome home. ⚓ #NavyBaseball
+
+**23. Retired. At 42.** — `exports/Navy_Baseball_LifeAfter_RetireBy42.png` *(Data Card)*
+> Retired. At 42. Serve 20 years and the pension starts the day you're done — healthcare for life included. Estimated lifetime retirement value: $3.5M+. ⚓ #NavyBaseball
+
+**24. Paid. Every Month.** — `exports/Navy_Baseball_Money_PaidMonthly.png` *(Statement)*
+> Paid. Every month. Midshipmen draw a real monthly paycheck starting freshman year — while classmates elsewhere take on debt. Paid to learn. Paid to lead. ⚓ #NavyBaseball
+
+**25. No Shortcuts. Just Development.** — `exports/Navy_Baseball_Culture_NoShortcuts.png` *(Cover Story)*
+> No shortcuts. Just development. No scholarship bidding, no NIL, no portal — the degree is already free, so every dollar goes into developing you. The lowest portal activity in the country. We build from within. ⚓ #NavyBaseball
+
+**26. Academics G3 — Humanities & Social Sciences** — `exports/Navy_Baseball_Academics_G3.png` *(Sheet)*
+> Group 3: Humanities & Social Sciences. Political Science, History, English — plus Arabic, Chinese, and Russian. Not every future officer is an engineer. Major in anything. Lead everywhere. ⚓ #NavyBaseball
+
+**27. 54 Astronauts** — `exports/Navy_Baseball_LifeAfter_Superlatives.png` *(Gold Standard)*
+> 54 astronauts — most in the nation. Plus a U.S. President, 20+ Members of Congress, 5 Governors, and 2 Nobel Laureates. The Yard produces leaders. In every direction. ⚓ #NavyBaseball
+
+**28. $36K at 0.75%** — `exports/Navy_Baseball_Money_CareerLoan.png` *(Sheet)*
+> $36,000 at 0.75% APR. Right after sophomore year, midshipmen qualify for a nearly interest-free career-starter loan — a head start most college grads never get. ⚓ #NavyBaseball
+
+**29. Where It Leads — In Uniform** — `exports/Navy_Baseball_Academics_InUniform.png` *(Sheet)*
+> Where it leads — in uniform. Nuclear Officer. Naval Aviator. Cyber & Intelligence. Civil Engineer Corps. Surface & Submarine. Your major shapes your community — your community shapes the next 5+ years. ⚓ #NavyBaseball
+
+**30. ...And After Service** — `exports/Navy_Baseball_Academics_AfterService.png` *(Sheet)*
+> ...and after service. Finance. Consulting. Big Tech & Aerospace. Law & Med School. Federal Agencies. Fortune 500. Navy grads don't just transition out — they're recruited for it. ⚓ #NavyBaseball
 
 ---
 

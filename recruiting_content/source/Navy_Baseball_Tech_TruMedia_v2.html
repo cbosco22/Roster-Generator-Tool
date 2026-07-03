@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<style>
+  :root{
+    --navy-0:#06152C;--navy-1:#0B2348;
+    --gold:#C9A85C;--gold-deep:#A98634;--cream:#F5F2EA;--ink:#0B2348;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  html,body{width:1080px;height:1350px;}
+  .card{
+    position:relative;width:1080px;height:1350px;overflow:hidden;
+    background:
+      radial-gradient(140% 100% at 50% 0%, #FBF9F3 0%, rgba(251,249,243,0) 60%),
+      linear-gradient(170deg,#F7F4EC 0%,#EFEADE 100%);
+    background-color:#F3EFE5;
+    font-family:'Oswald',sans-serif;color:var(--ink);
+  }
+  .card::before{
+    content:"";position:absolute;inset:0;
+    background-image:radial-gradient(rgba(11,35,72,0.055) 1px, transparent 1.4px);
+    background-size:6px 6px;opacity:.55;
+  }
+  .rule{position:absolute;inset:30px;border:1px solid rgba(11,35,72,0.22);pointer-events:none;}
+
+  .wrap{position:relative;z-index:2;height:100%;display:flex;flex-direction:column;align-items:center;text-align:center;padding:96px 90px 0;}
+
+  .mark{height:120px;width:auto;}
+
+  .kicker{margin-top:96px;font-weight:600;font-size:24px;letter-spacing:.5em;text-transform:uppercase;color:var(--gold-deep);}
+
+  h1{
+    margin-top:34px;
+    font-family:'Anton',sans-serif;font-weight:400;text-transform:uppercase;
+    font-size:158px;line-height:.92;color:var(--ink);transform:skewX(-4deg);
+  }
+  h1 .g{color:var(--gold-deep);}
+
+  .sub{margin-top:44px;max-width:800px;font-weight:300;font-size:30px;line-height:1.4;color:#3E5375;}
+  .sub b{font-weight:600;color:var(--ink);}
+
+  .strip{margin-top:60px;display:flex;align-items:center;gap:20px;}
+  .strip .s{font-weight:600;font-size:20px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink);
+    border:1.5px solid rgba(11,35,72,0.35);border-radius:100px;padding:14px 30px;}
+  .strip .s b{color:var(--gold-deep);}
+
+  .spacer{flex:1;}
+
+  .band{
+    position:absolute;bottom:0;left:0;width:100%;background:var(--navy-0);
+    display:flex;align-items:center;justify-content:space-between;
+    padding:26px 90px;z-index:3;
+  }
+  .band .wm{font-family:'Anton',sans-serif;font-size:34px;letter-spacing:.02em;text-transform:uppercase;color:var(--cream);transform:skewX(-7deg);}
+  .band .wm span{color:var(--gold);}
+  .band .tag{font-weight:300;font-size:17px;letter-spacing:.14em;text-transform:uppercase;color:#9FB1CC;}
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="rule"></div>
+    <div class="wrap">
+      <img class="mark" src="nstar_markonly.png" alt="Navy">
+      <div class="kicker">The Facilities</div>
+      <h1>Every swing.<br><span class="g">On film.</span></h1>
+      <p class="sub">Navy runs its video and analytics through <b>TruMedia</b> — the same platform pro front offices use to scout, prep, and develop. Every at-bat clipped, searchable, and reviewed with your coaches.</p>
+      <div class="strip">
+        <span class="s">Video, <b>clipped</b></span>
+        <span class="s">Stats, <b>scouting-grade</b></span>
+        <span class="s">TrackMan, <b>built in</b></span>
+      </div>
+      <div class="spacer"></div>
+    </div>
+    <div class="band">
+      <div class="wm">Navy <span>Baseball</span></div>
+      <div class="tag">Data-driven &nbsp;·&nbsp; Player by player</div>
+    </div>
+  </div>
+</body>
+</html>

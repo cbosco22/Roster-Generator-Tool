@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<style>
+  :root{
+    --navy-0:#06152C;--navy-1:#0B2348;
+    --gold:#C9A85C;--gold-deep:#A98634;--cream:#F5F2EA;--ink:#0B2348;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  html,body{width:1080px;height:1350px;}
+  .card{
+    position:relative;width:1080px;height:1350px;overflow:hidden;
+    background:
+      radial-gradient(140% 100% at 50% 0%, #FBF9F3 0%, rgba(251,249,243,0) 60%),
+      linear-gradient(170deg,#F7F4EC 0%,#EFEADE 100%);
+    background-color:#F3EFE5;
+    font-family:'Oswald',sans-serif;color:var(--ink);
+  }
+  /* paper grain */
+  .card::before{
+    content:"";position:absolute;inset:0;
+    background-image:radial-gradient(rgba(11,35,72,0.055) 1px, transparent 1.4px);
+    background-size:6px 6px;opacity:.55;
+  }
+  /* thin outer hairline, navy this time — different furniture from the gold corner frame */
+  .rule{position:absolute;inset:30px;border:1px solid rgba(11,35,72,0.22);pointer-events:none;}
+
+  .wrap{position:relative;z-index:2;height:100%;display:flex;flex-direction:column;align-items:center;text-align:center;padding:96px 90px 0;}
+
+  .mark{height:120px;width:auto;}
+
+  .kicker{margin-top:80px;font-weight:600;font-size:24px;letter-spacing:.5em;text-transform:uppercase;color:var(--gold-deep);}
+
+  .zero{
+    margin-top:30px;
+    font-family:'Anton',sans-serif;font-size:540px;line-height:.88;
+    color:var(--ink);letter-spacing:-.01em;transform:skewX(-4deg);
+  }
+  .zero small{font-size:220px;vertical-align:44%;color:var(--gold-deep);margin-right:8px;}
+
+  .compare{margin-top:6px;font-weight:300;font-size:31px;color:#3E5375;letter-spacing:.02em;}
+  .compare s{color:#8A97AC;text-decoration-thickness:3px;text-decoration-color:var(--gold-deep);}
+  .compare b{font-weight:600;color:var(--ink);}
+
+  .spacer{flex:1;}
+
+  .band{
+    position:relative;z-index:2;width:100%;background:var(--navy-0);
+    display:flex;align-items:center;justify-content:space-between;
+    padding:26px 90px;margin-top:40px;
+  }
+  .band .wm{font-family:'Anton',sans-serif;font-size:34px;letter-spacing:.02em;text-transform:uppercase;color:var(--cream);transform:skewX(-7deg);}
+  .band .wm span{color:var(--gold);}
+  .band .tag{font-weight:300;font-size:17px;letter-spacing:.14em;text-transform:uppercase;color:#9FB1CC;}
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="rule"></div>
+    <div class="wrap">
+      <img class="mark" src="nstar_markonly.png" alt="Navy">
+      <div class="kicker">What four years costs at Navy</div>
+      <div class="zero"><small>$</small>0</div>
+      <div class="compare">A comparable private degree: <s>$350,000+</s> &nbsp;·&nbsp; Here, <b>they pay you.</b></div>
+      <div class="spacer"></div>
+    </div>
+    <div class="band" style="position:absolute;bottom:0;left:0;">
+      <div class="wm">Navy <span>Baseball</span></div>
+      <div class="tag">The Pitch &nbsp;·&nbsp; No. 02</div>
+    </div>
+  </div>
+</body>
+</html>

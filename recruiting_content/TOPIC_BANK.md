@@ -21,23 +21,23 @@ Each Service community deep-dive is broken into: what the job is day-to-day, the
 | 3 | Service | Overview — "Choose How You Serve." | ✅ |
 | 4 | Baseball | Overview — "We Don't Buy Players. We Build Them." | ✅ |
 | 5 | Life After Service | Overview — "Five Years In. Set For Life." | ✅ |
-| 6 | Academics | G1 deep-dive: Engineering & Weapons majors | 🟡 |
-| 7 | Money/Degree Value | $350K → $0 stat post | 🟡 |
+| 6 | Academics | G1 deep-dive: Engineering & Weapons majors | ✅ (built — `Navy_Baseball_Academics_G1.png`) |
+| 7 | Money/Degree Value | $350K → $0 stat post | ✅ (built — `Navy_Baseball_Money_Zero.png`, cream Statement) |
 | 8 | Service | Community deep-dive: Aviation | 🔴 |
-| 9 | Baseball | Program culture/history: no scholarships, no NIL, no portal | 🟡 |
-| 10 | Life After Service | Retire-by-42 path breakdown | 🟡 |
-| 11 | Academics | G2 deep-dive: Math & Science / Quant Econ | 🟡 |
-| 12 | Money/Degree Value | "Paid every month" mechanic post | 🟡 |
+| 9 | Baseball | Program culture/history: no scholarships, no NIL, no portal | ✅ (built — `Navy_Baseball_Culture_NoShortcuts.png`) |
+| 10 | Life After Service | Retire-by-42 path breakdown | ✅ (built — `Navy_Baseball_LifeAfter_RetireBy42.png`, timeline Data Card) |
+| 11 | Academics | G2 deep-dive: Math & Science / Quant Econ | ✅ (built — `Navy_Baseball_Academics_G2.png`) |
+| 12 | Money/Degree Value | "Paid every month" mechanic post | ✅ (built — `Navy_Baseball_Money_PaidMonthly.png`) |
 | 13 | Service | Community deep-dive: Surface Warfare | 🔴 |
-| 14 | Life After Service | Branch-out path breakdown (CEOs, airline captains, politics) | 🟡 |
-| 15 | Academics | G3 deep-dive: Humanities & Social Sciences | 🟡 |
-| 16 | Money/Degree Value | Career-starter loan post ($36K @ 0.75% APR) | 🟡 |
+| 14 | Life After Service | Branch-out path breakdown (CEOs, airline captains, politics) | ✅ (built — `Navy_Baseball_LifeAfter_BranchOut.png`, jets Cover Story) |
+| 15 | Academics | G3 deep-dive: Humanities & Social Sciences | ✅ (built — `Navy_Baseball_Academics_G3.png`) |
+| 16 | Money/Degree Value | Career-starter loan post ($36K @ 0.75% APR) | ✅ (built — `Navy_Baseball_Money_CareerLoan.png`) |
 | 17 | Service | Community deep-dive: Submarines | 🔴 |
-| 18 | Life After Service | Navy alumni superlatives (President, Congress, astronauts, Nobel) | 🟡 |
-| 19 | Academics | "Where it leads — in uniform" career path post | 🟡 |
-| 20 | Money/Degree Value | Mid-career alumni salary stat post ($131K) | 🟡 |
+| 18 | Life After Service | Navy alumni superlatives (President, Congress, astronauts, Nobel) | ✅ (built — `Navy_Baseball_LifeAfter_Superlatives.png`, Gold Standard) |
+| 19 | Academics | "Where it leads — in uniform" career path post | ✅ (built — `Navy_Baseball_Academics_InUniform.png`) |
+| 20 | Money/Degree Value | Mid-career alumni salary stat post ($131K) | ✅ (built — `Navy_Baseball_Money_MidCareer.png`, bar-chart Data Card) |
 | 21 | Service | Community deep-dive: Marine Corps | 🔴 |
-| 22 | Academics | "...and after service" career path post | 🟡 |
+| 22 | Academics | "...and after service" career path post | ✅ (built — `Navy_Baseball_Academics_AfterService.png`) |
 | 23 | Service | Community deep-dive: Special Warfare | 🔴 |
 | 24 | Service | Community deep-dive: Cyber & Intel | 🔴 |
 | 25 | Service | "Plus" communities: NFO, Nuclear Power, Medicine, Civil Eng, Supply | 🔴 |

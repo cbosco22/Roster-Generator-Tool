@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<style>
+  :root{
+    --navy-0:#06152C;--navy-1:#0B2348;
+    --gold:#C9A85C;--gold-deep:#A98634;--cream:#F5F2EA;--ink:#0B2348;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  html,body{width:1080px;height:1350px;}
+  .card{
+    position:relative;width:1080px;height:1350px;overflow:hidden;
+    background:
+      radial-gradient(140% 100% at 50% 0%, #FBF9F3 0%, rgba(251,249,243,0) 60%),
+      linear-gradient(170deg,#F7F4EC 0%,#EFEADE 100%);
+    background-color:#F3EFE5;
+    font-family:'Oswald',sans-serif;color:var(--ink);
+  }
+  .card::before{
+    content:"";position:absolute;inset:0;
+    background-image:radial-gradient(rgba(11,35,72,0.055) 1px, transparent 1.4px);
+    background-size:6px 6px;opacity:.55;
+  }
+  .rule{position:absolute;inset:30px;border:1px solid rgba(11,35,72,0.22);pointer-events:none;}
+
+  .wrap{position:relative;z-index:2;height:100%;display:flex;flex-direction:column;align-items:center;text-align:center;padding:96px 90px 0;}
+
+  .mark{height:120px;width:auto;}
+
+  .kicker{margin-top:100px;font-weight:600;font-size:24px;letter-spacing:.5em;text-transform:uppercase;color:var(--gold-deep);}
+
+  h1{
+    margin-top:34px;
+    font-family:'Anton',sans-serif;font-weight:400;text-transform:uppercase;
+    font-size:172px;line-height:.92;color:var(--ink);transform:skewX(-4deg);
+  }
+  h1 .g{color:var(--gold-deep);}
+
+  .sub{margin-top:44px;max-width:760px;font-weight:300;font-size:30px;line-height:1.4;color:#3E5375;}
+  .sub b{font-weight:600;color:var(--ink);}
+
+  .chain{margin-top:64px;display:flex;align-items:center;gap:22px;}
+  .chain .c{text-align:center;}
+  .chain .c .v{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:64px;line-height:.9;color:var(--ink);}
+  .chain .c .k{margin-top:6px;font-weight:500;font-size:15.5px;letter-spacing:.12em;text-transform:uppercase;color:#6B7C97;}
+  .chain .sep{width:44px;height:2px;background:var(--gold-deep);}
+
+  .spacer{flex:1;}
+
+  .band{
+    position:absolute;bottom:0;left:0;width:100%;background:var(--navy-0);
+    display:flex;align-items:center;justify-content:space-between;
+    padding:26px 90px;z-index:3;
+  }
+  .band .wm{font-family:'Anton',sans-serif;font-size:34px;letter-spacing:.02em;text-transform:uppercase;color:var(--cream);transform:skewX(-7deg);}
+  .band .wm span{color:var(--gold);}
+  .band .tag{font-weight:300;font-size:17px;letter-spacing:.14em;text-transform:uppercase;color:#9FB1CC;}
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="rule"></div>
+    <div class="wrap">
+      <img class="mark" src="nstar_markonly.png" alt="Navy">
+      <div class="kicker">USNA Life</div>
+      <h1>Led by<br><span class="g">their own.</span></h1>
+      <p class="sub">The Brigade is run by midshipmen — a top first-class midshipman serves as <b>Brigade Commander</b>, with student leadership at every battalion and company. <b>Real command reps, before you ever commission.</b></p>
+      <div class="chain">
+        <div class="c"><div class="v">1</div><div class="k">Brigade<br>Commander</div></div>
+        <div class="sep"></div>
+        <div class="c"><div class="v">6</div><div class="k">Battalions</div></div>
+        <div class="sep"></div>
+        <div class="c"><div class="v">36</div><div class="k">Companies</div></div>
+      </div>
+      <div class="spacer"></div>
+    </div>
+    <div class="band">
+      <div class="wm">Navy <span>Baseball</span></div>
+      <div class="tag">USNA Life &nbsp;·&nbsp; Leadership</div>
+    </div>
+  </div>
+</body>
+</html>

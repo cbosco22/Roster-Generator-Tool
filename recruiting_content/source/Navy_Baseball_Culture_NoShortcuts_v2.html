@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<style>
+  :root{
+    --navy-0:#06152C;--gold:#C9A85C;--gold-br:#E6CF8B;--cream:#F5F2EA;--steel:#90A6C6;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  html,body{width:1080px;height:1350px;}
+  .card{
+    position:relative;width:1080px;height:1350px;overflow:hidden;
+    background:#06152C;font-family:'Oswald',sans-serif;color:var(--cream);
+  }
+  .photo{
+    position:absolute;inset:0;
+    background-image:url('bb_banner.jpg');background-size:cover;background-position:50% 8%;
+    filter:saturate(.9) contrast(1.04);
+  }
+  .wash{position:absolute;inset:0;background:rgba(9,27,55,0.36);mix-blend-mode:multiply;}
+  .grade{position:absolute;inset:0;background:
+    linear-gradient(0deg, rgba(4,12,26,0.97) 0%, rgba(4,12,26,0.6) 30%, rgba(4,12,26,0.06) 58%),
+    linear-gradient(180deg, rgba(4,12,26,0.5) 0%, rgba(4,12,26,0) 22%);}
+  .halftone{position:absolute;inset:0;
+    background-image:radial-gradient(rgba(255,255,255,0.05) 1px, transparent 1.4px);
+    background-size:7px 7px;mix-blend-mode:overlay;opacity:.35;}
+
+  .brandmark{position:absolute;top:70px;left:76px;height:110px;width:auto;z-index:6;
+    filter:drop-shadow(0 3px 12px rgba(0,0,0,0.5));}
+
+  .spine{position:absolute;top:76px;right:70px;bottom:76px;z-index:6;display:flex;flex-direction:column;align-items:center;gap:22px;}
+  .spine .line{flex:1;width:1.5px;background:linear-gradient(180deg, rgba(201,168,92,0.9), rgba(201,168,92,0.15));}
+  .spine .vtx{writing-mode:vertical-rl;font-weight:600;font-size:19px;letter-spacing:.42em;text-transform:uppercase;color:var(--gold-br);}
+
+  .content{position:absolute;left:76px;right:150px;bottom:84px;z-index:6;}
+  .kick{display:flex;align-items:center;gap:16px;}
+  .kick i{display:block;width:54px;height:3px;background:var(--gold);}
+  .kick span{font-weight:600;font-size:22px;letter-spacing:.4em;text-transform:uppercase;color:var(--gold-br);}
+  h1{
+    margin-top:20px;font-family:'Anton',sans-serif;font-weight:400;text-transform:uppercase;
+    font-size:140px;line-height:.88;color:#fff;transform:skewX(-5deg);transform-origin:left;
+    text-shadow:0 6px 30px rgba(0,0,0,0.45);
+  }
+  h1 .g{color:var(--gold);}
+  .strikes{margin-top:26px;display:flex;gap:14px;flex-wrap:wrap;}
+  .strikes .s{font-weight:600;font-size:21px;letter-spacing:.1em;text-transform:uppercase;color:#C8D3E4;
+    border:1.5px solid rgba(144,166,198,0.5);border-radius:100px;padding:12px 26px;text-decoration:line-through;text-decoration-color:var(--gold);text-decoration-thickness:2.5px;}
+  .sub{margin-top:26px;max-width:800px;font-weight:300;font-size:28px;line-height:1.36;color:#E4EAF4;text-shadow:0 2px 10px rgba(0,0,0,0.6);}
+  .sub b{font-weight:600;color:#fff;}
+  .sub em{font-style:normal;font-weight:600;color:var(--gold-br);}
+  .base{margin-top:32px;display:flex;align-items:center;gap:18px;border-top:1px solid rgba(201,168,92,0.4);padding-top:20px;}
+  .base .wm{font-family:'Anton',sans-serif;font-size:30px;letter-spacing:.02em;text-transform:uppercase;color:var(--cream);transform:skewX(-7deg);}
+  .base .wm span{color:var(--gold);}
+  .base .dot{color:var(--gold);font-size:22px;}
+  .base .t{font-weight:300;font-size:17px;letter-spacing:.12em;text-transform:uppercase;color:var(--steel);}
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="photo"></div>
+    <div class="wash"></div>
+    <div class="grade"></div>
+    <div class="halftone"></div>
+
+    <img class="brandmark" src="nstar_markonly.png" alt="Navy">
+
+    <div class="spine">
+      <span class="vtx">The Program</span>
+      <span class="line"></span>
+    </div>
+
+    <div class="content">
+      <div class="kick"><i></i><span>Built, not bought</span></div>
+      <h1>No shortcuts.<br><span class="g">Just development.</span></h1>
+      <div class="strikes">
+        <span class="s">Scholarship bidding</span>
+        <span class="s">NIL</span>
+        <span class="s">Transfer portal</span>
+      </div>
+      <p class="sub">The degree is already free — so <b>every dollar goes into developing you.</b> The lowest portal activity in the country. <em>We build from within.</em></p>
+      <div class="base">
+        <div class="wm">Navy <span>Baseball</span></div>
+        <span class="dot">·</span>
+        <div class="t">We don't buy players. We build them.</div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

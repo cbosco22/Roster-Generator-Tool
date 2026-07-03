@@ -13,10 +13,10 @@ Chris's feedback (2026-07-03): the first 19 graphics all share one skeleton — 
 
 | # | Name | Look | Use for | Prototype / example |
 |---|------|------|---------|---------------------|
-| 1 | **Statement** | Cream/light background, one giant numeral or 2-word phrase, huge negative space, navy band footer | Single-stat brags ($0, 131, #1) | `proto_A_statement_zero.html` |
-| 2 | **Cover Story** | Full-bleed photo, navy wash + bottom grade, big headline over photo, editorial vertical spine, no corner frame | Anything with a strong photo (facility, team, town) | `proto_B_cover_everyday.html` |
-| 3 | **Gold Standard** | Solid gold card, navy ink, ghost numeral bleeding off-edge | Rare, biggest brags only (~1 in 8 posts max) | `proto_C_gold_eleven.html` |
-| 4 | **Data Card** | Dark navy, left gold rail (no corner frame), giant numeral + real data furniture (timeline, chart, list) | Multi-fact stories, paths, timelines | `proto_D_timeline_42.html` |
+| 1 | **Statement** | Cream/light background, one giant numeral or 2-word phrase, huge negative space, navy band footer | Single-stat brags ($0, 131, #1) | `Navy_Baseball_Money_Zero.html` |
+| 2 | **Cover Story** | Full-bleed photo, navy wash + bottom grade, big headline over photo, editorial vertical spine, no corner frame | Anything with a strong photo (facility, team, town) | `Navy_Baseball_Coaches_Work_v2.html` |
+| 3 | **Gold Standard** | Solid gold card, navy ink, ghost numeral bleeding off-edge | Rare, biggest brags only (~1 in 8 posts max) | `Navy_Baseball_Patriot_League_v2.html` |
+| 4 | **Data Card** | Dark navy, left gold rail (no corner frame), giant numeral + real data furniture (timeline, chart, list) | Multi-fact stories, paths, timelines | `Navy_Baseball_LifeAfter_RetireBy42_v2.html` |
 | 5 | **Split Portrait** | Existing photo-split layout — text column + full-height portrait | People (coaches, alumni, player spotlights) | `Navy_Baseball_Coach_Ristano.html`, `Navy_Baseball_Alumni_Noah_Song.html` |
 | 6 | **The Sheet** | The original dense framed card (corner frame, stats, perks) | Sparingly — dense reference posts (draft list, majors overview), ~1 in 6 | `Navy_Baseball_Program_History.html` |
 
@@ -31,5 +31,5 @@ Chris's feedback (2026-07-03): the first 19 graphics all share one skeleton — 
 Cohesive-but-varied feeds lock constants (palette, type, one mark) and rotate layout archetypes; checkerboard/alternating light-dark rhythm; bold type organized in negative space; gradients on brand palette. Sources: [Content Stadium sports template teardowns](https://www.contentstadium.com/blog/sports-social-media-templates/), [ScoreVision 2025-26 sports design trends](https://blog.scorevision.com/top-4-trends-for-sports-graphics-2025-2026), [SVG sports design trends](https://www.sportsvideo.org/2024/04/02/whats-next-in-sports-graphics-design-creative-trends-shaping-the-industry/), [Instagram grid systems](https://www.postquick.ai/blog/how-to-plan-your-instagram-grid-for-a-brand-templates-examples), [later.com grid cohesion](https://later.com/blog/instagram-grid/).
 
 ## Status
-- 4 prototypes built 2026-07-03, awaiting Chris's pick of which directions to adopt
-- On approval: remake the unposted POSTING_QUEUE items across archetypes 1–5 (already-posted launch items stay as-is; the feed evolving forward is normal)
+- 2026-07-03: Chris approved all four directions. Full rollout done the same day — every unposted queue item restyled across archetypes 1–5, and the 13-item Monday "Pitch" backlog built new in the system (see POSTING_QUEUE.md days 24+). Already-posted launch items stay as-is; the feed evolving forward is normal.
+- Source files: v2 restyles live alongside originals as `*_v2.html`; exports always carry the canonical (non-v2) name.

@@ -6,20 +6,22 @@ Everything in here already has a rendered graphic + written caption sitting in `
 
 **Status key:** ⬜ not posted · ✅ posted
 
+**2026-07-03 design rework:** every unposted graphic below (Days 11–23) was restyled under the v2 design system (`DESIGN_SYSTEM.md`) — same file paths, new looks. Days 24+ extend the queue with the Monday "Pitch" backlog, all built in the new system.
+
 ---
 
 | Day | Type | Post | Source |
 |-----|------|------|--------|
-| 1 | Graphic | Academics | `exports/Navy_Baseball_Academics.png` |
-| 2 | Graphic | Coach Ristano | `exports/Navy_Baseball_Coach_Ristano.png` |
-| 3 | Graphic | Baseball / Program Culture | `exports/Navy_Baseball_Baseball.png` |
+| 1 | ✅ Graphic | Academics | `exports/Navy_Baseball_Academics.png` |
+| 2 | ✅ Graphic | Coach Ristano | `exports/Navy_Baseball_Coach_Ristano.png` |
+| 3 | ✅ Graphic | Baseball / Program Culture | `exports/Navy_Baseball_Baseball.png` |
 | 4 | 🎥 Video | Naval Academy overview video | *(Chris to find)* |
-| 5 | Graphic | The Field | `exports/Navy_Baseball_The_Field.png` |
-| 6 | Graphic | Money / Degree Value | `exports/Navy_Baseball_Degree_Value.png` |
-| 7 | Graphic | Service | `exports/Navy_Baseball_Service.png` |
+| 5 | ✅ Graphic | The Field | `exports/Navy_Baseball_The_Field.png` |
+| 6 | ✅ Graphic | Money / Degree Value | `exports/Navy_Baseball_Degree_Value.png` |
+| 7 | ✅ Graphic | Service | `exports/Navy_Baseball_Service.png` |
 | 8 | 🎥 Video | Annapolis, MD video | *(Chris to find)* |
-| 9 | Graphic | Program History — "Annapolis to the Show" | `exports/Navy_Baseball_Program_History.png` |
-| 10 | Graphic | Annapolis | `exports/Navy_Baseball_Annapolis.png` |
+| 9 | ✅ Graphic | Program History — "Annapolis to the Show" | `exports/Navy_Baseball_Program_History.png` |
+| 10 | ✅ Graphic | Annapolis | `exports/Navy_Baseball_Annapolis.png` |
 | 11 | Graphic | How the Yard Works | `exports/Navy_Baseball_USNA_Companies.png` |
 | 12 | Graphic | Led By Their Own | `exports/Navy_Baseball_USNA_Leadership.png` |
 | 13 | 🎥 Video | Service assignment video #1 | *(Chris to find)* |
@@ -36,9 +38,26 @@ Everything in here already has a rendered graphic + written caption sitting in `
 
 ---
 
-## After Day 23
+## Days 24–37 — Monday "Pitch" backlog (built 2026-07-03, new design system)
 
-Queue runs dry here — this is exactly the point where the Monday "Pitch" backlog (Academics/Money/Life-After-Service deep-dives, ~16 items in `TOPIC_BANK.md`) needs to be built out to keep daily posting going without a gap. Worth starting that build now rather than waiting until the queue is empty.
+| Day | Type | Post (archetype) | Source |
+|-----|------|------------------|--------|
+| 24 | Graphic | $0 — what four years costs (Statement) | `exports/Navy_Baseball_Money_Zero.png` |
+| 25 | Graphic | Academics G1: Engineering & Weapons (Sheet) | `exports/Navy_Baseball_Academics_G1.png` |
+| 26 | Graphic | Or Branch Out. Completely. (Cover Story) | `exports/Navy_Baseball_LifeAfter_BranchOut.png` |
+| 27 | Graphic | The Degree Out-Earns — $131K (Data Card) | `exports/Navy_Baseball_Money_MidCareer.png` |
+| 28 | 🎥 Video | Open video slot | *(Chris to find)* |
+| 29 | Graphic | Academics G2: Math & Science (Sheet) | `exports/Navy_Baseball_Academics_G2.png` |
+| 30 | Graphic | Retired. At 42. (Data Card) | `exports/Navy_Baseball_LifeAfter_RetireBy42.png` |
+| 31 | Graphic | Paid. Every Month. (Statement) | `exports/Navy_Baseball_Money_PaidMonthly.png` |
+| 32 | Graphic | No Shortcuts. Just Development. (Cover Story) | `exports/Navy_Baseball_Culture_NoShortcuts.png` |
+| 33 | Graphic | Academics G3: Humanities & Social Sciences (Sheet) | `exports/Navy_Baseball_Academics_G3.png` |
+| 34 | Graphic | 54 Astronauts (Gold Standard) | `exports/Navy_Baseball_LifeAfter_Superlatives.png` |
+| 35 | Graphic | $36K at 0.75% — career-starter loan (Sheet) | `exports/Navy_Baseball_Money_CareerLoan.png` |
+| 36 | Graphic | Where It Leads — In Uniform (Sheet) | `exports/Navy_Baseball_Academics_InUniform.png` |
+| 37 | Graphic | ...And After Service (Sheet) | `exports/Navy_Baseball_Academics_AfterService.png` |
+
+Captions for all of these are in `LAUNCH_BATCH.md` under "Third Batch." After Day 37, what's left in `TOPIC_BANK.md` is mostly 🔴 needs-input items (service community deep-dives, photos, player spotlights).
 
 ## Video slots
 
