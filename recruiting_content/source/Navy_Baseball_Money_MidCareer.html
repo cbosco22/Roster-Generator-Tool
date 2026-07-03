@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<style>
+  :root{
+    --navy-0:#06152C;--navy-1:#0B2348;--navy-2:#163765;
+    --gold:#C9A85C;--gold-br:#E6CF8B;--cream:#F5F2EA;--steel:#90A6C6;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  html,body{width:1080px;height:1350px;}
+  .card{
+    position:relative;width:1080px;height:1350px;overflow:hidden;
+    background:
+      radial-gradient(120% 90% at 18% 0%, #1B3E72 0%, rgba(27,62,114,0) 55%),
+      radial-gradient(140% 120% at 100% 100%, #0E2B57 0%, rgba(14,43,87,0) 50%),
+      linear-gradient(160deg, #0B2348 0%, #081B38 55%, #06152C 100%);
+    font-family:'Oswald',sans-serif;color:var(--cream);
+  }
+  .card::before{
+    content:"";position:absolute;inset:0;
+    background-image:radial-gradient(rgba(255,255,255,0.05) 1px, transparent 1.4px);
+    background-size:7px 7px;mix-blend-mode:overlay;opacity:.5;
+  }
+  .card::after{
+    content:"";position:absolute;inset:0;pointer-events:none;
+    box-shadow:inset 0 0 220px 60px rgba(2,9,20,0.65);
+  }
+  .anchor{
+    position:absolute;right:-205px;bottom:-205px;width:720px;height:auto;
+    opacity:.07;z-index:0;filter:brightness(1.2) saturate(.7);
+  }
+  .brandmark{position:absolute;top:84px;right:84px;height:118px;width:auto;z-index:6;
+    filter:drop-shadow(0 2px 10px rgba(0,0,0,0.35));}
+  .frame{position:absolute;inset:34px;border:1.5px solid rgba(201,168,92,0.40);z-index:3;pointer-events:none;}
+  .frame::before,.frame::after{content:"";position:absolute;width:22px;height:22px;border:2px solid var(--gold);}
+  .frame::before{top:-2px;left:-2px;border-right:0;border-bottom:0;}
+  .frame::after{bottom:-2px;right:-2px;border-left:0;border-top:0;}
+
+  .wrap{position:relative;z-index:5;height:100%;padding:92px 84px 78px;display:flex;flex-direction:column;}
+
+  .eyebrow{display:flex;align-items:center;gap:18px;}
+  .eyebrow .lbl{font-family:'Oswald',sans-serif;font-weight:600;font-size:25px;letter-spacing:.42em;color:var(--gold-br);text-transform:uppercase;white-space:nowrap;}
+  .wing{flex:0 0 64px;height:13px;position:relative;}
+  .wing i{position:absolute;left:0;right:0;height:2.5px;background:var(--gold);border-radius:2px;}
+  .wing i:nth-child(1){top:0;right:14px;}
+  .wing i:nth-child(2){top:5px;}
+  .wing i:nth-child(3){top:10px;right:14px;}
+
+  .head{margin-top:34px;}
+  .head h1{font-family:'Anton',sans-serif;font-weight:400;text-transform:uppercase;line-height:.86;letter-spacing:.005em;transform:skewX(-7deg);transform-origin:left;}
+  .head .l1{font-size:118px;color:var(--cream);}
+  .head .l2{font-size:118px;color:var(--gold);}
+  .sub{margin-top:26px;max-width:760px;font-family:'Oswald',sans-serif;font-weight:300;font-size:31px;line-height:1.32;color:#D7E0EE;}
+  .sub b{font-weight:600;color:#fff;}
+
+  .compare{
+    margin-top:44px;display:grid;grid-template-columns:1fr 78px 1fr;align-items:center;
+    background:linear-gradient(180deg, rgba(22,55,101,0.55), rgba(9,26,52,0.35));
+    border:1px solid rgba(201,168,92,0.30);border-radius:6px;padding:32px 34px;
+  }
+  .compare .cell .k{font-family:'Oswald',sans-serif;font-weight:500;font-size:20px;letter-spacing:.16em;text-transform:uppercase;color:var(--steel);}
+  .compare .cell .v{font-family:'Barlow Condensed',sans-serif;font-weight:700;line-height:.95;margin-top:6px;}
+  .compare .left .v{font-size:96px;color:#9FB1CC;}
+  .compare .right .v{font-size:96px;color:var(--gold-br);}
+  .arrow{display:flex;align-items:center;justify-content:center;color:var(--gold);font-size:50px;font-family:'Barlow Condensed';font-weight:700;}
+
+  .fin{margin-top:100px;display:flex;flex-direction:column;gap:40px;}
+  .fin .row{display:flex;align-items:flex-start;gap:20px;}
+  .fin .mk{flex:0 0 auto;margin-top:7px;}
+  .fin .tx{font-family:'Oswald',sans-serif;font-weight:300;font-size:28px;line-height:1.32;color:#DCE4F0;}
+  .fin .tx b{font-weight:600;color:#fff;}
+  .fin .tx em{font-style:normal;font-weight:600;color:var(--gold-br);}
+  .fin .src{margin-left:40px;font-family:'Oswald',sans-serif;font-weight:500;font-size:14px;letter-spacing:.14em;text-transform:uppercase;color:var(--gold-br);opacity:.8;}
+
+  .spacer{flex:1;}
+
+  .foot{display:flex;align-items:flex-end;justify-content:space-between;border-top:1px solid rgba(201,168,92,0.28);padding-top:24px;}
+  .foot .mark{font-family:'Anton',sans-serif;font-size:42px;letter-spacing:.01em;text-transform:uppercase;color:var(--cream);transform:skewX(-7deg);}
+  .foot .mark span{color:var(--gold);}
+  .foot .meta{text-align:right;font-family:'Oswald',sans-serif;font-weight:300;font-size:17px;line-height:1.4;color:var(--steel);letter-spacing:.04em;}
+  .foot .meta b{display:block;font-weight:600;color:#C4D0E2;letter-spacing:.1em;text-transform:uppercase;font-size:15px;}
+</style>
+</head>
+<body>
+  <div class="card">
+    <img class="anchor" src="anchor.png" alt="">
+    <img class="brandmark" src="nstar.png" alt="Navy">
+    <div class="frame"></div>
+
+    <div class="wrap">
+      <div class="eyebrow">
+        <span class="wing"><i></i><i></i><i></i></span>
+        <span class="lbl">Navy Baseball &nbsp;·&nbsp; The Pitch</span>
+      </div>
+
+      <div class="head">
+        <h1>
+          <div class="l1">$131K.</div>
+          <div class="l2">Mid-Career.</div>
+        </h1>
+        <p class="sub">Naval Academy grads don't just avoid debt — they <b>out-earn the national average by a wide margin.</b></p>
+      </div>
+
+      <div class="compare">
+        <div class="cell left">
+          <div class="k">National average</div>
+          <div class="v">$90K</div>
+        </div>
+        <div class="arrow">&#10142;</div>
+        <div class="cell right">
+          <div class="k">Median Navy alumni salary</div>
+          <div class="v">$131K</div>
+        </div>
+      </div>
+
+      <div class="fin">
+        <div class="row">
+          <svg class="mk" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#C9A85C" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4l8 8-8 8"/><path d="M13 4l8 8-8 8"/></svg>
+          <div class="tx">Ranked <b>#2 in the nation for alumni earning potential.</b><span class="src">PayScale</span></div>
+        </div>
+        <div class="row">
+          <svg class="mk" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#C9A85C" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4l8 8-8 8"/><path d="M13 4l8 8-8 8"/></svg>
+          <div class="tx">And that's <em>on top of</em> five years of active-duty pay most civilian grads never see.</div>
+        </div>
+      </div>
+
+      <div class="spacer"></div>
+
+      <div class="foot">
+        <div class="mark">Navy <span>Baseball</span></div>
+        <div class="meta">
+          <b>The degree pays.</b>
+          Literally.
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

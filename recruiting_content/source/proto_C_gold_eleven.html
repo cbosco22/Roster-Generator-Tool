@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<style>
+  :root{
+    --navy-0:#06152C;--navy-1:#0B2348;--gold:#C9A85C;--gold-br:#E6CF8B;--cream:#F5F2EA;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  html,body{width:1080px;height:1350px;}
+  .card{
+    position:relative;width:1080px;height:1350px;overflow:hidden;
+    background:
+      radial-gradient(120% 90% at 20% 0%, #E2C787 0%, rgba(226,199,135,0) 55%),
+      linear-gradient(165deg, #D2B168 0%, #C4A050 52%, #B08D3F 100%);
+    font-family:'Oswald',sans-serif;color:var(--navy-0);
+  }
+  /* navy halftone grain on gold */
+  .card::before{
+    content:"";position:absolute;inset:0;
+    background-image:radial-gradient(rgba(11,35,72,0.10) 1px, transparent 1.4px);
+    background-size:7px 7px;opacity:.6;
+  }
+  /* giant numeral bleeding off the right edge */
+  .big{
+    position:absolute;right:-70px;top:118px;z-index:1;
+    font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:1030px;line-height:.78;
+    color:rgba(11,35,72,0.14);letter-spacing:-.03em;
+  }
+
+  .wrap{position:relative;z-index:3;height:100%;padding:88px 84px 74px;display:flex;flex-direction:column;}
+
+  .top{display:flex;align-items:center;justify-content:space-between;}
+  .top .lbl{font-weight:600;font-size:23px;letter-spacing:.42em;text-transform:uppercase;color:var(--navy-1);}
+  .top img{height:112px;width:auto;}
+
+  .heads{margin-top:150px;}
+  .n{
+    font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:430px;line-height:.8;
+    color:var(--navy-0);letter-spacing:-.02em;
+  }
+  h1{
+    margin-top:26px;font-family:'Anton',sans-serif;font-weight:400;text-transform:uppercase;
+    font-size:92px;line-height:.92;color:var(--navy-0);transform:skewX(-5deg);transform-origin:left;
+  }
+  h1 span{color:#F7F2E4;text-shadow:0 2px 8px rgba(90,66,20,0.3);}
+
+  .years{
+    margin-top:38px;max-width:880px;
+    font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:34px;line-height:1.5;letter-spacing:.06em;
+    color:#3D3113;
+  }
+  .years b{color:var(--navy-0);background:rgba(245,242,234,0.55);padding:2px 12px;border-radius:4px;}
+
+  .spacer{flex:1;}
+
+  .foot{display:flex;align-items:flex-end;justify-content:space-between;border-top:2px solid rgba(11,35,72,0.45);padding-top:22px;}
+  .foot .wm{font-family:'Anton',sans-serif;font-size:40px;letter-spacing:.02em;text-transform:uppercase;color:var(--navy-0);transform:skewX(-7deg);}
+  .foot .meta{text-align:right;font-weight:500;font-size:17px;line-height:1.45;letter-spacing:.1em;text-transform:uppercase;color:#4A3D1C;}
+  .foot .meta b{display:block;font-weight:700;color:var(--navy-0);}
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="big">11</div>
+
+    <div class="wrap">
+      <div class="top">
+        <div class="lbl">The Legacy</div>
+        <img src="nstar_markonly.png" alt="Navy">
+      </div>
+
+      <div class="heads">
+        <div class="n">11</div>
+        <h1>Patriot League titles<br><span>in 16 years.</span></h1>
+      </div>
+
+      <div class="years">'09 &nbsp;'10 &nbsp;'11 &nbsp;'13 &nbsp;'14 &nbsp;'15 &nbsp;'16 &nbsp;'21 &nbsp;'22 &nbsp;'23 &nbsp;<b>'24</b></div>
+
+      <div class="spacer"></div>
+
+      <div class="foot">
+        <div class="wm">Navy Baseball</div>
+        <div class="meta">
+          <b>Reigning champs.</b>
+          Chasing the next one.
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
