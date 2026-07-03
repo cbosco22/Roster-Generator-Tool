@@ -35,7 +35,7 @@ SUPABASE_URL = os.environ.get("SUPABASE_URL", "https://bcdoidnfbrsfeulyhwhi.supa
 SUPABASE_ANON_KEY = os.environ.get("SUPABASE_ANON_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJjZG9pZG5mYnJzZmV1bHlod2hpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI3NzM2OTEsImV4cCI6MjA5ODM0OTY5MX0.aXLapvAxINhebAjiKY9wTYka9XxoJn827T5-CaiBPbc")  # <-- paste anon public key
 
 
-def push_event(name, csv_text, roster_json=None, supabase_url=None, anon_key=None, timeout=30):
+def push_event(name, csv_text, roster_json=None, schedule_url=None, supabase_url=None, anon_key=None, timeout=30):
     """Create or update an event by name. Returns {'action','id','name'}.
 
     roster_json: optional JSON text of the event's full team rosters
@@ -99,6 +99,9 @@ def push_event(name, csv_text, roster_json=None, supabase_url=None, anon_key=Non
         body["csv"] = ""  # creating fresh: column wants a value
     if roster_json is not None:
         body["roster"] = roster_json
+    if schedule_url:
+        # saved link = the Event Day Refresh button becomes one-tap
+        body["schedule_url"] = schedule_url
     r = _write(body)
     if not r.ok and roster_json is not None and "roster" in r.text:
         roster_skipped = True

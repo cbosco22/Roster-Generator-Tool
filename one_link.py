@@ -54,6 +54,9 @@ def run(url, outdir=None, event_name=None, crawl=True, push=True,
         log(f'      sheet sync failed ({e}) — using the xlsx already on disk')
 
     log('[2/6] Scraping event (teams + rosters)…')
+    import re as _re
+    _m = _re.match(r'(https?://events\.fivetool\.org/events/[^/?#]+)', url.strip())
+    base_link = _m.group(1) if _m else url
     data = scrape_event(url, log=lambda m: None)
     if event_name:
         data['event'] = event_name
@@ -151,7 +154,8 @@ def run(url, outdir=None, event_name=None, crawl=True, push=True,
         try:
             from push_event import push_event
             r = push_event(name, csv_text,
-                           roster_json=json.dumps({'teams': data['teams']}))
+                           roster_json=json.dumps({'teams': data['teams']}),
+                           schedule_url=base_link)
             what = 'schedule + roster' if csv_text else 'roster (no games posted yet)'
             msg = f'      {r["action"]} — {what} live for all coaches'
             if r.get('roster_skipped'):
