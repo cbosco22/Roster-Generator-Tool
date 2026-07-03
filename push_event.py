@@ -281,3 +281,31 @@ if __name__ == "__main__":
     with open(sys.argv[2], "r", encoding="utf-8") as f:
         text = f.read()
     print(push_event(event_name, text))
+
+
+def push_pdf(name, pdf_bytes, filename, supabase_url=None, anon_key=None, timeout=120):
+    """Attach the roster-book PDF to an event (event_files table) so coaches
+    can download it straight from the Event Day app — 'easy first grab into
+    GoodNotes' (Chris 2026-07-03). Upserts by event id; base64 in a side
+    table so the events list stays light."""
+    import base64
+    url = (supabase_url or SUPABASE_URL).rstrip("/")
+    key = anon_key or SUPABASE_ANON_KEY
+    headers = {"apikey": key, "Authorization": f"Bearer {key}",
+               "Content-Type": "application/json",
+               "Prefer": "resolution=merge-duplicates"}
+    r = requests.get(f"{url}/rest/v1/events", headers=headers,
+                     params={"name": "eq." + name, "select": "id"}, timeout=30)
+    r.raise_for_status()
+    rows = r.json()
+    if not rows:
+        raise RuntimeError(f"push_pdf: no event named {name!r}")
+    event_id = rows[0]["id"]
+    body = {"event_id": event_id,
+            "pdf": base64.b64encode(pdf_bytes).decode(),
+            "pdf_name": filename}
+    r = requests.post(f"{url}/rest/v1/event_files", headers=headers,
+                      json=body, timeout=timeout)
+    if not r.ok:
+        raise RuntimeError(f"push_pdf failed ({r.status_code}): {r.text[:200]}")
+    return {"event_id": event_id, "bytes": len(pdf_bytes)}

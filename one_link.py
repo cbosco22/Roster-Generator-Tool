@@ -161,6 +161,14 @@ def run(url, outdir=None, event_name=None, crawl=True, push=True,
             if r.get('roster_skipped'):
                 msg += f' (⚠ {r["roster_skipped"]})'
             log(msg)
+            try:
+                from push_event import push_pdf
+                with open(pdf_path, 'rb') as f:
+                    pr = push_pdf(name, f.read(), os.path.basename(pdf_path))
+                log(f'      roster book attached — downloadable in Event Day '
+                    f'({pr["bytes"] // 1024} KB)')
+            except Exception as e:
+                log(f'      PDF attach skipped ({e}) — still downloadable here')
         except Exception as e:
             log(f'      push failed (event still fully usable locally): {e}')
     else:
