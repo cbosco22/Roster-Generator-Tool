@@ -168,8 +168,14 @@ def _ensure_pbr_pkl(pbr_files):
 # ----------------------------------------------------------------------------
 def run_event(xlsx, roster, schedule=None, pbr=None,
               event=None, division='17U/18U', outdir='out',
-              div_pdf=None, division_pdfs=None, schedule_specs=None):
+              div_pdf=None, division_pdfs=None, schedule_specs=None,
+              crawl=False, log=print):
     """Run the full event workup. Returns (pdf_path, csv_path|None).
+
+    crawl: False = no PBR measurables. True = run pbr_crawler over every
+           rostered player (public data, ~3-4s/player, checkpointed in
+           outdir/pbr_checkpoint.jsonl so re-runs resume). A string = path
+           to an existing pbr_crawl.json / checkpoint .jsonl to reuse.
 
     roster: a roster JSON path, OR a list of paths to combine (PG often splits
             one event into per-age-group exports — pass them all and they're
@@ -293,12 +299,49 @@ def run_event(xlsx, roster, schedule=None, pbr=None,
     pdf_path = os.path.join(outdir, f'{stub}.pdf')
     csv_path = os.path.join(outdir, f'{stub}_Schedule.csv') if has_schedule else None
 
+    # 2.5) PBR measurables (public crawl) — same crawl one_link.py runs, so
+    #      an extension-scraped event (PG / PBR tournaments) gets the same
+    #      measurable chips as a one-link FiveTool/PS event.
+    crawl_out = None
+    if isinstance(crawl, str) and crawl:
+        crawl_out = crawl
+    elif crawl:
+        import pbr_crawler
+        seen, players = set(), []
+        for t in roster_data['teams']:
+            for p in t.get('players', []):
+                nm = (p.get('name') or '').strip()
+                key = (nm.lower(), str(p.get('grad')), str(p.get('state')),
+                       (p.get('hs') or '').lower())
+                if nm and key not in seen:
+                    seen.add(key)
+                    players.append({'name': nm, 'grad_year': p.get('grad'),
+                                    'state': p.get('state'), 'school': p.get('hs'),
+                                    'team': t['name']})
+        ckpt = os.path.join(outdir, 'pbr_checkpoint.jsonl')
+        log(f'[run_event] PBR crawl: {len(players)} unique players '
+            f'(resumable — checkpoint {ckpt})')
+        done_n = [0]
+        def _clog(msg):
+            done_n[0] += 1
+            if done_n[0] % 100 == 0:
+                log(f'      {msg}')
+        results, unmatched = pbr_crawler.crawl(players, checkpoint=ckpt, log=_clog)
+        crawl_out = os.path.join(outdir, 'pbr_crawl.json')
+        import datetime as _dt
+        with open(crawl_out, 'w') as f:
+            json.dump({'scraped_at': _dt.datetime.now(_dt.timezone.utc).isoformat(),
+                       'results': results, 'unmatched': unmatched}, f)
+        log(f'[run_event] crawl done: {len(results)} matched, '
+            f'{len(unmatched)} without a PBR profile')
+
     # 3) Load the DB straight from the xlsx, then build the PDF
     import gen_roster_pdf as grp
     grp.init_db_from_xlsx(xlsx)              # <- the correct, only DB source
     grp.build_pdf(patched_roster, pdf_path,
                   divisions_pdf=div_pdf,
-                  division_pdfs=division_pdfs)   # build_pdf keeps the loaded DB
+                  division_pdfs=division_pdfs,
+                  crawl=crawl_out)   # build_pdf keeps the loaded DB
 
     # 4) Schedule CSV (if any schedule was provided). When schedules are labeled
     #    per age group, build each separately so its Division column is correct,

@@ -770,6 +770,12 @@ with tab_tourney:
         tb_division = st.text_input("Division label (single-division events)",
                                     value="17U/18U", key="tb_division",
                                     help="Ignored when an age-groups PDF is provided.")
+    tb_crawl = st.checkbox("PBR measurables (public crawl)", value=False, key="tb_crawl",
+                           help="Same crawl the one-link path runs: every rostered "
+                                "player's public PBR profile (~3-4s each — a big PG "
+                                "event takes hours). Checkpointed per event name, so "
+                                "a re-run resumes instead of starting over. Leave off "
+                                "to build the book now and re-run with it on later.")
 
     tb_go = st.button("🏟️ Build tournament", type="primary",
                       use_container_width=True,
@@ -779,7 +785,17 @@ with tab_tourney:
         import tempfile
         with st.status("Building…", expanded=True) as tstatus:
             try:
-                tdir = tempfile.mkdtemp()
+                # Persistent per-event dir (not a throwaway tempdir) so the
+                # PBR crawl checkpoint survives re-runs and the book/CSV can
+                # be rebuilt later with the finished crawl.
+                if (tb_event or "").strip():
+                    import re as _re
+                    _slug = _re.sub(r'[^a-z0-9]+', '-',
+                                    tb_event.strip().lower()).strip('-')[:60]
+                    tdir = str(Path(__file__).parent / "events" / _slug)
+                    os.makedirs(tdir, exist_ok=True)
+                else:
+                    tdir = tempfile.mkdtemp()
                 roster_paths = []
                 for i, f in enumerate(tb_roster):
                     rp = os.path.join(tdir, f"rosters_{i}.json")
@@ -817,12 +833,14 @@ with tab_tourney:
                         divpdf_path = saved[0][1]
 
                 tstatus.update(label="📄 Generating roster book + schedule "
-                                     "(a full event can take a minute)…")
+                                     "(a full event can take a minute; with the "
+                                     "PBR crawl on, hours — it resumes if killed)…")
                 pdf_path, csv_path = run_event.run_event(
                     xlsx=str(XLSX_PATH), roster=roster_paths,
                     schedule=(sched_paths or None), schedule_specs=schedule_specs,
                     event=(tb_event or None), division=(tb_division or "17U/18U"),
                     outdir=tdir, div_pdf=divpdf_path, division_pdfs=division_pdfs,
+                    crawl=tb_crawl, log=st.write,
                 )
                 st.session_state["tb_pdf"] = Path(pdf_path).read_bytes()
                 st.session_state["tb_pdfname"] = os.path.basename(pdf_path)
@@ -851,10 +869,22 @@ with tab_tourney:
                             st.session_state["tb_csv"],
                             roster_json=_roster_json,
                         )
+                        _attach = ""
+                        try:
+                            from push_event import push_pdf as _push_pdf
+                            _pr = _push_pdf((tb_event or "").strip(),
+                                            st.session_state["tb_pdf"],
+                                            st.session_state["tb_pdfname"])
+                            _attach = (f"\n\n📕 Roster book attached "
+                                       f"({_pr['bytes'] // 1024} KB) — downloadable "
+                                       f"in Event Day.")
+                        except Exception as _ae:
+                            _attach = f"\n\n⚠️ Book attach skipped ({_ae})"
                         st.session_state["tb_push_status"] = (
                             "✅ Pushed to Event Day",
                             f"**{_r['name']}** — {_r['action']} live for all coaches."
-                            + (f"\n\n⚠️ {_r['roster_skipped']}" if _r.get("roster_skipped") else ""),
+                            + (f"\n\n⚠️ {_r['roster_skipped']}" if _r.get("roster_skipped") else "")
+                            + _attach,
                         )
                     except Exception as _pe:
                         st.session_state["tb_push_status"] = (
