@@ -88,13 +88,19 @@ def push_event(name, csv_text, roster_json=None, supabase_url=None, anon_key=Non
         return requests.post(endpoint, headers=write_headers,
                              json={"name": name, **body}, timeout=timeout)
 
-    body = {"csv": csv_text}
+    # csv_text=None -> leave the existing schedule untouched (one_link.py
+    # pushes the roster before any schedule exists; Event Day's own Refresh
+    # fills the schedule in later)
+    body = {} if csv_text is None else {"csv": csv_text}
+    if csv_text is None and not existing:
+        body["csv"] = ""  # creating fresh: column wants a value
     if roster_json is not None:
         body["roster"] = roster_json
     r = _write(body)
     if not r.ok and roster_json is not None and "roster" in r.text:
         roster_skipped = True
-        r = _write({"csv": csv_text})
+        body.pop("roster", None)
+        r = _write(body or {"csv": csv_text or ""})
     action = "updated" if existing else "created"
 
     if not r.ok:

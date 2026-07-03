@@ -27,3 +27,4 @@ pbr_crawler_output.json
 # tracked (public ranking data, lower sensitivity, no live-sync source yet).
 data/recruiting.xlsx
 data/college_logos/
+data/geocode_cache.json
