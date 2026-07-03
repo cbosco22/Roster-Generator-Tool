@@ -212,16 +212,52 @@ def _summarize_hits(extracted: dict) -> dict:
     return hits
 
 
-def _generate_pdf(extracted: dict, event_name: str, division: str) -> bytes:
-    """Run the locked build_pdf pipeline. Returns PDF bytes."""
+def _generate_pdf(extracted: dict, event_name: str, division: str,
+                  crawl_path: str = None, preset: str = "navy") -> bytes:
+    """Run the build_pdf pipeline. Returns PDF bytes.
+    Re-installs the DB from the freshest synced xlsx first, so a Field Tool
+    PDF always carries the LATEST board data (Cur-star, commits) — Chris
+    2026-07-02: 'fully populated, not just a PDF of names'."""
+    gen_roster_pdf.init_db_from_xlsx(str(XLSX_PATH))
     payload = to_pdf_payload(extracted, event_name, division or None)
     with tempfile.TemporaryDirectory() as td:
         in_json = Path(td) / "roster.json"
         out_pdf = Path(td) / "out.pdf"
         in_json.write_text(json.dumps(payload))
-        # Build with raw_sheet_text="" — our xlsx DB is already installed.
-        gen_roster_pdf.build_pdf(str(in_json), str(out_pdf), raw_sheet_text="", skip_cover=True)
+        gen_roster_pdf.build_pdf(str(in_json), str(out_pdf), raw_sheet_text="",
+                                 skip_cover=True, preset=preset,
+                                 crawl=crawl_path)
         return out_pdf.read_bytes()
+
+
+FT_CRAWL_CKPT = DATA_DIR / "fieldtool_pbr_checkpoint.jsonl"
+
+
+def _fieldtool_crawl(extracted: dict, status) -> str:
+    """Crawl PBR public data for the extracted roster (shared checkpoint —
+    a kid ever crawled by the Field Tool is never fetched twice). Returns a
+    crawl-results json path for build_pdf, or None on total failure."""
+    import pbr_crawler
+    players = []
+    for t in extracted.get("teams", [{"players": extracted.get("players", [])}]):
+        for p in t.get("players", []):
+            if p.get("name"):
+                players.append({"name": p["name"], "grad_year": p.get("grad"),
+                                "state": p.get("state"), "school": p.get("hs")})
+    if not players:
+        return None
+    done = [0]
+    def _log(msg):
+        done[0] += 1
+        status.update(label=f"📡 PBR measurables… {done[0]}/{len(players)}")
+    try:
+        results, unmatched = pbr_crawler.crawl(players, checkpoint=str(FT_CRAWL_CKPT),
+                                               log=_log)
+        out = Path(tempfile.gettempdir()) / "ft_crawl.json"
+        out.write_text(json.dumps({"results": results, "unmatched": unmatched}))
+        return str(out)
+    except Exception:
+        return None  # measurables are a bonus — never sink the PDF
 
 
 def _pdf_open_link(pdf_bytes: bytes, filename: str,
@@ -401,9 +437,12 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-tab_field, tab_add, tab_board, tab_post, tab_tourney, tab_sched, tab_admin = st.tabs(
-    ["🎯 Field Tool", "➕ Add Player", "📋 Board", "📥 Post-Event", "🏟️ Tournament Builder",
-     "🔄 Schedule Refresh", "⚙️  Admin"])
+# Schedule Refresh tab retired 2026-07-02: Event Day's own one-tap Refresh
+# handles Perfect Game AND FiveTool in-app now (api/refresh.py), with a
+# what-changed summary. schedule_refresh.py stays importable as a fallback.
+tab_field, tab_add, tab_board, tab_post, tab_tourney, tab_admin = st.tabs(
+    ["🎯 Field Tool", "➕ Add Player", "📋 Board", "📥 Post-Event", "🏟️ New Event",
+     "⚙️  Admin"])
 
 
 # ---- Field Tool ----
@@ -450,6 +489,11 @@ with tab_field:
         )
         if division == "Other / leave blank":
             division = ""
+
+    ftc1, ftc2 = st.columns(2)
+    ftc1.checkbox("Pull PBR measurables (~4s/player, repeats are instant)",
+                  value=True, key="ft_crawl")
+    ftc2.selectbox("PDF layout", ["Navy", "Classic"], key="ft_preset")
 
     go = st.button("🚀 Generate PDF",
                    type="primary", use_container_width=True,
@@ -498,9 +542,18 @@ with tab_field:
                 status.update(label="🔎 Cross-referencing DB and PBR rankings…")
                 hits = _summarize_hits(extracted)
 
+                # Step 2.5: optional live PBR measurables for these players
+                ft_crawl_path = None
+                if st.session_state.get("ft_crawl", True):
+                    status.update(label="📡 Pulling PBR measurables…")
+                    ft_crawl_path = _fieldtool_crawl(extracted, status)
+
                 # Step 3: PDF
                 status.update(label="📄 Building Navy PDF…")
-                pdf_bytes = _generate_pdf(extracted, event_name, division)
+                pdf_bytes = _generate_pdf(
+                    extracted, event_name, division, crawl_path=ft_crawl_path,
+                    preset=("classic" if st.session_state.get("ft_preset") == "Classic"
+                            else "navy"))
 
                 status.update(label="Done", state="complete")
             except Exception as e:
@@ -571,7 +624,64 @@ with tab_field:
 
 # ---- Tournament Builder ----
 with tab_tourney:
-    st.subheader("Tournament Builder")
+    st.subheader("⚡ New event from one link")
+    st.caption("Paste the event link. Everything else happens: rosters, PBR "
+               "measurables, the roster book PDF (venue map page first), the "
+               "Navy schedule CSV, and the live push to the Event Day app.")
+
+    ol_url = st.text_input("Event link", key="ol_url",
+                           placeholder="https://events.fivetool.org/events/…")
+    olc1, olc2, olc3, olc4 = st.columns(4)
+    ol_crawl = olc1.checkbox("PBR measurables", value=True, key="ol_crawl",
+                             help="Crawls every rostered player's public PBR "
+                                  "profile. First run on a big event takes a "
+                                  "while (~4s/player); re-runs resume and only "
+                                  "fetch new kids.")
+    ol_map = olc2.checkbox("Venue map page", value=True, key="ol_map")
+    ol_push = olc3.checkbox("Push to Event Day", value=True, key="ol_push")
+    ol_preset = olc4.selectbox("PDF layout", ["Navy", "Classic"], key="ol_preset")
+
+    _ol_supported = "fivetool.org" in (ol_url or "").lower()
+    if ol_url and not _ol_supported:
+        st.info("One-link currently automates **FiveTool** events end to end. "
+                "Perfect Game / PBR / Prospect Select links: use the manual "
+                "upload below for rosters (PG schedules already refresh with "
+                "one tap inside Event Day). Send me one sample event link per "
+                "site and their adapters get built next.")
+
+    if st.button("🚀 Build everything", type="primary", use_container_width=True,
+                 disabled=not (ol_url and _ol_supported), key="ol_go"):
+        import one_link as _one_link
+        with st.status("Running the event…", expanded=True) as ol_status:
+            try:
+                _res = _one_link.run(
+                    ol_url.strip(), crawl=ol_crawl, push=ol_push,
+                    venue_map=ol_map,
+                    preset=("classic" if ol_preset == "Classic" else "navy"),
+                    log=st.write)
+                st.session_state["ol_result"] = _res
+                ol_status.update(label="Event ready", state="complete")
+            except Exception as e:
+                ol_status.update(label="Failed — safe to re-run (it resumes "
+                                       "where it stopped)", state="error")
+                st.exception(e)
+                st.stop()
+
+    if st.session_state.get("ol_result"):
+        _res = st.session_state["ol_result"]
+        _pdfp = Path(_res["pdf"])
+        if _pdfp.exists():
+            st.download_button("⬇️ Roster book (PDF)", data=_pdfp.read_bytes(),
+                               file_name=_pdfp.name, mime="application/pdf",
+                               use_container_width=True, key="ol_pdf_dl")
+        _csvp = Path(_res["outdir"]) / "schedule.csv"
+        if _csvp.exists():
+            st.download_button("⬇️ Schedule (CSV)", data=_csvp.read_text(),
+                               file_name=_csvp.name, mime="text/csv",
+                               use_container_width=True, key="ol_csv_dl")
+
+    st.divider()
+    st.subheader("Manual upload (Perfect Game, photos, other sites)")
     st.caption("Upload a whole event — rosters, plus an optional schedule and "
                "age-groups PDF — and get the full roster book (cover, divisions, "
                "running header) and the schedule CSV.")
@@ -770,10 +880,6 @@ with tab_tourney:
 
 
 # ---- Schedule Refresh ----
-with tab_sched:
-    schedule_refresh.render()
-
-
 # ---- Post-Event ----
 with tab_post:
     st.subheader("Post-event ratings")

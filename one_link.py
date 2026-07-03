@@ -38,7 +38,7 @@ def _slug(name):
 
 
 def run(url, outdir=None, event_name=None, crawl=True, push=True,
-        checkpoint=None, log=print):
+        checkpoint=None, venue_map=True, preset='navy', log=print):
     from fivetool_scrape import scrape_event
     import pbr_crawler
     import gen_roster_pdf as grp
@@ -100,7 +100,7 @@ def run(url, outdir=None, event_name=None, crawl=True, push=True,
     log('[4/6] Building the roster book PDF…')
     grp.init_db_from_xlsx(xlsx)
     pdf_path = os.path.join(outdir, f'{_slug(name)}_roster_book.pdf')
-    grp.build_pdf(roster_json, pdf_path,
+    grp.build_pdf(roster_json, pdf_path, preset=preset,
                   crawl=crawl_out if (crawl and os.path.exists(crawl_out)) else None)
     log(f'      {pdf_path}')
 
@@ -124,7 +124,7 @@ def run(url, outdir=None, event_name=None, crawl=True, push=True,
             f.write(csv_text)
         log(f'      schedule CSV: {len(sched["games"])} games')
 
-    if sched.get('venues') and sched.get('hub'):
+    if venue_map and sched.get('venues') and sched.get('hub'):
         try:
             from venue_map import drive_minutes, venue_map_for
             from venue_page import draw_venue_page
