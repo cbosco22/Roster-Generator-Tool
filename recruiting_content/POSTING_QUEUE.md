@@ -22,7 +22,7 @@ Everything in here already has a rendered graphic + written caption sitting in `
 | 8 | 🎥 Video | Annapolis, MD video | *(Chris to find)* |
 | 9 | ✅ Graphic | Program History — "Annapolis to the Show" | `exports/Navy_Baseball_Program_History.png` |
 | 10 | ✅ Graphic | Annapolis | `exports/Navy_Baseball_Annapolis.png` |
-| 11 | Graphic | How the Yard Works | `exports/Navy_Baseball_USNA_Companies.png` |
+| 11 | ✅ Graphic | How the Yard Works | `exports/Navy_Baseball_USNA_Companies.png` |
 | 12 | Graphic | Led By Their Own | `exports/Navy_Baseball_USNA_Leadership.png` |
 | 13 | 🎥 Video | Service assignment video #1 | *(Chris to find)* |
 | 14 | Graphic | Strength. Built In. | `exports/Navy_Baseball_Weight_Room.png` |
