@@ -24,6 +24,7 @@ USAGE in your Roster tool, after building the CSV:
 CLI test:
     python push_event.py "PBR 16U Nat'l Champ 2026" schedule.csv
 """
+import json
 import os
 import sys
 import csv
@@ -33,6 +34,53 @@ import requests
 # Your project URL is pre-filled. Paste your anon public key here, or set env vars.
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "https://bcdoidnfbrsfeulyhwhi.supabase.co")
 SUPABASE_ANON_KEY = os.environ.get("SUPABASE_ANON_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJjZG9pZG5mYnJzZmV1bHlod2hpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI3NzM2OTEsImV4cCI6MjA5ODM0OTY5MX0.aXLapvAxINhebAjiKY9wTYka9XxoJn827T5-CaiBPbc")  # <-- paste anon public key
+
+
+def enrich_teams_with_crawl(teams, crawl_path):
+    """Fold each player's PBR measurables into the roster teams list as a
+    compact display string (p['meas'] = "FB 88 · EV 95.4 · 60 7.27"), so the
+    Event Day app's tap-a-team roster view shows the same verified numbers
+    as the roster book. Reuses gen_roster_pdf.meas_chip_items (short labels,
+    order, 1-year freshness filter) for exact PDF parity. Mutates and
+    returns teams; missing/loadable-less crawl file is a no-op."""
+    import os
+    import re as _re
+    if not (crawl_path and os.path.exists(crawl_path)):
+        return teams
+    try:
+        from gen_roster_pdf import meas_chip_items
+        with open(crawl_path) as f:
+            first = f.read(1)
+            f.seek(0)
+            if str(crawl_path).endswith('.jsonl') and first == '{':
+                recs = [json.loads(l)['record'] for l in f
+                        if l.strip() and json.loads(l).get('matched')]
+            else:
+                recs = json.load(f).get('results', [])
+    except Exception as e:
+        print(f'[MEAS] enrichment skipped ({e}) — roster pushes without measurables')
+        return teams
+    norm = lambda s: _re.sub(r'\s+', ' ', (s or '').strip().lower())
+    idx = {}
+    for r in recs:
+        q = r.get('query', {})
+        nm = norm(q.get('name'))
+        if not nm:
+            continue
+        idx[(nm, norm(q.get('team')))] = r
+        idx.setdefault(nm, r)
+    n = 0
+    for t in teams:
+        for p in t.get('players', []):
+            r = idx.get((norm(p.get('name')), norm(t.get('name')))) or idx.get(norm(p.get('name')))
+            if not r:
+                continue
+            chips = meas_chip_items(r.get('measurables'), r.get('measurables_dated'))
+            if chips:
+                p['meas'] = ' · '.join(f'{lab} {val}' for val, lab in chips)
+                n += 1
+    print(f'[MEAS] {n} players enriched with measurables from {crawl_path}')
+    return teams
 
 
 def push_event(name, csv_text, roster_json=None, schedule_url=None, location=None,

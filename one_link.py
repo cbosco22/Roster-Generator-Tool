@@ -152,7 +152,11 @@ def run(url, outdir=None, event_name=None, crawl=True, push=True,
     if push:
         log('[6/6] Pushing to Event Day (schedule + roster)…')
         try:
-            from push_event import push_event
+            from push_event import push_event, enrich_teams_with_crawl
+            if crawl and os.path.exists(crawl_out):
+                # roster view in Event Day shows the same verified numbers
+                # as the book (short labels, 1-year freshness)
+                enrich_teams_with_crawl(data['teams'], crawl_out)
             # home-page location = "City, ST" pulled off the hub address tail
             loc = None
             hub_addr = ((sched.get('hub') or {}).get('address') or '')

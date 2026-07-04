@@ -922,6 +922,11 @@ with tab_tourney:
                             for _rp in roster_paths:
                                 _teams.extend(json.loads(Path(_rp).read_text()).get("teams", []))
                             if _teams:
+                                try:  # measurables in the app's roster view (PDF parity)
+                                    from push_event import enrich_teams_with_crawl
+                                    enrich_teams_with_crawl(_teams, os.path.join(tdir, "pbr_crawl.json"))
+                                except Exception:
+                                    pass
                                 _roster_json = json.dumps({"teams": _teams})
                         except Exception:
                             _roster_json = None  # roster is a bonus, never block the push
