@@ -137,10 +137,11 @@ def run(url, outdir=None, event_name=None, crawl=True, push=True,
             c.showPage(); c.save()
             import pypdf
             w = pypdf.PdfWriter()
-            for pg in pypdf.PdfReader(vp).pages:
-                w.add_page(pg)
-            for pg in pypdf.PdfReader(pdf_path).pages:
-                w.add_page(pg)
+            # append(import_outline=True), NEVER add_page: add_page drops the
+            # book's Division->Team sidebar outline, which GoodNotes needs
+            # (bit us live 2026-07-05 — three event books shipped outline-less)
+            w.append(pypdf.PdfReader(vp))
+            w.append(pypdf.PdfReader(pdf_path), import_outline=True)
             with open(pdf_path, 'wb') as f:
                 w.write(f)
             os.remove(vp)
