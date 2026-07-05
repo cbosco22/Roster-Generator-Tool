@@ -298,22 +298,50 @@ _sheet_sync_result = _sync_recruiting_sheet()
 st.markdown(
     """
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
     html, body, [data-testid="stAppViewContainer"], [data-testid="stApp"] {
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif !important;
+      background: #F7F6F2;
     }
+    /* tabular figures everywhere numbers matter — aligned, never monospace */
+    [data-testid="stMetricValue"], [data-testid="stDataFrame"] { font-variant-numeric: tabular-nums; }
 
-    /* Fraunces on headers/brand moments only, Inter everywhere else that's
-       functional (buttons, labels, data) — the serif is what reads as
-       premium/editorial, but a whole app set in a display serif would hurt
-       readability on data-dense screens. Added 2026-06-30 per feedback that
-       Inter alone still read as generic, not "worth $20k/year." */
-    h1, h2, h3, .brand-serif {
-      font-family: 'Fraunces', Georgia, serif !important;
-      font-weight: 600 !important;
-      letter-spacing: -0.01em;
-      color: #14233B;
+    /* ONE family (Inter). Hierarchy comes from weight + size, not a second
+       display serif — the Fraunces headers read as mismatched/JV against the
+       data-dense body (Chris 2026-07-05, "looks like a high school project").
+       Kill the school-project feel: quiet, confident, weight-driven. */
+    h1, h2, h3, h4 {
+      font-family: 'Inter', -apple-system, sans-serif !important;
+      font-weight: 700 !important;
+      letter-spacing: -0.015em !important;
+      color: #14233B !important;
+    }
+    h1 { font-size: 1.7rem !important; }
+    h2, .stTabs + div h3 { font-size: 1.15rem !important; }
+
+    /* Hide the Streamlit chrome that screams "template": top toolbar, hamburger
+       menu, the "Deploy" bar, footer, and the default header band. This one
+       change does the most to make it read as a real product, not a demo. */
+    #MainMenu, header[data-testid="stHeader"], [data-testid="stToolbar"],
+    [data-testid="stDecoration"], footer { display: none !important; }
+    [data-testid="stAppViewContainer"] > .main { padding-top: 0 !important; }
+
+    /* Tighter, less empty-template block spacing + a comfortable reading width */
+    [data-testid="stAppViewBlockContainer"], .block-container {
+      padding-top: 1.2rem !important; max-width: 860px !important;
+    }
+    [data-testid="stVerticalBlock"] { gap: 0.7rem !important; }
+
+    /* Inputs/selects: real borders + a gold focus ring instead of the flat
+       default that reads as a form mockup */
+    [data-testid="stTextInput"] input, [data-testid="stNumberInput"] input,
+    [data-baseweb="select"] > div, textarea {
+      border-radius: 9px !important; border: 1px solid #E4E1D8 !important;
+      background: #FFFFFF !important;
+    }
+    [data-testid="stTextInput"] input:focus, textarea:focus {
+      border-color: #C8A24B !important; box-shadow: 0 0 0 3px rgba(200,162,75,.18) !important;
     }
 
     /* Buttons — depth and weight instead of the flat default box */
@@ -390,46 +418,33 @@ st.markdown(
        guaranteed gap and full text wrapping instead of relying on default
        flex behavior, which can render differently across mobile Safari
        versions than it does here. */
-    [data-testid="stFileUploaderDropzone"] {
-      flex-direction: column !important;
-      align-items: flex-start !important;
-      row-gap: 12px !important;
-      padding: 16px !important;
-    }
-    [data-testid="stFileUploaderDropzone"] > div {
-      white-space: normal !important;
-      overflow: visible !important;
-      text-overflow: unset !important;
-      width: 100% !important;
-    }
+    /* File uploader: leave Streamlit's default row layout intact (label left,
+       Browse button right) — earlier custom flex overrides made the button
+       wrap and overlap the field below it. Just round the corners + let the
+       small caption wrap on mobile. */
+    [data-testid="stFileUploaderDropzone"] { border-radius: 12px !important; }
     [data-testid="stFileUploaderDropzone"] small {
-      white-space: normal !important;
-      overflow-wrap: break-word !important;
-    }
-    [data-testid="stFileUploaderDropzone"] section > button,
-    [data-testid="stFileUploaderDropzone"] span > button {
-      margin-top: 4px !important;
+      white-space: normal !important; overflow-wrap: break-word !important;
     }
     </style>
     """,
     unsafe_allow_html=True,
 )
 
-# Brand lockup — mirrors the Event Day app (navy header, gold eyebrow).
+# Brand lockup — one family (Inter), weight-driven, mirrors Event Day's
+# elevated header (2026-07-05 redesign: no display serif, tighter).
 st.markdown(
     """
-    <div style="background:#14233B;border:1px solid #1F3357;border-radius:14px;
-                padding:18px 20px;margin-bottom:14px;">
-      <div style="color:#C8A24B;letter-spacing:.18em;font-size:11px;font-weight:700;
-                  font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">
+    <div style="background:#14233B;border-radius:16px;padding:20px 22px;margin-bottom:16px;
+                box-shadow:0 1px 3px rgba(20,35,59,.10);">
+      <div style="color:#C8A24B;letter-spacing:.2em;font-size:10.5px;font-weight:700;">
         NAVY BASEBALL · RECRUITING
       </div>
-      <div style="color:#FFFFFF;font-size:28px;font-weight:600;line-height:1.15;margin-top:4px;
-                  font-family:'Fraunces',Georgia,serif;letter-spacing:-0.01em;">
-        ⚓ Navy Baseball
+      <div style="color:#FFFFFF;font-size:26px;font-weight:800;line-height:1.1;margin-top:5px;
+                  letter-spacing:-0.02em;">
+        Navy Baseball
       </div>
-      <div style="color:#A9B4C6;font-size:13px;margin-top:5px;
-                  font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">
+      <div style="color:#A9B4C6;font-size:12.5px;margin-top:6px;font-weight:500;">
         PDF rosters · CSV schedules · post-event summaries
       </div>
     </div>
