@@ -231,13 +231,23 @@ def post_ops_chunked(ops, url, token, dry_run=True, chunk_size=10,
     stay retryable, they're read-only).
 
     progress: optional callable(done_ops, total_ops) for UI updates.
-    Returns {'ok', 'results', 'error'?} aggregated across chunks; stops at
-    the first failed chunk (results has everything up to and incl. it).
+
+    Per-op resilient (2026-07-05, the Hoover outage root-fix): a failed op
+    or a dead chunk no longer takes down everything after it — every chunk
+    is always attempted, failures are QUARANTINED per op, and the good ops
+    keep writing. Returns {'ok', 'results', 'quarantined', 'applied',
+    'error'?}: 'ok' means zero quarantined; 'quarantined' is a list of
+    {'player','action','error','status'} where status is 'failed' (the
+    server reported this specific op failed) or 'unknown' (the whole
+    request died — the chunk's ops may or may not have landed; resending
+    them is SAFE because Code.gs skips already-applied op_ids).
     """
     import time as _t
     for op in ops:
         op.setdefault('op_id', _op_id(op))
     all_results = []
+    quarantined = []
+    applied = 0
     total = len(ops)
     for start in range(0, total, chunk_size):
         if start:
@@ -250,17 +260,43 @@ def post_ops_chunked(ops, url, token, dry_run=True, chunk_size=10,
             r = post_ops(chunk, url, token, dry_run=dry_run, timeout=timeout,
                          retries=2)
         except Exception as e:
-            return {'ok': False, 'results': all_results,
-                    'error': f'{type(e).__name__}: {e}', 'failed_at': start,
-                    'written_before_failure': 0 if dry_run else start}
-        all_results.extend(r.get('results', []))
+            for op in chunk:
+                quarantined.append({'player': op.get('player'),
+                                    'action': op.get('action'),
+                                    'error': f'{type(e).__name__}: {e}',
+                                    'status': 'unknown'})
+            if progress:
+                progress(min(start + len(chunk), total), total)
+            continue
+        results = r.get('results', [])
+        all_results.extend(results)
+        if not r.get('ok') and not results:
+            # request-level failure with no per-op detail (bad token, header
+            # not found, request-body parse error): every later chunk would
+            # fail identically, so stop instead of burning through them.
+            for op in ops[start:]:
+                quarantined.append({'player': op.get('player'),
+                                    'action': op.get('action'),
+                                    'error': r.get('error') or 'request failed',
+                                    'status': 'unknown'})
+            break
+        for op, res in zip(chunk, results):
+            if res.get('ok'):
+                applied += 1
+            else:
+                quarantined.append({'player': res.get('player') or op.get('player'),
+                                    'action': op.get('action'),
+                                    'row': res.get('row'),
+                                    'error': res.get('error') or 'failed',
+                                    'status': 'failed'})
         if progress:
             progress(min(start + len(chunk), total), total)
-        if not r.get('ok'):
-            return {'ok': False, 'results': all_results,
-                    'error': r.get('error'), 'failed_at': start,
-                    'written_before_failure': 0 if dry_run else start}
-    return {'ok': True, 'results': all_results}
+    out = {'ok': not quarantined, 'results': all_results,
+           'quarantined': quarantined, 'applied': applied}
+    if quarantined:
+        out['error'] = (f'{len(quarantined)} of {total} op(s) quarantined '
+                        f'({applied} applied cleanly)')
+    return out
 
 
 def post_ops(ops, url, token, dry_run=True, timeout=45, retries=2):

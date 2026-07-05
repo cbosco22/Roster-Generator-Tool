@@ -1409,29 +1409,42 @@ with tab_post:
                         check = sheet_write.post_ops_chunked(
                             ops, sw_url, sw_token, dry_run=True,
                             progress=lambda d, t: _prog.write(f"Validated {d}/{t}…"))
-                        if not check.get("ok"):
+                        # Per-op quarantine (2026-07-05): one bad player no
+                        # longer blocks the whole batch. Anyone who fails
+                        # validation is held back and reported; everyone
+                        # else still gets written.
+                        quar_dry = check.get("quarantined", [])
+                        if quar_dry and len(quar_dry) >= len(ops):
                             wstatus.update(label="Failed", state="error")
-                            _fa = check.get("failed_at", 0)
-                            _who = ", ".join(
-                                (o.get("player") or "?") for o in ops[_fa:_fa + 10])
                             st.error(
-                                f"**Nothing was written** — validation stopped on this "
-                                f"group of players: {_who}.\n\n"
+                                f"**Nothing was written** — validation failed for "
+                                f"every player.\n\n"
                                 f"Error: `{check.get('error')}`\n\n"
                                 f"**What to do:** your work is saved (it survives an app "
-                                f"restart — reopen this tab and tap Restore). Check those "
-                                f"players' rows in the tables above for anything odd, "
-                                f"then click Write again. If it keeps failing, use the "
-                                f"Manual fallback at the bottom and text CB.")
+                                f"restart — reopen this tab and tap Restore). Wait a few "
+                                f"seconds and click Write again. If it keeps failing, use "
+                                f"the Manual fallback at the bottom and text CB.")
                             st.stop()
+                        if quar_dry:
+                            _bad = {q.get("player") for q in quar_dry}
+                            ops = [o for o in ops if o.get("player") not in _bad]
+                            st.warning(
+                                "Held back — these player(s) failed validation and "
+                                "will NOT be written this round (everyone else still "
+                                "goes in). Check their rows above, then click Write "
+                                "again to retry just them:\n\n" +
+                                "\n".join(f"• {q.get('player') or '?'} — `{q.get('error')}`"
+                                          for q in quar_dry))
 
                         st.write(f"Writing {len(ops)} player(s)…")
                         real = sheet_write.post_ops_chunked(
                             ops, sw_url, sw_token, dry_run=False,
                             progress=lambda d, t: _prog.write(f"Written {d}/{t}…"))
-                        if real.get("ok"):
-                            n_new = sum(1 for r in real["results"] if r["action"] == "append")
-                            n_upd = sum(1 for r in real["results"] if r["action"] == "update")
+                        n_new = sum(1 for r in real["results"]
+                                    if r.get("ok") and r["action"] == "append")
+                        n_upd = sum(1 for r in real["results"]
+                                    if r.get("ok") and r["action"] == "update")
+                        if real.get("ok") and not quar_dry:
                             wstatus.update(label="Done", state="complete")
                             st.success(f"✓ Written to Recruiting Sheet 2.0 — "
                                       f"{n_new} new player(s), {n_upd} update(s), "
@@ -1441,25 +1454,45 @@ with tab_post:
                                  f"pe_autosave_{(pe_by or 'XX').strip()}.json").unlink()
                             except Exception:
                                 pass
+                        elif real.get("ok"):
+                            # everything sent was written, but some players
+                            # were held back at validation — keep the autosave
+                            # so a Write-again can pick them up after fixing.
+                            wstatus.update(label="Done (some held back)", state="complete")
+                            st.success(f"✓ {n_new} new player(s), {n_upd} update(s) "
+                                      f"written and verified. The held-back players "
+                                      f"above were NOT written — fix their rows and "
+                                      f"click Write again (already-written players are "
+                                      f"skipped automatically, no double-adds).")
                         else:
-                            wstatus.update(label="Failed", state="error")
-                            bad = [(op, r) for op, r in zip(ops, real.get("results", []))
-                                  if not r.get("ok")]
-                            if bad:
-                                st.error("Some fields did not verify after writing — "
-                                        "nothing here is guaranteed applied correctly:")
-                                for op, r in bad:
-                                    st.write(f"- {op.get('player')} (row {r.get('row')}): "
-                                            f"{r.get('error')}")
-                            else:
-                                done = real.get("written_before_failure", 0)
-                                st.error(
-                                    f"Write stopped at player {done + 1} of {len(ops)}: "
-                                    f"{real.get('error')}\n\n"
-                                    f"**Safe to just click Write again** — players "
-                                    f"already written are recognized and skipped "
-                                    f"automatically, so a retry can never double-add "
-                                    f"anyone.")
+                            # Per-op quarantine (2026-07-05): the good ops all
+                            # landed; only the quarantined ones need attention.
+                            quar = real.get("quarantined", [])
+                            wstatus.update(label="Partial — some quarantined",
+                                           state="error")
+                            if n_new or n_upd:
+                                st.success(f"✓ {n_new} new player(s), {n_upd} "
+                                          f"update(s) written and verified.")
+                            st.error(
+                                f"**Quarantined — NOT confirmed written** "
+                                f"({len(quar)} player(s)). The rest of the batch "
+                                f"went in; only these need attention:\n\n" +
+                                "\n".join(
+                                    f"• {q.get('player') or '?'}"
+                                    + (f" (row {q['row']})" if q.get('row') else "")
+                                    + f" — `{q.get('error')}`"
+                                    + (" *(request died mid-flight — may or may not "
+                                       "have landed; a retry is still safe)*"
+                                       if q.get('status') == 'unknown' else "")
+                                    for q in quar) +
+                                f"\n\n**Safe to just click Write again** — players "
+                                f"already written are recognized and skipped "
+                                f"automatically, so a retry can never double-add "
+                                f"anyone; only the quarantined ones are re-attempted. "
+                                f"If the same player keeps failing, the error above "
+                                f"names the exact column — fix that cell value in the "
+                                f"table and Write again, or add them by hand via the "
+                                f"Manual fallback and text CB.")
                         with st.expander("🔍 What was sent (debug)"):
                             st.write("Resolved columns for this write:")
                             st.json(cols)

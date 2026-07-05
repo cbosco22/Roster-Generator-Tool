@@ -70,7 +70,21 @@ function doPost(e) {
         results.push({ action: op.action, ok: true, skipped_duplicate: true });
         continue;
       }
-      var res = _applyOp(sheet, op, dryRun, firstNameCol, appendCursor);
+      // Per-op isolation (root-fix for the 2026-07-05 Hoover outage): one
+      // op throwing used to abort the WHOLE request via doPost's outer
+      // catch - everything after it never ran, the client saw a bodyless
+      // error, and retries died on the same op forever (earlier ops skip
+      // via the op_id cache, then the same throw repeats). Now a throwing
+      // op becomes a normal per-op failure result and the loop keeps
+      // going, so one bad row can never take the rest of the batch down.
+      var res;
+      try {
+        res = _applyOp(sheet, op, dryRun, firstNameCol, appendCursor);
+      } catch (err) {
+        res = { action: op.action, ok: false, player: op.player,
+                error: 'op threw: ' + String(err) };
+      }
+      if (res.player === undefined) res.player = op.player;
       if (res.ok && ckey && !dryRun) cache.put(ckey, '1', 21600);
       results.push(res);
     }
@@ -109,16 +123,11 @@ function _findLastDataRow(sheet, firstNameCol) {
   return DATA_START_ROW - 1;
 }
 
-// Writes one column's value and reads it back to confirm it actually
-// persisted, instead of trusting that setValue() not throwing means the
-// write stuck (it does not always - see file header comment). Returns the
-// value actually found in the cell afterward.
-function _setAndVerify(sheet, row, col, value) {
-  var range = sheet.getRange(row, col);
-  range.setValue(value);
-  SpreadsheetApp.flush();
-  return range.getValue();
-}
+// (was _setAndVerify: one setValue+flush+read-back per FIELD. Removed
+// 2026-07-05 - flushing 15x per player was the original 2026-07-02
+// timeout cause only half-fixed, and a single throwing field aborted the
+// whole request. _applyOp now writes all of an op's fields with ONE
+// flush and still reads every cell back before reporting it applied.)
 
 // Sheets auto-converts a date-looking string (e.g. "7/1/2026", written for
 // Date Added) into a real Date value on write. Reading that cell back then
@@ -150,26 +159,65 @@ function _applyOp(sheet, op, dryRun, firstNameCol, appendCursor) {
 
   var written = {};
   var mismatches = [];
-  for (var col in op.fields) {
-    var intended = op.fields[col];
-    if (dryRun) {
-      written[col] = intended;
-    } else {
-      var actual = _setAndVerify(sheet, targetRow, parseInt(col, 10), intended);
-      written[col] = actual;
+  var fieldErrors = [];
+  if (dryRun) {
+    for (var dcol in op.fields) written[dcol] = op.fields[dcol];
+  } else {
+    // Set every field first, flush ONCE, then read everything back.
+    // A field whose setValue throws (e.g. a data-validation reject) is
+    // recorded and skipped - the op's clean fields still land.
+    var pending = [];
+    for (var col in op.fields) {
+      try {
+        sheet.getRange(targetRow, parseInt(col, 10)).setValue(op.fields[col]);
+        pending.push(col);
+      } catch (err) {
+        fieldErrors.push(col + ': ' + String(err));
+      }
+    }
+    try {
+      SpreadsheetApp.flush();
+    } catch (flushErr) {
+      // The batched flush can't say WHICH field it choked on, so redo
+      // this op field-by-field with individual flushes (slow, but only
+      // ever runs on an already-failing op) to pin the exact offender
+      // while every clean field still lands.
+      pending = [];
+      fieldErrors = [];
+      for (var scol in op.fields) {
+        try {
+          sheet.getRange(targetRow, parseInt(scol, 10)).setValue(op.fields[scol]);
+          SpreadsheetApp.flush();
+          pending.push(scol);
+        } catch (err2) {
+          fieldErrors.push(scol + ': ' + String(err2));
+        }
+      }
+    }
+    for (var j = 0; j < pending.length; j++) {
+      var vcol = pending[j];
+      var actual = sheet.getRange(targetRow, parseInt(vcol, 10)).getValue();
+      written[vcol] = actual;
       // Loose equality: Sheets can return a Date object for a date string,
       // or a number for a numeric string - normalize both sides before
       // comparing to avoid false-positive mismatches on those, while still
       // catching a value that genuinely did not take.
-      if (_normalizeForCompare(actual) !== _normalizeForCompare(intended) &&
-          !(actual === '' && intended === '')) {
-        mismatches.push(col);
+      if (_normalizeForCompare(actual) !== _normalizeForCompare(op.fields[vcol]) &&
+          !(actual === '' && op.fields[vcol] === '')) {
+        mismatches.push(vcol);
       }
     }
   }
+  var problems = [];
+  if (fieldErrors.length) {
+    problems.push('These columns threw on write: ' + fieldErrors.join('; '));
+  }
   if (mismatches.length) {
+    problems.push('These columns did not verify after write: ' + mismatches.join(', '));
+  }
+  if (problems.length) {
     return { action: op.action, ok: false, row: targetRow, fields: written,
-            error: 'These columns did not verify after write: ' + mismatches.join(', ') };
+            error: problems.join(' | ') };
   }
   return { action: op.action, ok: true, row: targetRow, fields: written };
 }
