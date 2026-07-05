@@ -1123,6 +1123,36 @@ def build_pdf(json_path, out_path, raw_sheet_text="", proof_only=False,
         return (str(s or '').replace('&', '&amp;').replace('<', '&lt;')
                 .replace('>', '&gt;'))
 
+    # profile-link icon strip: 6.5pt brand marks right-aligned under the
+    # last name, each registered as a PDF link annotation at draw time.
+    _ICON_DIR = _os.path.join(_script_dir, 'data', 'icons')
+    _ICON_FILE = {'X': 'x.png', 'PBR': 'pbr.png', 'PG': 'pg.png',
+                  '5T': '5t.png', 'EV': 'ev.png'}
+
+    class _LinkIcons(Flowable):
+        SZ, GAP = 6.5, 1.6
+        def __init__(self, links):
+            super().__init__()
+            self.links = [(l, u) for l, u in links if l in _ICON_FILE]
+            self.height = self.SZ if self.links else 0
+            self.width = 0
+        def wrap(self, availWidth, availHeight):
+            self.width = availWidth
+            return (availWidth, self.height)
+        def draw(self):
+            x = self.width - 2
+            for label, url in reversed(self.links):
+                icon = _os.path.join(_ICON_DIR, _ICON_FILE[label])
+                x -= self.SZ
+                try:
+                    self.canv.drawImage(icon, x, 0, self.SZ, self.SZ,
+                                        mask='auto', preserveAspectRatio=True)
+                    self.canv.linkURL(url, (x, 0, x + self.SZ, self.SZ),
+                                      relative=1)
+                except Exception:
+                    pass
+                x -= self.GAP
+
     def _row_ctx(p):
         """Everything any column renderer might need, computed once per player."""
         first, last = split_name(p.get('name',''))
@@ -1267,15 +1297,13 @@ def build_pdf(json_path, out_path, raw_sheet_text="", proof_only=False,
     COLUMNS = {
         'num':    dict(hdr='#',     w=0.23*inch, cell=lambda p, c: Paragraph(c['j'], sNum)),
         'first':  dict(hdr='First', w=0.62*inch, cell=lambda p, c: Paragraph(_esc(c['first']), sName)),
-        # last name + profile link chips beneath it (X / PBR / event page)
-        # — the two-line-in-ROW_H pattern class_htwt already proves out.
-        # 4.5pt steel-blue text, live hyperlinks in GoodNotes/Preview.
-        'last':   dict(hdr='Last',  w=0.80*inch, cell=lambda p, c: Paragraph(
-            _esc(c['last']) +
-            ('<br/>' + ' '.join(
-                f'<link href="{_esc(u)}"><font size=4.5 color="#1B4A8A"><b>{_esc(l)}</b></font></link>'
-                for l, u in c['links']) if c.get('links') else ''),
-            sName)),
+        # last name + tiny LOGO icons tucked bottom-right beneath it (Chris's
+        # sketch, 2026-07-05 v2: "smaller, bottom right, and I want the
+        # logo"). Real brand marks (X, PBR's own icon, PG/5T badges), each a
+        # live tap target in GoodNotes via canvas.linkURL.
+        'last':   dict(hdr='Last',  w=0.80*inch, cell=lambda p, c:
+            [Paragraph(_esc(c['last']), sName)] +
+            ([_LinkIcons(c['links'])] if c.get('links') else [])),
         # sketch layout: Pos with B/T under it, Class with Ht·Wt under it
         # (UTILITY abbreviated -- at this column width it wraps mid-word)
         'pos_bt': dict(hdr='Pos', wt=0.9, cell=lambda p, c: Paragraph(
