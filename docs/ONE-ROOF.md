@@ -1,4 +1,5 @@
-# One Roof — the Multi-Program Recruiting Platform
+# Recruiting AI — College Baseball
+## (the One Roof multi-program platform)
 
 _v2 blueprint, 2026-07-05 (late night). Supersedes nothing — extends
 SCALING_STRATEGY.md (2026-07-04) with Chris's product requirements from
@@ -181,28 +182,89 @@ lists — this is config plumbing, not new rendering.
 | AppSheet | already retired ✅ |
 | Public gviz/export reads | RLS'd REST — no more link-shared sheet holding minors' data |
 
-## Rollout (real dates)
+## Rollout — ACCELERATED (Chris 2026-07-05 night: "I want to run this now.
+## I need to beat the competition to market.")
 
-- **This week (Jul 6–12): freeze.** Boston/Mattingly/WWBA run on what we
-  have. Zero architecture changes during events. (Tonight = blueprint,
-  schema, agreement drafts only.)
-- **Phase 0 (Jul 13–20): the schema goes live, dual-write starts.**
-  `supabase/platform_schema.sql` deploys alongside the existing tables;
-  every board write (post-event, Add Player, Board edits) mirrors into
-  Postgres. The sheet stays source of truth; the real database assembles
-  itself from live usage. Auth ships (Navy staff get logins; "By: TR"
-  becomes automatic).
-- **Phase 1 (late Jul): Navy reads flip.** Board tab + Event Day cross-ref
-  read Postgres. Sheet becomes a generated mirror. The in-app grid view
-  ships here — Chris lives in it for two weeks and hates/loves it into
-  shape.
-- **Phase 2 (Aug): tenant #2.** The friend's program onboards via the
-  wizard with Claude-assisted import, on the signed data agreement, after
-  the adversarial RLS test suite passes. Their feedback drives a month of
-  polish.
-- **Phase 3 (fall): the roof widens.** PWA install flow, per-program
-  branding, self-serve onboarding, Capacitor App Store build, the Claude
-  Design pass over every surface, pricing.
+Key insight that unlocks speed: the original "freeze during event week"
+protected the surfaces coaches USE. Additive work — new tables, auth, new
+routes, the wizard — touches none of them. So Phase 0 runs **during** the
+event week, in parallel with event support.
+
+- **Mon–Tue Jul 6–7 (foundation):** deploy `platform_schema.sql`
+  (additive), Supabase → Pro ($25/mo: daily backups, no pausing — required
+  before anyone else's data), Sentry error tracking + in-app feedback
+  table, seed `public_players` from the existing caches (academics.json,
+  crawls, rankings pkl). Org accounts + LLC/entity question to Chris.
+- **Wed–Thu Jul 8–9 (tenancy):** Supabase Auth in Event Day (Navy staff
+  get logins; "By: TR" from identity), program-scoped events + board API,
+  import-wizard MVP. The friend runs the SAME sheet format as Navy —
+  `db_loader` already parses it, so his import path is literally built.
+- **Fri–Sat Jul 10–11 (tenant #2 sandbox):** friend's board imported into
+  a sandbox program; instant enrichment demo; books + one-link pipeline run
+  for HIS program; **adversarial RLS test suite green before any real
+  data.** His post-event writes go straight to Postgres — no sheet, no
+  Apps Script; his stack is born clean.
+- **Sun–Mon Jul 12–13 (handoff):** data agreement signed (attorney pass is
+  the one external dependency — a mutual NDA + the DATA-PRIVACY draft
+  bridges if the attorney is slow), logins delivered. **Friend starts.**
+- **Rest of July:** his feedback + Navy dual-write (board changes mirror
+  into Postgres). In-app grid view ships. Navy reads flip when stable.
+- **Fall:** PWA install polish, Capacitor App Store build, Claude Design
+  pass, self-serve onboarding, pricing.
+
+Honest risks of the compressed path: attorney timing; build hours compete
+with live event support during WWBA week; the friend's first weeks run on
+Event Day + books + wizard (Streamlit's flows port later — he never sees
+Streamlit at all).
+
+## Feedback, errors, and the improvement loop
+
+- **In-app "Send feedback" on every screen** → `feedback` table
+  (program, member, screen, text, optional screenshot) + instant push to
+  Chris (email/webhook). Doubles as the per-tenant feature-request backlog.
+- **Sentry** (free tier) in the app + serverless functions: every crash
+  reports itself with stack, device, and tenant before the coach even
+  texts.
+- **Uptime monitor** (UptimeRobot free) on the app + board/tag APIs.
+- **A changelog screen** — coaches see the product moving; momentum is a
+  retention feature.
+
+## Storage (scalable from day one)
+
+- **Stay Supabase Postgres + Vercel** — right tools, already proven, one
+  bill each. Upgrade Supabase to **Pro** before tenant #2 (backups!).
+- **PDFs and photos move to Supabase Storage buckets**, not base64 rows —
+  tonight's book-push statement timeouts (57014) are the symptom; Storage
+  is CDN-served, cheaper, and size-unbounded.
+- **Backups:** Pro dailies + a weekly `pg_dump` shipped off-site.
+- **Org accounts** for Vercel/Supabase/GitHub under the company, not
+  Chris's personal logins — cheapest to fix now, painful at 10 tenants.
+
+## Name & legal protection (asked 2026-07-05)
+
+**"Recruiting AI — College Baseball"** — workable launch name; the
+`— <Sport>` suffix scales exactly as intended (Football, Hockey, Softball).
+Eyes open on the tradeoffs: it is *descriptive*, which makes it a weak
+trademark (descriptive marks get refused or land on the Supplemental
+Register) and "recruiting AI" collides with a crowded HR-tech phrase in
+search results and app stores. Verdict: launch privately under it now —
+naming must not delay tenant #2 — and before PUBLIC launch do the
+30-minute check: USPTO TESS search, domain grabs, App Store search test;
+consider a coined brand ("the product formerly known as…" is cheap before
+you have customers, expensive after).
+
+**Patents: no (for now).** Nothing here clears the novelty bar —
+multi-tenant SaaS, data aggregation, and AI-assisted import are prior art
+everywhere, and post-*Alice* software patents are weak, slow (2–3 years),
+and expensive ($15–30k+). The real moats, in order: **speed to market, the
+shared data pool (network effect), the trademark (~$350/class — worth
+filing), automatic copyright on the code, the signed data agreement, and
+trade-secret treatment of the pipelines.** A ~$2–3k provisional buys
+12 months of "patent pending" as marketing if an attorney pushes for it —
+ask when the data-agreement attorney is already on the phone.
+
+**Entity:** form the LLC before holding another program's data or money.
+Same attorney call.
 
 ## Open decisions for Chris (the real forks)
 
