@@ -24,20 +24,30 @@ def _norm(s):
     return re.sub(r'\s+', ' ', (s or '').strip().lower())
 
 
-def apply_academics(event_dir, acad_map, event_name, rebuild=True, push=True):
+def apply_academics(event_dir, acad_map, event_name, rebuild=True, push=True,
+                    source='harvest'):
     roster_path = os.path.join(event_dir, 'roster.json')
     data = json.load(open(roster_path))
-    idx = {_norm(k): v for k, v in acad_map.items()}
-    n = 0
+
+    # 1) fold this harvest into the PERSISTENT cross-event cache (academics
+    # attach to the player, not the event — so a GPA learned here shows up at
+    # every future event too). See academics.py.
+    import academics as _A
+    cache = _A.load()
+    roster_idx = {}
     for t in data['teams']:
         for p in t.get('players', []):
-            v = idx.get(_norm(p.get('name')))
-            if v:
-                p['acad'] = v
-                n += 1
+            roster_idx[_norm(p.get('name'))] = (p.get('state'), p.get('grad'))
+    _A.merge_harvest(cache, acad_map, source=source, roster_index=roster_idx)
+    _A.save(cache)
+
+    # 2) enrich this event's roster from the FULL cache (this harvest + every
+    # prior event's academics), not just today's map
+    n = _A.enrich_event_from_cache(data['teams'], cache)
     with open(roster_path, 'w') as f:
         json.dump(data, f, indent=1)
-    print(f'[ACAD] wrote academics onto {n} players in {roster_path}')
+    print(f'[ACAD] cache now holds {len(cache)} players; '
+          f'filled {n} on this event roster ({roster_path})')
 
     if not rebuild:
         return n
