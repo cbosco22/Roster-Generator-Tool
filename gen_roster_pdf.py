@@ -1069,7 +1069,11 @@ def build_pdf(json_path, out_path, raw_sheet_text="", proof_only=False,
     W = doc.width
     # 2.50 -> 2.40 (2026-07-02): the 0.10" moved to the Acad column so all
     # three GPA/SAT/ACT chips fit two pill rows instead of dropping the ACT
-    NOTES_W = 2.40 * inch
+    # 2.40 -> 2.66 on 2026-07-05 (Chris: "shrink the academic column to the
+    # size of the Class column; Notes absorbs the extra space") — the 0.26in
+    # here is exactly the width acad_chips gave up (wt 2.0 -> 1.3), so every
+    # other column's width is unchanged.
+    NOTES_W = 2.66 * inch
 
     sTeam   = ParagraphStyle('TM', fontName='Helvetica-Bold', fontSize=20,
                               textColor=TEXT_DARK, alignment=TA_CENTER, spaceBefore=4, spaceAfter=16)
@@ -1268,7 +1272,7 @@ def build_pdf(json_path, out_path, raw_sheet_text="", proof_only=False,
             sSchl)),
         'meas':   dict(hdr='Measurables', wt=1.8,
                        cell=lambda p, c: MeasChips(c['meas'], _MEAS_W[0])),
-        'acad_chips': dict(hdr='Acad', wt=2.0, cell=_acad_cell),
+        'acad_chips': dict(hdr='Acad', wt=1.3, cell=_acad_cell),  # = Class width (Chris 2026-07-05)
         'rank':   dict(hdr='Rank', wt=1.4, cell=_rank_cell),
         # real star icon under the label (vector StarGlyph) -- Chris liked
         # the old Sheets look where Cur and New matched, star below the word

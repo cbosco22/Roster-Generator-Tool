@@ -83,16 +83,30 @@ def enrich_teams_with_crawl(teams, crawl_path):
     return teams
 
 
+def enrich_teams_with_academics(teams):
+    """Fill each player's `acad` field from the persistent academics cache
+    (data/academics.json — the cross-event waterfall store). Chris ranked
+    the roster view's info: academics FIRST, then rank, then metrics
+    (2026-07-05). Rosters that already carry acad (FiveTool events) keep
+    it; the cache fills everyone it knows. Mutates and returns teams."""
+    try:
+        import academics
+        n = academics.enrich_event_from_cache(teams, academics.load())
+        print(f'[ACAD] {n} players filled from the academics cache')
+    except Exception as e:
+        print(f'[ACAD] cache enrichment skipped ({e})')
+    return teams
+
+
 def enrich_teams_with_ranks(teams, pkl_path=None):
-    """Append rank chips to each player's `meas` display line so the Event
-    Day app's tap-a-team roster view shows ranked guys, not just the PDF
-    book (Chris 2026-07-05: "I need to know ranked guys" in-app). Same
-    chip text as the book's Rank column — "#4 GA", "#120 Nat'l", "#57 PG"
-    — folded into the existing meas string ("FB 88 · SPIN 2212 · #4 GA")
-    so the app needs zero changes to render it. Same cross-validation
-    semantics as gen_roster_pdf's _pbr_match: state rank must match the
-    player's grad year AND state; national rank must match grad year
-    (entries carry '- select state -' so the state check passes through).
+    """Set each player's `rank` field ("#4 GA · #120 Nat'l · #57 PG") so
+    the Event Day roster view can show it NEXT TO the name (Chris
+    2026-07-05 — originally folded into the meas line, promoted to its own
+    field the same day). Same chip text as the book's Rank column and the
+    same cross-validation semantics as gen_roster_pdf's _pbr_match: state
+    rank must match the player's grad year AND state (region entries match
+    member states); national rank must match grad year (entries carry
+    '- select state -' so the state check passes through).
     Mutates and returns teams; a missing pkl is a no-op."""
     import os
     import pickle
@@ -159,10 +173,9 @@ def enrich_teams_with_ranks(teams, pkl_path=None):
             if pg.isdigit():
                 chips.append(f"#{pg} PG")
             if chips:
-                rank_str = ' · '.join(chips)
-                p['meas'] = f"{p['meas']} · {rank_str}" if p.get('meas') else rank_str
+                p['rank'] = ' · '.join(chips)
                 n += 1
-    print(f'[RANK] {n} players carry rank chips in the roster line')
+    print(f'[RANK] {n} players carry a rank field')
     return teams
 
 
