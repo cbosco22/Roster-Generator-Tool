@@ -115,12 +115,27 @@ def enrich_teams_with_ranks(teams, pkl_path=None):
             return 'NEng'
         return _STATE_ABV.get(s.lower(), s.upper())
 
+    # mirrors gen_roster_pdf's region handling: a multi-state PBR region
+    # entry ('New England', 'Dakotas', MD-site covering DE/DC) matches all
+    # of its member states instead of rejecting real state ranks
+    region_members = {
+        'new england': {'CT', 'MA', 'ME', 'NH', 'RI', 'VT'},
+        'dakotas': {'ND', 'SD'},
+        'maryland': {'MD', 'DE', 'DC'},
+    }
+
+    def state_match(entry_state, player_state):
+        if abbrev(entry_state) == abbrev(player_state):
+            return True
+        return abbrev(player_state) in region_members.get(
+            (entry_state or '').strip().lower(), ())
+
     def valid(entry, grad, state):
         if not entry:
             return False
         if grad and str(entry.get('class', '')) != str(grad):
             return False
-        if state and abbrev(entry.get('state', '')) != abbrev(state) and \
+        if state and not state_match(entry.get('state', ''), state) and \
                 entry.get('state', '') not in ('- select state -', ''):
             return False
         return True

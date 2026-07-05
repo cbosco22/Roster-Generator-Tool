@@ -982,6 +982,22 @@ def build_pdf(json_path, out_path, raw_sheet_text="", proof_only=False,
         if s.lower() == 'new england': return 'NEng'
         return _STATE_ABV.get(s.lower(), s.upper())
 
+    # PBR runs some rankings as multi-state REGIONS; a region entry must
+    # match every member state or kids lose real state ranks (seen live
+    # 2026-07-05: 'New England' entries rejected vs players' CT/MA/ME, and
+    # 'Maryland' — PBR's MD site covers DE/DC — rejected vs a DE player).
+    _REGION_MEMBERS = {
+        'new england': {'CT', 'MA', 'ME', 'NH', 'RI', 'VT'},
+        'dakotas': {'ND', 'SD'},
+        'maryland': {'MD', 'DE', 'DC'},
+    }
+
+    def _state_match(entry_state, player_state):
+        if _abbrev(entry_state) == _abbrev(player_state):
+            return True
+        return _abbrev(player_state) in _REGION_MEMBERS.get(
+            (entry_state or '').strip().lower(), ())
+
     def _pbr_match(name, grad_year=None, state=None):
         """
         Look up PBR ranking with cross-validation on grad year + state.
@@ -998,7 +1014,7 @@ def build_pdf(json_path, out_path, raw_sheet_text="", proof_only=False,
             def _valid(entry):
                 if not entry: return False
                 yr_ok    = (not grad_year) or (str(entry.get('class','')) == str(grad_year))
-                state_ok = (not state)     or (_abbrev(entry.get('state','')) == _abbrev(state)) \
+                state_ok = (not state)     or _state_match(entry.get('state',''), state) \
                            or entry.get('state','') in ('- select state -', '')
                 return yr_ok and state_ok
 
