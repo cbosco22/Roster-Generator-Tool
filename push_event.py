@@ -79,6 +79,12 @@ def enrich_teams_with_crawl(teams, crawl_path):
             if chips:
                 p['meas'] = ' · '.join(f'{lab} {val}' for val, lab in chips)
                 n += 1
+            # deep links for the app (Chris 2026-07-05): the kid's PBR
+            # profile always; his X when a crawl has captured it
+            if r.get('profile_path'):
+                p['pbr_url'] = 'https://www.prepbaseballreport.com' + r['profile_path']
+            if r.get('twitter'):
+                p['x'] = r['twitter']
     print(f'[MEAS] {n} players enriched with measurables from {crawl_path}')
     return teams
 

@@ -1149,7 +1149,20 @@ def build_pdf(json_path, out_path, raw_sheet_text="", proof_only=False,
         if not pg_commit and not db_commit:
             _st_e, _nat_e = _pbr_match(p.get('name',''), grad_year=yr or None, state=state or None)
             pbr_commit = ((_st_e or _nat_e) or {}).get('commit', '') or ''
+        # profile deep links, rendered as tappable chips under the last
+        # name (Chris's sketch, 2026-07-05): X first when a crawl captured
+        # the handle, the PBR profile, then the event platform's page
+        links = []
+        if (crawl or {}).get('twitter'):
+            links.append(('X', crawl['twitter']))
+        if (crawl or {}).get('profile_path'):
+            links.append(('PBR', 'https://www.prepbaseballreport.com' + crawl['profile_path']))
+        purl = (p.get('profile_url') or '').strip()
+        if purl:
+            src = 'PG' if 'perfectgame' in purl else '5T' if 'fivetool' in purl else 'EV'
+            links.append((src, purl))
         return {
+            'links': links,
             'first': first, 'last': last, 'j': j, 'pos': pos, 'ht': ht, 'wt': wt,
             'yr': yr, 'sch': (p.get('hs','') or '').strip(), 'state': state,
             'db': db, 'cur': db['tier'] if db else '', 'bt': bt,
@@ -1254,7 +1267,15 @@ def build_pdf(json_path, out_path, raw_sheet_text="", proof_only=False,
     COLUMNS = {
         'num':    dict(hdr='#',     w=0.23*inch, cell=lambda p, c: Paragraph(c['j'], sNum)),
         'first':  dict(hdr='First', w=0.62*inch, cell=lambda p, c: Paragraph(_esc(c['first']), sName)),
-        'last':   dict(hdr='Last',  w=0.80*inch, cell=lambda p, c: Paragraph(_esc(c['last']), sName)),
+        # last name + profile link chips beneath it (X / PBR / event page)
+        # — the two-line-in-ROW_H pattern class_htwt already proves out.
+        # 4.5pt steel-blue text, live hyperlinks in GoodNotes/Preview.
+        'last':   dict(hdr='Last',  w=0.80*inch, cell=lambda p, c: Paragraph(
+            _esc(c['last']) +
+            ('<br/>' + ' '.join(
+                f'<link href="{_esc(u)}"><font size=4.5 color="#1B4A8A"><b>{_esc(l)}</b></font></link>'
+                for l, u in c['links']) if c.get('links') else ''),
+            sName)),
         # sketch layout: Pos with B/T under it, Class with Ht·Wt under it
         # (UTILITY abbreviated -- at this column width it wraps mid-word)
         'pos_bt': dict(hdr='Pos', wt=0.9, cell=lambda p, c: Paragraph(

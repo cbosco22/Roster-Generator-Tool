@@ -204,6 +204,16 @@ def fetch_profile(session, profile_path):
     if commit_el:
         out["commitment"] = re.sub(r"^Commitment\s*", "", commit_el.get_text(" ", strip=True))
 
+    # social: PBR profiles link the kid's X/Twitter — capture it so books
+    # and Event Day can deep-link (Chris 2026-07-05). Only profile-shaped
+    # links count; PBR's own @prepbaseball footer links are filtered out.
+    for a in soup.select('a[href*="twitter.com/"], a[href*="x.com/"]'):
+        href = a.get("href", "")
+        m = re.search(r"(?:twitter|x)\.com/@?([A-Za-z0-9_]{1,15})/?$", href)
+        if m and m.group(1).lower() not in ("prepbaseball", "share", "intent", "home"):
+            out["twitter"] = f"https://x.com/{m.group(1)}"
+            break
+
     # measurable stat cards: <div class="dynamic-stat-box stat"><strong>91</strong><span>INF<br>VELO</span></div>
     measurables = {}
     for box in soup.select(".dynamic-stat-box.stat"):
