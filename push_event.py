@@ -83,6 +83,74 @@ def enrich_teams_with_crawl(teams, crawl_path):
     return teams
 
 
+def enrich_teams_with_ranks(teams, pkl_path=None):
+    """Append rank chips to each player's `meas` display line so the Event
+    Day app's tap-a-team roster view shows ranked guys, not just the PDF
+    book (Chris 2026-07-05: "I need to know ranked guys" in-app). Same
+    chip text as the book's Rank column — "#4 GA", "#120 Nat'l", "#57 PG"
+    — folded into the existing meas string ("FB 88 · SPIN 2212 · #4 GA")
+    so the app needs zero changes to render it. Same cross-validation
+    semantics as gen_roster_pdf's _pbr_match: state rank must match the
+    player's grad year AND state; national rank must match grad year
+    (entries carry '- select state -' so the state check passes through).
+    Mutates and returns teams; a missing pkl is a no-op."""
+    import os
+    import pickle
+    from db_loader import strip_suffix
+    from gen_schedule_csv import _STATE_ABV
+    path = pkl_path or os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                    'data', 'pbr_rankings.pkl')
+    if not os.path.exists(path):
+        print('[RANK] pbr_rankings.pkl not found — roster pushes without ranks')
+        return teams
+    with open(path, 'rb') as f:
+        d = pickle.load(f)
+    nat, st = d.get('national', {}), d.get('state_rnks', {})
+
+    def abbrev(s):
+        s = (s or '').strip()
+        if len(s) == 2:
+            return s.upper()
+        if s.lower() == 'new england':
+            return 'NEng'
+        return _STATE_ABV.get(s.lower(), s.upper())
+
+    def valid(entry, grad, state):
+        if not entry:
+            return False
+        if grad and str(entry.get('class', '')) != str(grad):
+            return False
+        if state and abbrev(entry.get('state', '')) != abbrev(state) and \
+                entry.get('state', '') not in ('- select state -', ''):
+            return False
+        return True
+
+    n = 0
+    for t in teams:
+        for p in t.get('players', []):
+            key = strip_suffix((p.get('name') or '').strip().lower())
+            if not key:
+                continue
+            grad = str(p.get('grad') or '')
+            state = (p.get('state') or '').strip()
+            chips = []
+            e = st.get(key)
+            if valid(e, grad, state):
+                chips.append(f"#{e['rank']} {abbrev(e.get('state', ''))}")
+            e = nat.get(key)
+            if valid(e, grad, state):
+                chips.append(f"#{e['rank']} Nat'l")
+            pg = str(p.get('pg_rank') or '').strip()
+            if pg.isdigit():
+                chips.append(f"#{pg} PG")
+            if chips:
+                rank_str = ' · '.join(chips)
+                p['meas'] = f"{p['meas']} · {rank_str}" if p.get('meas') else rank_str
+                n += 1
+    print(f'[RANK] {n} players carry rank chips in the roster line')
+    return teams
+
+
 def push_event(name, csv_text, roster_json=None, schedule_url=None, location=None,
                supabase_url=None, anon_key=None, timeout=30):
     """Create or update an event by name. Returns {'action','id','name'}.
