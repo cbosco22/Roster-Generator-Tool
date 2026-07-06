@@ -202,10 +202,14 @@ create table program_events (       -- per-tenant, RLS like players
 ```
 
 **Lane 1 — catalog drop-down.** Weekly discovery already builds the
-catalog of every upcoming PBR/PG/FiveTool event. Freshness is
-demand-driven, not size-guessed: **any event with ≥1 subscriber is
-auto-re-crawled the night before it starts, and nightly while it runs.**
-No subscriber = no refresh spend.
+catalog of every upcoming PBR/PG/FiveTool/PS event. Refresh policy
+(Chris, 7/6): **every catalog event gets a final-roster re-crawl at
+T-24h before its start date** — teams routinely don't post final rosters
+until the day before, so the T-24h pass is what makes the books right.
+On top of that, subscribed events also re-crawl nightly while the event
+runs (measurables and DK links move during play). The worker schedules
+the T-24h pass from `starts_on`; it's the one crawl that runs regardless
+of demand.
 
 **Lane 2 — paste a URL.** Recognized event-URL patterns (PBR/PG/5T)
 insert a high-priority sweep_events row; the worker picks it up
@@ -229,6 +233,73 @@ Every lane converges: event live in their tenant, book in their branding,
 cross-ref against THEIR board, pg-sourced academics gated by
 `pg_entitled`. PDF extraction (Claude API) runs in the web app's backend,
 not on the crawl box (the VPS stays dumb: fetch, parse, upsert).
+
+## Fourth source: Prospect Select (verified live 2026-07-06)
+
+Chris asked for a look at PS profiles — verified by fetching real pages:
+
+- Platform: `play.ps-baseball.com` (Playbook365). Everything checked is
+  **server-rendered and public, no login** — requests+bs4 works, VPS-safe.
+- Team/roster pages: `/public/team/details/<event-slug>/<team-uuid>` —
+  full roster with grad year, HS + HS coach, city/state, both positions,
+  commit, H/T, height/weight (this is already what feeds Boston's
+  roster.json), plus links to each player's profile uuid.
+- Player profiles: `/public/player-profile/baseball/<uuid>`. PUBLIC:
+  player info, commitment, and **live in-game velocities per pitch type**
+  (verified: FB 86 / SL 78 / CB 77 on a Boston Classic kid) — in-game
+  tournament velo is data PBR profiles don't carry; showcase metrics
+  (60, position velos, pop, EV, bat speed, attack angle…) populate when
+  the kid has done a PS showcase. MEMBERSHIP-GATED: event video, advanced
+  hitting metrics, Scorebook365 game stats. **We scrape public fields
+  only — gated PS content is their paid product; if we ever want it,
+  that's a license/entitlement conversation like PG academics, not a
+  crawl.**
+- Name→profile resolution: the player-search page has a public
+  autocomplete endpoint; roster pages carry profile uuids directly, so
+  event crawls don't need search at all.
+- Schema impact: add `'ps'` to the sweep_events source enum, `links.ps`
+  in the pool, `sources` tags `ps` per field. Merge rule: PS in-game
+  velos land in measurables with dates like everything else.
+
+## Commitment sync to tenant boards (Chris, 7/6)
+
+Every crawl already reads commitments; the pool should push changes OUT,
+not just collect them. Nightly after crawls:
+
+1. Diff pass: pool rows whose `commit` changed since last sync (keep a
+   `commit_changed_at` timestamp; optionally a small history jsonb).
+2. For each tenant, match changed rows to their board by identity hash.
+3. Write the commit to the tenant's board — Sheets via the Apps Script
+   path for Navy today, Postgres `players` when boards move in-product.
+   Write rules carry the hard-won lessons: resolve columns dynamically,
+   read back to verify, never blind-retry a real write.
+4. **Conflict rule:** if the tenant's cell already has a DIFFERENT
+   non-empty value than the pool, don't overwrite — flag it (same diff-
+   flag pattern as Event Day refresh) and let the coach decide. Empty or
+   matching cells update silently. Every write is logged per tenant.
+
+This is the first case of pool→tenant write-back, so it sets the
+pattern (rankings refresh and measurables freshness can ride the same
+rail later).
+
+## Adjacent product adds (routed to app backlogs, recorded here 7/6)
+
+- **Google-the-player button**: in Event Day player rows/cards — one tap
+  opens a Google search of `"Name" baseball <grad> <state>`, next to
+  brand-icon links (PBR / PG / X / PS) drawn from `public_players.links`.
+  Pure frontend + pool read; lands in navy-event-day.
+- **Inline rating edit from the schedule**: change a kid's rating
+  directly on the game card in the schedule view — writes an evaluation
+  (append-only, tagger initials) and syncs the board like the existing
+  tagger flow. Lands in navy-event-day.
+- **Hosted player video as an upcharge**: coaches attach their own
+  scouting video to a player; stored in Supabase Storage buckets
+  (ONE-ROOF storage section), gated by a billing/entitlement flag —
+  first concrete paid add-on. Boundary: **coach-shot/uploaded video
+  only; never rehost PBR/PG/PS video** (PS literally sells video
+  memberships — rehosting is a legal fight we'd lose and a partner
+  bridge we'd burn). Public video links (a kid's X highlight) are links,
+  not hosted copies.
 
 ## Queue seeding order (first nights)
 
