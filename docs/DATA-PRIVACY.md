@@ -1,5 +1,9 @@
 # Data Privacy & Confidentiality — draft agreement + engineering notes
 
+_Counterparty for the signed version: **Bosco Technology LLC** (entity in
+formation, 2026-07-06), operating the product “Recruiting AI — College
+Baseball.” Update when the LLC filing lands._
+
 _Draft 2026-07-05. Plain-English first; a real attorney turns this into the
 signed version before tenant #2 onboards. The engineering commitments are
 buildable and mostly built — nothing here is marketing fiction._

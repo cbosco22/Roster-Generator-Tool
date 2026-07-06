@@ -262,7 +262,16 @@ Streamlit at all).
 - **Org accounts** for Vercel/Supabase/GitHub under the company, not
   Chris's personal logins — cheapest to fix now, painful at 10 tenants.
 
-## Name & legal protection (asked 2026-07-05)
+## Name & legal protection (asked 2026-07-05; DECIDED 2026-07-06)
+
+**DECIDED (Chris, 2026-07-06): company = "Bosco Technology", product =
+"Recruiting AI — College Baseball".** Two-layer naming is the right
+structure: the LLC/trademark/contracts live under Bosco Technology (a
+distinctive, protectable mark), while the product name stays descriptive
+and swappable per sport. Domain check 2026-07-06: **boscotechnology.com
+AVAILABLE** (grab it), boscotech.io / recruitingai.io / getrecruitingai.com
+also open; recruitingai.com + recruiting-ai.com taken. Sentry org already
+created under `bosco-technology` — the name is in use.
 
 **"Recruiting AI — College Baseball"** — workable launch name; the
 `— <Sport>` suffix scales exactly as intended (Football, Hockey, Softball).
