@@ -170,6 +170,66 @@ existing morning health check (it queries `sweep_events where status =
 'failed' or (status = 'crawling' and crawled_at is null and started
 yesterday)`). No new notification channel.
 
+## Tenant event ingestion — the three lanes (Chris, 2026-07-06 evening)
+
+The coach-facing side of the sweep. Design goal, verbatim intent: a coach
+at another program adds an event in a few clicks and has the app live in
+a few minutes — book, schedule, and their own board cross-ref — without
+ever knowing what a scraper is. All crawling is server-side; no tenant
+ever runs tooling locally (today's flow — Chris running pbr_crawler.py /
+FiveTool harvest / push_event.py by hand — is the operator bootstrap, not
+the product).
+
+**Overlap between tenants is the point, with one privacy rule.** Events
+are public facts and get crawled ONCE (`sweep_events` is already unique
+on source+source_key); a second program "adding" WWBA is a subscription
+to data that already exists — instant for them, free for us. But WHICH
+programs subscribed to WHICH events is competitive intel (a rival seeing
+Navy's event list = exactly what DATA-PRIVACY promises against), so:
+
+```sql
+create table program_events (       -- per-tenant, RLS like players
+  program_id uuid references programs(id),
+  sweep_event_id bigint references sweep_events(id),
+  source     text default 'catalog',  -- catalog | url | pdf
+  private_roster jsonb,               -- pdf-lane only (see lane 3)
+  added_at   timestamptz default now(),
+  primary key (program_id, sweep_event_id)
+);
+-- policy: program_id in (select my_programs()) — nobody sees another
+-- program's subscriptions. sweep_events itself gets a read policy for
+-- authenticated (the catalog is shared).
+```
+
+**Lane 1 — catalog drop-down.** Weekly discovery already builds the
+catalog of every upcoming PBR/PG/FiveTool event. Freshness is
+demand-driven, not size-guessed: **any event with ≥1 subscriber is
+auto-re-crawled the night before it starts, and nightly while it runs.**
+No subscriber = no refresh spend.
+
+**Lane 2 — paste a URL.** Recognized event-URL patterns (PBR/PG/5T)
+insert a high-priority sweep_events row; the worker picks it up
+immediately (on-demand lane runs at the same polite rate — a ~300-player
+event ≈ 15 min). UI shows pending → crawling (n/total) → ready.
+Unrecognized domains are rejected with a "send us the link" contact path
+rather than crawling arbitrary sites.
+
+**Lane 3 — upload a PDF** (the PBR Pennsylvania Showcase case: roster
+exists only as an emailed file). Server-side Claude-assisted import —
+pdf_to_roster.py's extraction grown into the same preview-and-confirm
+wizard as the ONE-ROOF board import: upload → extract → editable preview
+table → confirm → event created. Two rules: (a) PDF-sourced rosters are
+**tenant-private by default** (`private_roster` on their program_events
+row, NOT the shared catalog — the file was given to that program); (b)
+players in it are still enriched from the shared pool by identity hash,
+so even a PDF-only event comes back with measurables/ranks/links
+attached. Schedules ride the same lanes: URL, PDF, or CSV upload.
+
+Every lane converges: event live in their tenant, book in their branding,
+cross-ref against THEIR board, pg-sourced academics gated by
+`pg_entitled`. PDF extraction (Claude API) runs in the web app's backend,
+not on the crawl box (the VPS stays dumb: fetch, parse, upsert).
+
 ## Queue seeding order (first nights)
 
 1. **Re-crawl Boston / Mattingly / WWBA profile paths for X handles**
