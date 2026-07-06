@@ -182,6 +182,28 @@ lists — this is config plumbing, not new rendering.
 | AppSheet | already retired ✅ |
 | Public gviz/export reads | RLS'd REST — no more link-shared sheet holding minors' data |
 
+## Phase 0 status — Mon Jul 6 (foundation day): DONE
+
+Executed 2026-07-06 while Boston/WWBA ran, touching zero coach surfaces:
+
+- **Schema deployed** to production Supabase (all 10 platform tables + RLS
+  + a `feedback` table). Three bugs found and fixed pre-deploy — see the
+  header of `supabase/platform_schema.sql` (that file is now the
+  AS-DEPLOYED schema): sha256→pgcrypto digest, members-policy RLS
+  recursion, cross-tenant player_id references in evaluations/depth_chart.
+- **public_players seeded: 11,127 players** (6,422 measurables, 1,364
+  academics, 380 nat + 2,645 state PBR ranks, 966 PG ranks, 251 commits)
+  from the 3 live event rosters + academics.json + pbr_rankings.pkl.
+  Re-runnable: `supabase/seed_public_players.py`. travel_programs
+  catalog seeded (142 names).
+- **Adversarial RLS suite GREEN: 27/27** (`supabase/rls_suite.py`,
+  fixtures in `supabase/rls_fixtures.sql` — two rls-test-* tenants).
+  The tenant-#2 gate is already satisfied.
+- **Feedback button + crash beacon** built in navy-event-day (commit
+  pending deploy window); Sentry wired behind VITE_SENTRY_DSN.
+- Supabase **Pro confirmed** (org shows PRO). Still on Chris: Sentry
+  account/DSN, attorney call, Nate text.
+
 ## Rollout — ACCELERATED (Chris 2026-07-05 night: "I want to run this now.
 ## I need to beat the competition to market.")
 

@@ -1,9 +1,24 @@
 -- ============================================================
--- ONE ROOF: multi-tenant platform schema (DRAFT — NOT DEPLOYED)
--- Written 2026-07-05 alongside docs/ONE-ROOF.md. Deploys in
--- Phase 0 (after the Jul 6-12 event week). Additive only: touches
--- nothing Event Day uses today (events, event_files stay as-is;
--- events gains program_id in Phase 0 via the ALTER at the bottom).
+-- ONE ROOF / Recruiting AI: multi-tenant platform schema
+-- DEPLOYED 2026-07-06 (Phase 0, Mon Jul 6). Additive only:
+-- touches nothing Event Day uses today (events, event_files
+-- stay as-is; the events ALTER at the bottom stays commented).
+--
+-- Deltas from the 2026-07-05 draft (facc731), found pre-deploy:
+--   1. identity_hash used sha256(text) — no such function in
+--      Postgres, and generated columns need IMMUTABLE. Now uses
+--      pgcrypto digest(text,'sha256') (immutable). Hash formula
+--      is unchanged: sha256(lower(trim(first)||' '||trim(last))
+--      || '|' || upper(state) || '|' || grad_year), hex-encoded.
+--   2. mem_admin queried members inside a members policy →
+--      infinite RLS recursion (42P17) at query time. Replaced
+--      with a security-definer helper my_admin_programs().
+--   3. evaluations/depth_chart INSERTs could reference another
+--      tenant's player_id. WITH CHECK now pins player_id to a
+--      player in the same program.
+--   4. feedback table added (spec'd in ONE-ROOF §feedback but
+--      absent from the draft). Anon INSERT allowed (Event Day
+--      has no auth until Wed); reads = service role only.
 --
 -- Design rules (paid for in blood this summer, see ONE-ROOF.md):
 --   * values only, no formulas — the DB is never also a UI
@@ -13,6 +28,8 @@
 --   * public pool joins on identity HASH — cross-tenant tooling
 --     never moves human-readable names across tenant lines
 -- ============================================================
+
+create extension if not exists pgcrypto;
 
 -- ---------- tenancy ----------
 create table programs (
@@ -36,10 +53,16 @@ create table members (
   unique (program_id, initials)
 );
 
--- current user's program memberships (used by every policy below)
+-- current user's program memberships (used by every policy below).
+-- security definer: reads members WITHOUT re-entering members' own
+-- RLS (policies that query their own table recurse — 42P17).
 create or replace function my_programs() returns setof uuid
 language sql stable security definer set search_path = public as
 $$ select program_id from members where user_id = auth.uid() $$;
+
+create or replace function my_admin_programs() returns setof uuid
+language sql stable security definer set search_path = public as
+$$ select program_id from members where user_id = auth.uid() and role = 'admin' $$;
 
 -- ---------- per-program config ----------
 create table program_config (
@@ -77,10 +100,11 @@ create table players (
   academic    text,                          -- program's own academic notes
   email       text, phone text,
   commit      text,
-  -- join key to the public pool; app-computed, never contains the name
+  -- join key to the public pool; never contains the name.
+  -- digest() (pgcrypto) is IMMUTABLE, which generated columns require.
   identity_hash text generated always as
-    (encode(sha256(lower(trim(first_name) || ' ' || trim(last_name))
-      || '|' || coalesce(upper(state),'') || '|' || coalesce(grad_year::text,''))::bytea, 'hex')) stored,
+    (encode(digest(lower(trim(first_name) || ' ' || trim(last_name))
+      || '|' || coalesce(upper(state),'') || '|' || coalesce(grad_year::text,''), 'sha256'), 'hex')) stored,
   created_by  uuid references members(id),
   created_at  timestamptz default now(),
   updated_at  timestamptz default now()
@@ -127,6 +151,20 @@ create table public_players (
   updated_at    timestamptz default now()
 );
 
+-- ---------- in-app feedback (ONE-ROOF §feedback loop) ----------
+-- Anon INSERT allowed: Event Day ships the button before auth exists.
+-- No SELECT policy — reads via service role (Chris) only.
+create table feedback (
+  id          bigint generated always as identity primary key,
+  program_id  uuid references programs(id) on delete set null,
+  member_id   uuid references members(id) on delete set null,
+  screen      text,
+  message     text not null check (char_length(message) between 1 and 4000),
+  contact     text,
+  meta        jsonb default '{}',            -- device, url, app version
+  created_at  timestamptz default now()
+);
+
 -- ---------- row-level security ----------
 alter table programs             enable row level security;
 alter table members              enable row level security;
@@ -137,28 +175,39 @@ alter table evaluations          enable row level security;
 alter table depth_chart          enable row level security;
 alter table travel_programs      enable row level security;
 alter table public_players       enable row level security;
+alter table feedback             enable row level security;
 
 -- members see their own programs; admins manage membership
 create policy prog_read  on programs  for select using (id in (select my_programs()));
 create policy mem_read   on members   for select using (program_id in (select my_programs()));
 create policy mem_admin  on members   for all
-  using (program_id in (select program_id from members
-                        where user_id = auth.uid() and role = 'admin'));
+  using (program_id in (select my_admin_programs()))
+  with check (program_id in (select my_admin_programs()));
 
 -- tenant tables: full access within your own program, nothing outside it
 create policy cfg_rw    on program_config       for all using (program_id in (select my_programs()));
 create policy tiers_rw  on program_travel_tiers for all using (program_id in (select my_programs()));
 create policy players_rw on players             for all using (program_id in (select my_programs()));
-create policy depth_rw  on depth_chart          for all using (program_id in (select my_programs()));
+create policy depth_rw  on depth_chart          for all
+  using (program_id in (select my_programs()))
+  with check (program_id in (select my_programs())
+    and (player_id is null or player_id in
+         (select id from players p where p.program_id = depth_chart.program_id)));
 
 -- evaluations: readable in-program; INSERT only (append-only — no update/
--- delete policy exists, so PostgREST cannot mutate history)
+-- delete policy exists, so PostgREST cannot mutate history). player_id is
+-- pinned to a player of the SAME program (no cross-tenant references).
 create policy evals_read   on evaluations for select using (program_id in (select my_programs()));
-create policy evals_insert on evaluations for insert with check (program_id in (select my_programs()));
+create policy evals_insert on evaluations for insert with check (
+  program_id in (select my_programs())
+  and player_id in (select id from players p where p.program_id = evaluations.program_id));
 
 -- shared reference: readable by any signed-in member; write via service role only
 create policy travel_read on travel_programs for select using (auth.uid() is not null);
 create policy pool_read   on public_players  for select using (auth.uid() is not null);
+
+-- feedback: anyone can file, nobody can read via the API
+create policy feedback_insert on feedback for insert with check (true);
 
 -- ---------- operator-blindness audit ----------
 -- Every service-role/admin read of tenant tables is logged; program admins
@@ -173,8 +222,7 @@ create table access_audit (
 );
 alter table access_audit enable row level security;
 create policy audit_read on access_audit for select
-  using (program_id in (select program_id from members
-                        where user_id = auth.uid() and role = 'admin'));
+  using (program_id in (select my_admin_programs()));
 
 -- ---------- Phase 0 ALTERs (existing Event Day tables) ----------
 -- run when dual-write begins; null program_id = legacy Navy rows
