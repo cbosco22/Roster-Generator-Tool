@@ -58,6 +58,25 @@ program (tenant)            ← "Navy Baseball", "Program X"
   never a dropdown.
 - **Rating labels:** the *values* stay canonical internally (so tooling
   works for everyone); the *labels and meanings* are per-program config.
+- **Rating SCALE is per-program too (Chris expanded this 2026-07-06
+  night):** not just renames — a program picks how many tiers and what
+  they're called. Just 1/2/XX? Fine. Five-star football style? Fine.
+  "O" for Offer and "F" for Follow? Fine. Implementation: a
+  `program_rating_scale` config — ordered rows of {sort_rank, value,
+  label, color, meaning}, defaulted at onboarding to Navy's
+  1/2/3/4/C/XX. Evals store the program's own value; every surface
+  (grid, card buttons, roster tier bubbles, PDF legend) renders from the
+  scale. Nothing cross-tenant reads ratings, so scales can diverge
+  freely. Board-import wizard maps their old sheet's values onto their
+  scale one time.
+- **Program identity & theming (same admin screen):** team name
+  (prefilled), logo upload, and TWO brand colors that theme their whole
+  app (CSS variables — Event Day already runs on NAVY/GOLD constants;
+  those become var(--brand-primary)/var(--brand-accent)) and their PDF
+  books (cover, headers, tier-band accents). Plus member access
+  management: the admin sees who has access, invites by email, removes.
+  One screen: who we are, what our colors are, what our ratings mean,
+  who's on staff.
 - **Travel program tiers:** two-layer. A shared **catalog** of travel
   programs (names, so everyone spells "Canes National" the same way) +
   per-program **tier assignments** seeded from Navy's cleaned list at
@@ -338,6 +357,48 @@ ask when the data-agreement attorney is already on the phone.
 
 **Entity:** form the LLC before holding another program's data or money.
 Same attorney call.
+
+## Future build: transfer recruiting — HS / JUCO / Portal (Chris 2026-07-06 night)
+
+Noted for future builds; structure deliberately loose per Chris ("no firm
+structure in my head yet"):
+
+- The Recruiting area splits into two big doors: **High School
+  Recruiting** (everything built so far) and **Transfer Recruiting**
+  (JUCO + four-year portal). Separate boards *as coaches see them* —
+  they're genuinely different recruiting paths — but the same database
+  and the same machinery underneath: pool of players, boards, evals,
+  player cards, notes, video.
+- Schema direction: `player_kind` (`hs | juco | college`) on players and
+  public_players, plus a kind-aware identity hash (HS uses
+  name|STATE|grad; college kids key better on name|SCHOOL|class — decide
+  when built). Boards filter by kind; the board UI is the same grid.
+- Pool sources differ: portal lists, JUCO rosters/stats, conference
+  sites — new crawl targets for the sweep box, same sweep_events
+  machinery. Navy doesn't recruit transfers, so this is pure
+  other-programs value ("expand our horizons") — good tenant-#3+ bait,
+  zero Navy-workflow risk.
+
+## Player video clips (add-on; refined 2026-07-06 night)
+
+The field-use case a coach described to Chris from a rival app: you're at
+a game, you take a 15-second clip of a kid, and instead of texting it to
+the whole staff thread it lives on his profile — 6-12 short clips per
+player, each with the date and the coach's note, right next to his evals
+on the player card.
+
+- `player_videos`: identity-hash key + program_id, event, by_initials,
+  note, created_at, storage path. Upload from the player card (phone
+  camera roll), client-side compress to ~720p.
+- Storage math (Chris asked): Supabase Storage ≈ $0.021/GB/mo. A
+  compressed 15s 720p clip ≈ 10-15 MB → even 100 players × 10 clips ≈
+  ~12 GB ≈ **~$0.25/month**. Storage is NOT the expensive part; the
+  add-on price is for the value, not the cost. Per-program quota (e.g.
+  5 GB free tier, more with the add-on) keeps it bounded.
+- Boundary (already standing): coach-shot/uploaded video only; PBR/PG/PS
+  footage is linked, never rehosted.
+- Tenant-private like evals: a program's clips are theirs (RLS by
+  program_id); clips never enter the shared pool.
 
 ## Open decisions for Chris (the real forks)
 
