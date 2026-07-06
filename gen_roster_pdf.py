@@ -1123,31 +1123,39 @@ def build_pdf(json_path, out_path, raw_sheet_text="", proof_only=False,
         return (str(s or '').replace('&', '&amp;').replace('<', '&lt;')
                 .replace('>', '&gt;'))
 
-    # profile-link icon strip: 6.5pt brand marks right-aligned under the
-    # last name, each registered as a PDF link annotation at draw time.
+    # Last-name cell: name vertically centered (matching the First column),
+    # profile-link brand marks pinned to the BOTTOM of the cell at the
+    # right edge — Chris 2026-07-05: icons stacked right under the name
+    # "bumps against it, looks bad." Fixed-height flowable fills the row so
+    # the icon baseline is the cell floor regardless of name wrapping.
     _ICON_DIR = _os.path.join(_script_dir, 'data', 'icons')
     _ICON_FILE = {'X': 'x.png', 'PBR': 'pbr.png', 'PG': 'pg.png',
                   '5T': '5t.png', 'EV': 'ev.png'}
 
-    class _LinkIcons(Flowable):
-        SZ, GAP = 6.5, 1.6
-        def __init__(self, links):
+    class _NameIconsCell(Flowable):
+        H = 0.46 * inch - 2   # keep in sync with the roster ROW_H below
+        SZ, GAP = 6.0, 1.6
+        def __init__(self, last, links):
             super().__init__()
-            self.links = [(l, u) for l, u in links if l in _ICON_FILE]
-            self.height = self.SZ if self.links else 0
+            self.last = last
+            self.links = [(l, u) for l, u in (links or []) if l in _ICON_FILE]
             self.width = 0
+            self.height = self.H
         def wrap(self, availWidth, availHeight):
             self.width = availWidth
             return (availWidth, self.height)
         def draw(self):
+            p = Paragraph(_esc(self.last), sName)
+            w, h = p.wrap(self.width, self.height)
+            p.drawOn(self.canv, 0, (self.height - h) / 2.0)
             x = self.width - 2
             for label, url in reversed(self.links):
                 icon = _os.path.join(_ICON_DIR, _ICON_FILE[label])
                 x -= self.SZ
                 try:
-                    self.canv.drawImage(icon, x, 0, self.SZ, self.SZ,
+                    self.canv.drawImage(icon, x, 1, self.SZ, self.SZ,
                                         mask='auto', preserveAspectRatio=True)
-                    self.canv.linkURL(url, (x, 0, x + self.SZ, self.SZ),
+                    self.canv.linkURL(url, (x, 1, x + self.SZ, 1 + self.SZ),
                                       relative=1)
                 except Exception:
                     pass
@@ -1297,13 +1305,10 @@ def build_pdf(json_path, out_path, raw_sheet_text="", proof_only=False,
     COLUMNS = {
         'num':    dict(hdr='#',     w=0.23*inch, cell=lambda p, c: Paragraph(c['j'], sNum)),
         'first':  dict(hdr='First', w=0.62*inch, cell=lambda p, c: Paragraph(_esc(c['first']), sName)),
-        # last name + tiny LOGO icons tucked bottom-right beneath it (Chris's
-        # sketch, 2026-07-05 v2: "smaller, bottom right, and I want the
-        # logo"). Real brand marks (X, PBR's own icon, PG/5T badges), each a
-        # live tap target in GoodNotes via canvas.linkURL.
-        'last':   dict(hdr='Last',  w=0.80*inch, cell=lambda p, c:
-            [Paragraph(_esc(c['last']), sName)] +
-            ([_LinkIcons(c['links'])] if c.get('links') else [])),
+        # last name centered + brand-mark links pinned to the cell floor,
+        # right-aligned (Chris's sketch v3, 2026-07-05)
+        'last':   dict(hdr='Last',  w=0.80*inch,
+                       cell=lambda p, c: _NameIconsCell(c['last'], c.get('links'))),
         # sketch layout: Pos with B/T under it, Class with Ht·Wt under it
         # (UTILITY abbreviated -- at this column width it wraps mid-word)
         'pos_bt': dict(hdr='Pos', wt=0.9, cell=lambda p, c: Paragraph(
