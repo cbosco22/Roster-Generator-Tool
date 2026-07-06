@@ -82,6 +82,42 @@ Same data, two views, both first-class:
      anyone who wants to take the grid to Sheets — an export format, never
      the system of record.
 
+**Own-opinion vs public-fact columns (Chris confirmed the model 2026-07-06
+night):** the board table stores ONLY the program's own opinions — tier,
+notes, Seen, tags, contact history. Public facts (commitment, academics,
+measurables, ranks, links) are never written into any tenant's board:
+every view (grid, app, PDF, schedule chips, big board) JOINS them live
+from public_players by identity hash at render time. One overnight scrape
+catches a commitment → every tenant's every surface shows it on next
+render, zero propagation jobs. The commitment write-back in
+MASS-EVENT-SWEEP.md is only the bridge for the Google-Sheet era (Navy,
+pre-Phase-1); born-in-Postgres boards get this by construction. Standing
+rule: a coach's manually-entered value that CONFLICTS with the pool shows
+his value + a "pool disagrees" flag — coach opinion outranks the crawler
+on his own screen, always.
+
+## Event Day: three tabs per event (Chris 2026-07-06 night)
+
+Opening an event offers three pages, matching the three ways coaches
+actually work an event:
+
+1. **Schedule** — what exists today (game cards, tags, DK links, venue
+   maps, mini-rosters, player cards).
+2. **Rosters** — every team's full roster as a browsable in-app table:
+   the event website's roster page but with our spin — board marks/tiers,
+   metrics, academics, rank/commit chips, profile links, and tap-a-kid →
+   player card (rating + notes into the system). Mostly assembled from
+   shipped parts: the full-event roster JSON is already parsed per event,
+   the row renderer is the existing mini-roster component, board cross-ref
+   already merges, the card already attaches to roster rows. Add a team
+   index + event-wide player search.
+3. **Book PDF** — the existing in-app download (routes to GoodNotes on
+   iPads) for the annotate-then-upload crowd.
+
+Phone-only coach: tabs 1+2 + player card. iPad coach: tab 3 + post-event
+upload. Both funnel into the same backend, and both see the results at
+the next event.
+
 ## Confidentiality: sealed from each other AND from the operator
 
 This is the make-or-break feature since we are a competitor to every
