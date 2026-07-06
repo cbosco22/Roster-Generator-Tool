@@ -118,6 +118,12 @@ Phone-only coach: tabs 1+2 + player card. iPad coach: tab 3 + post-event
 upload. Both funnel into the same backend, and both see the results at
 the next event.
 
+The Schedule tab renders only when the event HAS a schedule —
+schedule-less events (emailed-PDF showcases, camps, one-offs from the
+lane-3 wizard in MASS-EVENT-SWEEP.md) open straight to Rosters + Book.
+Events list shows a type chip per event: tournament / showcase / camp /
+custom.
+
 ## Confidentiality: sealed from each other AND from the operator
 
 This is the make-or-break feature since we are a competitor to every

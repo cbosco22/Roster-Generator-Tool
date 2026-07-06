@@ -29,7 +29,7 @@ create table player_evals (
   team         text,
   pos          text,
   hs           text,
-  new_tier     text,                 -- '0.1'|'1'|'2'|'3'|'4'; null = note-only
+  new_tier     text,                 -- '0.1'|'1'|'2'|'3'|'4'|'XX'; null = note-only
   note         text,                 -- null = rating-only
   by_initials  text,
   created_at   timestamptz default now(),

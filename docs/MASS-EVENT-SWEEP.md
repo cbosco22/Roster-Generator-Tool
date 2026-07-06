@@ -201,15 +201,39 @@ create table program_events (       -- per-tenant, RLS like players
 -- authenticated (the catalog is shared).
 ```
 
-**Lane 1 — catalog drop-down.** Weekly discovery already builds the
-catalog of every upcoming PBR/PG/FiveTool/PS event. Refresh policy
-(Chris, 7/6): **every catalog event gets a final-roster re-crawl at
-T-24h before its start date** — teams routinely don't post final rosters
-until the day before, so the T-24h pass is what makes the books right.
-On top of that, subscribed events also re-crawl nightly while the event
-runs (measurables and DK links move during play). The worker schedules
-the T-24h pass from `starts_on`; it's the one crawl that runs regardless
-of demand.
+**Lane 1 — catalog drop-down (THE default; Chris upgraded it 7/6 late:
+crawl EVERYTHING).** Not just discovery — every PBR / FiveTool / PG /
+Prospect Select event gets its rosters crawled and loaded, whether anyone
+subscribed or not. A coach's whole flow is: pick the source, pick the
+event from the list, done — it connects to their database and runs.
+Events they don't want, they never click. No coach ever pastes a link in
+the normal path, and Chris + Claude own making sure every event has
+rosters + rankings before it starts.
+
+What keeps crawl-everything inside a $5 box — split the work:
+- **Roster sweep (universal, cheap):** an event's roster pages are ~1
+  page per team (~30-60 pages/event). Crawling EVERY event's rosters,
+  plus the universal **T-24h final-roster re-crawl** (teams post final
+  rosters the day before — this pass is what makes the books right), is
+  hundreds of pages a night, not thousands.
+- **Profile enrichment (incremental, cached):** per-player profile
+  fetches are the expensive part, but the pool caches by identity hash —
+  a kid enriched at one event is already enriched at his next five. Order:
+  subscribed events first, then event start date; skip players whose pool
+  data is fresh (<30 days). Enrichment converges fast: by mid-summer most
+  kids at any event are already in the pool.
+Subscribed events additionally re-crawl nightly while running
+(measurables and DK links move during play).
+
+**"Event not listed?" submit box.** On the event-picker screen. A
+submission writes a `sweep_events` row (source='request',
+status='triage') with whatever the coach knows (name, source, link if
+they have one, or "PDF only"). Triage chain, per Chris: **Claude first**
+— a session picks up triage rows (surfaceable via the morning check),
+tries to resolve them (find the event on a source, run the crawl, or
+route a PDF to lane 3) — **then escalates to Chris** only when blocked
+(new source, weird format, needs a login). The coach just sees their
+event appear.
 
 **Lane 2 — paste a URL.** Recognized event-URL patterns (PBR/PG/5T)
 insert a high-priority sweep_events row; the worker picks it up
@@ -218,16 +242,28 @@ event ≈ 15 min). UI shows pending → crawling (n/total) → ready.
 Unrecognized domains are rejected with a "send us the link" contact path
 rather than crawling arbitrary sites.
 
-**Lane 3 — upload a PDF** (the PBR Pennsylvania Showcase case: roster
-exists only as an emailed file). Server-side Claude-assisted import —
-pdf_to_roster.py's extraction grown into the same preview-and-confirm
-wizard as the ONE-ROOF board import: upload → extract → editable preview
-table → confirm → event created. Two rules: (a) PDF-sourced rosters are
+**Lane 3 — upload a PDF or spreadsheet** (the PBR Pennsylvania Showcase
+case: roster exists only as an emailed file; also camps and one-off
+events). Server-side Claude-assisted import — pdf_to_roster.py's
+extraction grown into the same preview-and-confirm wizard as the
+ONE-ROOF board import: upload → extract → editable preview table →
+confirm → event created. Two rules: (a) PDF-sourced rosters are
 **tenant-private by default** (`private_roster` on their program_events
 row, NOT the shared catalog — the file was given to that program); (b)
 players in it are still enriched from the shared pool by identity hash,
 so even a PDF-only event comes back with measurables/ranks/links
 attached. Schedules ride the same lanes: URL, PDF, or CSV upload.
+
+**Schedule-less events + event types (Chris 7/6 late).** A schedule is
+OPTIONAL. An emailed-PDF showcase, a random local event, or a program's
+own camp (spreadsheet of names + details) becomes a first-class event:
+it shows on the events page with its name and dates, opens to just the
+**Rosters** tab and the **Book PDF** download — no Schedule tab — and
+the book generator must handle roster-only events (no schedule section).
+Every event carries a type chip on the events list:
+`tournament | showcase | camp | custom` (`sweep_events.event_type` /
+set in the lane-3 wizard). "Northeastern Baseball camp, Jul 20 — open
+the roster or download the booklet" is the acceptance test.
 
 Every lane converges: event live in their tenant, book in their branding,
 cross-ref against THEIR board, pg-sourced academics gated by
