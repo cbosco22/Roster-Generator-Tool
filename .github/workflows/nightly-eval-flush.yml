@@ -1,0 +1,59 @@
+# Nightly flush of Event Day player evals into Recruiting Sheet 2.0.
+#
+# Runs sync_player_evals.py --send once a night, well outside coach hours, so
+# every rating/note a coach takes in the app that day lands in the sheet
+# automatically — no one has to remember to run the script by hand. Interim
+# measure until the whole operation moves to the Postgres backend (ONE-ROOF).
+#
+# SAFETY (why this is safe to run unattended):
+#   - The script self-gates: it runs a DRY-RUN validation first and aborts
+#     without writing if anything fails to validate.
+#   - Writes are append-only / only-if-changed (Seen appended with dedupe,
+#     tier written only when it changed, notes appended never overwritten).
+#     Nothing is ever deleted.
+#   - Ops are idempotent by op_id and per-op quarantined, so a partial failure
+#     is safe to re-run — the already-applied half is skipped server-side.
+#   - Only rows the server confirms applied get stamped synced_at; anything
+#     else stays unsynced and flushes on the next run.
+#   - Recovery: the Google Sheet keeps full Version History (File -> Version
+#     history), and Supabase Pro takes daily backups.
+#
+# ACTIVATION (one-time, on Chris):
+#   1. This file must be on the DEFAULT branch (main) — GitHub only runs
+#      scheduled workflows from the default branch. Merge it when ready.
+#   2. Add repo secrets (Settings -> Secrets and variables -> Actions):
+#        SHEET_WRITE_URL    the Apps Script webapp URL  (required)
+#        SHEET_WRITE_TOKEN  the Apps Script webapp token (required)
+#        SUPABASE_ANON_KEY  optional — falls back to the public key baked
+#                           into push_event.py if unset
+#   Until both secrets exist the run fails loudly (it won't write garbage).
+name: Nightly eval flush to Sheet 2.0
+
+on:
+  schedule:
+    # 07:00 UTC = ~3 AM ET (3 EDT summer / 2 EST winter) — always off-hours,
+    # honoring sync_player_evals.py's "never on a timer during coach hours".
+    - cron: "0 7 * * *"
+  workflow_dispatch: {}   # allow a manual run from the Actions tab
+
+# never let two flushes overlap
+concurrency:
+  group: eval-flush
+  cancel-in-progress: false
+
+jobs:
+  flush:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install minimal deps
+        run: pip install requests openpyxl
+      - name: Flush unsynced player_evals -> Sheet 2.0
+        env:
+          SHEET_WRITE_URL: ${{ secrets.SHEET_WRITE_URL }}
+          SHEET_WRITE_TOKEN: ${{ secrets.SHEET_WRITE_TOKEN }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: python sync_player_evals.py --send
