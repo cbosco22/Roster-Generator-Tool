@@ -25,7 +25,7 @@ Everything in here already has a rendered graphic + written caption sitting in `
 | 11 | ✅ Graphic | How the Yard Works | `exports/Navy_Baseball_USNA_Companies.png` |
 | 12 | ✅ Graphic | Strength. Built In. | `exports/Navy_Baseball_Weight_Room.png` |
 | 13 | ✅ Video | Service assignment video #1 *(posted directly by Chris — link/title not yet logged in VIDEO_BANK.md)* | *(Chris to find)* |
-| 14 | Graphic | Academics G1: Engineering & Weapons (Sheet) *(swapped in — Chris wanted a change of pace from facility/photo posts)* | `exports/Navy_Baseball_Academics_G1.png` |
+| 14 | ✅ Graphic | Academics G1: Engineering & Weapons (Sheet) *(swapped in — Chris wanted a change of pace from facility/photo posts)* | `exports/Navy_Baseball_Academics_G1.png` |
 | 15 | Graphic | See The Spin Rate. (TrackMan) | `exports/Navy_Baseball_Tech_TrackMan.png` |
 | 16 | 🎥 Video | Service assignment video #2 | *(Chris to find)* |
 | 17 | Graphic | Every Swing. Broken Down. (TruMedia) | `exports/Navy_Baseball_Tech_TruMedia.png` |
