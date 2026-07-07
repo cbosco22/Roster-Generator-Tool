@@ -25,16 +25,16 @@ Everything in here already has a rendered graphic + written caption sitting in `
 | 11 | ✅ Graphic | How the Yard Works | `exports/Navy_Baseball_USNA_Companies.png` |
 | 12 | ✅ Graphic | Strength. Built In. | `exports/Navy_Baseball_Weight_Room.png` |
 | 13 | ✅ Video | Service assignment video #1 *(posted directly by Chris — link/title not yet logged in VIDEO_BANK.md)* | *(Chris to find)* |
-| 14 | Graphic | Led By Their Own *(moved from Day 12 — too close to Day 11's company/battalion breakdown; needs distance)* | `exports/Navy_Baseball_USNA_Leadership.png` |
-| 15 | Graphic | Hands On. Every Day. | `exports/Navy_Baseball_Coaches_Work.png` |
-| 16 | Graphic | See The Spin Rate. (TrackMan) | `exports/Navy_Baseball_Tech_TrackMan.png` |
-| 17 | 🎥 Video | Service assignment video #2 | *(Chris to find)* |
-| 18 | Graphic | Every Swing. Broken Down. (TruMedia) | `exports/Navy_Baseball_Tech_TruMedia.png` |
-| 19 | Graphic | $5M. Breaking Ground. | `exports/Navy_Baseball_Renovation.png` |
-| 20 | Graphic | 131 Seasons. | `exports/Navy_Baseball_History_1893.png` |
-| 21 | 🎥 Video | Service assignment video #3 | *(Chris to find)* |
-| 22 | Graphic | 11 Titles. 16 Years. | `exports/Navy_Baseball_Patriot_League.png` |
-| 23 | Graphic | **Noah Song — Alumni Spotlight** *(held back — first solo alumni highlight)* | `exports/Navy_Baseball_Alumni_Noah_Song.png` |
+| 14 | Graphic | Hands On. Every Day. | `exports/Navy_Baseball_Coaches_Work.png` |
+| 15 | Graphic | See The Spin Rate. (TrackMan) | `exports/Navy_Baseball_Tech_TrackMan.png` |
+| 16 | 🎥 Video | Service assignment video #2 | *(Chris to find)* |
+| 17 | Graphic | Every Swing. Broken Down. (TruMedia) | `exports/Navy_Baseball_Tech_TruMedia.png` |
+| 18 | Graphic | $5M. Breaking Ground. | `exports/Navy_Baseball_Renovation.png` |
+| 19 | Graphic | 131 Seasons. | `exports/Navy_Baseball_History_1893.png` |
+| 20 | 🎥 Video | Service assignment video #3 | *(Chris to find)* |
+| 21 | Graphic | 11 Titles. 16 Years. | `exports/Navy_Baseball_Patriot_League.png` |
+| 22 | Graphic | **Noah Song — Alumni Spotlight** *(held back — first solo alumni highlight)* | `exports/Navy_Baseball_Alumni_Noah_Song.png` |
+| 23 | Graphic | Led By Their Own *(pushed way back — same Brigade/Battalion/Company facts as Day 11, needed real distance not just a day or two)* | `exports/Navy_Baseball_USNA_Leadership.png` |
 
 ---
 
