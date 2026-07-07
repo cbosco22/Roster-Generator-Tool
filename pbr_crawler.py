@@ -47,6 +47,12 @@ HEADERS = {
 }
 THROTTLE_SEC = 2.0
 
+# X/Twitter paths that are never a player handle (reserved routes + share
+# buttons); PBR's own accounts are filtered separately by prefix.
+_X_SKIP = {"new", "home", "share", "intent", "i", "login", "signup", "explore",
+           "search", "messages", "notifications", "settings", "hashtag",
+           "compose", "about", "tos", "privacy", "download", "status"}
+
 # player_state select values, scraped from the live search form on prepbaseballreport.com
 STATE_CODES = {
     "AL": 31, "AK": 32, "AZ": 33, "AR": 20, "CA": 34, "CO": 13, "CT": 28, "DE": 35,
@@ -205,14 +211,24 @@ def fetch_profile(session, profile_path):
         out["commitment"] = re.sub(r"^Commitment\s*", "", commit_el.get_text(" ", strip=True))
 
     # social: PBR profiles link the kid's X/Twitter — capture it so books
-    # and Event Day can deep-link (Chris 2026-07-05). Only profile-shaped
-    # links count; PBR's own @prepbaseball footer links are filtered out.
+    # and Event Day can deep-link (Chris 2026-07-05). Pick the PLAYER's own
+    # handle: (1) anchor the regex to the real twitter/x.com domain so
+    # substring false positives like "happyfox.com/new" are rejected, (2)
+    # skip X's reserved paths (new/share/login/…) and PBR's own org accounts
+    # (prepbaseball, PrepBaseball_TX, PBRTournaments…), and (3) don't stop at
+    # the first link — the page lists PBR's accounts before the kid's
+    # (Chris 2026-07-06, after a full page of x.com/new false positives).
     for a in soup.select('a[href*="twitter.com/"], a[href*="x.com/"]'):
         href = a.get("href", "")
-        m = re.search(r"(?:twitter|x)\.com/@?([A-Za-z0-9_]{1,15})/?$", href)
-        if m and m.group(1).lower() not in ("prepbaseball", "share", "intent", "home"):
-            out["twitter"] = f"https://x.com/{m.group(1)}"
-            break
+        m = re.match(r"https?://(?:www\.)?(?:twitter|x)\.com/@?([A-Za-z0-9_]{1,15})/?(?:\?.*)?$", href, re.I)
+        if not m:
+            continue
+        handle = m.group(1)
+        low = handle.lower()
+        if low in _X_SKIP or low.startswith("prepbaseball") or low.startswith("pbr"):
+            continue
+        out["twitter"] = f"https://x.com/{handle}"
+        break
 
     # measurable stat cards: <div class="dynamic-stat-box stat"><strong>91</strong><span>INF<br>VELO</span></div>
     measurables = {}
