@@ -44,7 +44,7 @@ def _load_teams():
             _teams_cache = json.load(f)
         return _teams_cache
     teams = []
-    seen_names = set()
+    seen_schools = set()
     for league, url in _TEAMS_URLS:  # baseball first: it wins duplicates
         r = requests.get(url, timeout=20)
         r.raise_for_status()
@@ -57,10 +57,16 @@ def _load_teams():
                 t.get('abbreviation')] if n})
             if not logos or not names:
                 continue
-            key = _norm(names[0])
-            if key in seen_names:
+            # Dedup by SCHOOL IDENTITY (displayName), not the alphabetically
+            # first name — the old key collided on shared mascots ("Bulldogs",
+            # "Tigers"), silently dropping Georgia, Oklahoma State, etc. from
+            # the bank entirely. displayName ("Georgia Bulldogs") is unique
+            # per school and identical across the baseball/football lists, so
+            # baseball still wins the cross-league dupe.
+            key = _norm(t.get('displayName') or names[0])
+            if key in seen_schools:
                 continue
-            seen_names.add(key)
+            seen_schools.add(key)
             teams.append({
                 'id': f"{league}_{t['id']}",
                 'names': names,
@@ -72,27 +78,53 @@ def _load_teams():
     return teams
 
 
+# Grammatical filler only. A commit's leftover words (after a team name is
+# matched) may ONLY be these for a team-name-is-subset match to count, so
+# "University of Florida" -> Florida works, but "Massachusetts Maritime
+# Academy" does NOT collapse to Massachusetts (maritime/academy aren't
+# filler). Deliberately excludes college/state/academy/community, which are
+# distinctive (Boston College vs Boston University; Florida vs Florida State).
+_FILLER = {'university', 'of', 'the', 'at', 'a', 'and'}
+
+
 def _match(commit_text):
-    """Best team for a free-text commit string. Exact normalized name/abbrev
-    match first; then whole-word containment. Deliberately conservative --
-    a wrong school logo on a recruiting PDF is worse than no logo."""
-    q = _norm(commit_text)
+    """Best team for a free-text commit string, scored to avoid wrong logos
+    (a wrong school logo is worse than none):
+      4 exact normalized name/abbrev
+      3 significant words equal
+      2 commit words fully inside the team name (e.g. "Miami" -> Miami Hurricanes)
+      1 team name is the commit's distinctive core (leftover is filler only,
+        e.g. "University of Florida" -> Florida) — the guarded direction
+    A school not in the bank (JUCO/D2/D3) that shares one word with a D1
+    school (Mass Maritime vs Massachusetts) now scores nothing -> None."""
+    # drop parentheticals first: "Louisiana State University (LSU)" would
+    # otherwise inject a stray "lsu" token that blocks the filler match.
+    q = _norm(re.sub(r'\([^)]*\)', ' ', commit_text or ''))
     if not q:
         return None
-    teams = _load_teams()
-    for t in teams:
-        if any(_norm(n) == q for n in t['names']):
-            return t
     q_words = set(q.split())
-    best = None
+    teams = _load_teams()
+    best = None  # (score, name_word_count, team)
     for t in teams:
         for n in t['names']:
-            nw = set(_norm(n).split())
-            if nw and (nw <= q_words or q_words <= nw):
-                cand = (len(nw), t)
-                if best is None or cand[0] > best[0]:
-                    best = cand
-    return best[1] if best else None
+            nq = _norm(n)
+            nw = set(nq.split())
+            if not nw:
+                continue
+            if nq == q:
+                score = 4
+            elif nw == q_words:
+                score = 3
+            elif q_words <= nw:
+                score = 2
+            elif nw <= q_words and (q_words - nw) <= _FILLER:
+                score = 1
+            else:
+                continue
+            cand = (score, len(nw), t)
+            if best is None or cand[:2] > best[:2]:
+                best = cand
+    return best[2] if best else None
 
 
 def logo_path(commit_text):
