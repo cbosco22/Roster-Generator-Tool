@@ -23,8 +23,8 @@ Everything in here already has a rendered graphic + written caption sitting in `
 | 9 | ✅ Graphic | Program History — "Annapolis to the Show" | `exports/Navy_Baseball_Program_History.png` |
 | 10 | ✅ Graphic | Annapolis | `exports/Navy_Baseball_Annapolis.png` |
 | 11 | ✅ Graphic | How the Yard Works | `exports/Navy_Baseball_USNA_Companies.png` |
-| 12 | Graphic | Strength. Built In. | `exports/Navy_Baseball_Weight_Room.png` |
-| 13 | 🎥 Video | Service assignment video #1 | *(Chris to find)* |
+| 12 | ✅ Graphic | Strength. Built In. | `exports/Navy_Baseball_Weight_Room.png` |
+| 13 | ✅ Video | Service assignment video #1 *(posted directly by Chris — link/title not yet logged in VIDEO_BANK.md)* | *(Chris to find)* |
 | 14 | Graphic | Led By Their Own *(moved from Day 12 — too close to Day 11's company/battalion breakdown; needs distance)* | `exports/Navy_Baseball_USNA_Leadership.png` |
 | 15 | Graphic | Hands On. Every Day. | `exports/Navy_Baseball_Coaches_Work.png` |
 | 16 | Graphic | See The Spin Rate. (TrackMan) | `exports/Navy_Baseball_Tech_TrackMan.png` |
