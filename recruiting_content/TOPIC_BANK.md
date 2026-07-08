@@ -107,8 +107,8 @@ Items 1, 3, 4, 5, 6 still need real photos/schedule specifics.
 | 8 | Tech spotlight: Aware | 🔴 (could not verify what "Aware" tech actually is — no matching Navy baseball tool found; skipped rather than guess) |
 | 9 | $5M renovation — groundbreaking (new locker room, expanded training room, wardroom, nutrition center, coaches' offices, 2 fan suites, press box; targets 2027 home opener) | ✅ (built — `Navy_Baseball_Renovation.png`, no photo per Chris's instruction) |
 | 10 | $5M renovation — progress update | 🔴 |
-| 11 | Program History: 1893–2026, 131 seasons, 11 NCAA Tournament bids, 2 Elite Eight runs (1954, 1986), 2016's 43-win program record | ✅ (built — `Navy_Baseball_History_1893.png`) |
-| 12 | Program History: Patriot League — 11 titles in the last 16 years, reigning 2024–25 champs, 13 All-America selections | ✅ (built — `Navy_Baseball_Patriot_League.png`) |
+| 11 | Program History: 1893–2026, 131 seasons, 10 NCAA Tournament bids, 2016's 43-win program record | ✅ (built — `Navy_Baseball_History_1893.png`, corrected 2026-07-08, old version had fabricated basketball-history stats mixed in — see RESEARCH_FINDINGS.md) |
+| 12 | Program History: Patriot League — 6 titles (1994, '98, '99, '02, '11, '16), runner-up to Army in 2019 & 2024 | ✅ (built — `Navy_Baseball_Patriot_League.png`, rebuilt 2026-07-08, old version had a fabricated "11 titles, reigning champs" claim — see RESEARCH_FINDINGS.md) |
 | 13 | Program History: **"Annapolis to the Show"** — full 11-pick MLB Draft list (2003–2021) with Noah Song hero photo | ✅ (built — `Navy_Baseball_Program_History.png`, rebuilt around Chris's reference graphic, replaces the earlier placeholder "94-year gap" framing) |
 | 14 | Program History: the "94-year gap" — Nemo Gaines (1921), Navy's first Midshipman in MLB (pre-draft era), to Mitch Harris (2015) | 🟡 |
 

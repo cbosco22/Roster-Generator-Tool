@@ -72,11 +72,11 @@ Built after launch-batch review, covering the rest of Wednesday ("USNA Life") an
 **15. $5M. Breaking Ground.** — `exports/Navy_Baseball_Renovation.png`
 > $5M. Breaking ground. Right after this season, Navy Baseball's home gets a full facilities overhaul — new locker room, wardroom, nutrition center, coaches' offices, fan suites, and a modern press box. Targeting the 2027 home opener. ⚓ #NavyBaseball
 
-**16. 131 Seasons.** — `exports/Navy_Baseball_History_1893.png`
-> 131 seasons. Navy Baseball has been on the field since 1893 — 11 NCAA Tournament appearances, 2 Elite Eight runs, and a program-record 43 wins in 2016. Still adding to it every year. ⚓ #NavyBaseball
+**16. 131 Seasons.** — `exports/Navy_Baseball_History_1893.png` *(corrected 2026-07-08 — see RESEARCH_FINDINGS.md)*
+> 131 seasons. Navy Baseball has been on the field since 1893 — 10 NCAA Tournament appearances and a program-record 43 wins in 2016, the same year the team won the Patriot League. Still adding to it every year. ⚓ #NavyBaseball
 
-**17. 11 Titles. 16 Years.** — `exports/Navy_Baseball_Patriot_League.png`
-> 11 titles. 16 years. Navy hasn't just competed in the Patriot League — it's owned it. Eleven conference championships since 2009, and the reigning 2024 champs. ⚓ #NavyBaseball
+**17. 6 Titles. 3 Decades.** — `exports/Navy_Baseball_Patriot_League.png` *(rebuilt 2026-07-08 — the original "11 Titles. 16 Years." version had fabricated data, caught and pulled before it went out; see RESEARCH_FINDINGS.md)*
+> 6 titles. 3 decades. Navy has won the Patriot League six times — 1994, '98, '99, '02, '11 and '16 — championship baseball across three different eras of the program. ⚓ #NavyBaseball
 
 ---
 

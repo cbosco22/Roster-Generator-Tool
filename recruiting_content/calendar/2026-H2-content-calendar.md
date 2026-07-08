@@ -77,7 +77,7 @@ Weekends are unscheduled — capture opportunistically at live events.
 | 9/14 | Mon | The Pitch — Value Props (Academics) | G2 deep-dive: Math & Science / Quant Econ | 🟡 Needs design |
 | 9/15 | Tue | People (Alumni Spotlight) | Pro-pipeline or post-service career feature — name, story, photo | 🔴 Needs input |
 | 9/16 | Wed | USNA Life (USNA Life) | Bancroft Hall / dorm life | 🔴 Needs input |
-| 9/17 | Thu | Facility & Program (Program History) | Patriot League: 11 titles in the last 16 years (2009-2024), reigning 2024-25 champs | 🟡 Needs design |
+| 9/17 | Thu | Facility & Program (Program History) | Patriot League: 6 titles (1994, '98, '99, '02, '11, '16), runner-up to Army in 2019 & 2024 | 🟡 Needs design |
 | 9/18 | Fri | Reactive / Pipeline (Pro-Pipeline) | Draft / Cape Cod League milestone (skip if none) | 🔴 Needs input |
 | 9/21 | Mon | The Pitch — Value Props (Money/Degree Value) | "Paid every month" mechanic post | 🟡 Needs design |
 | 9/22 | Tue | People (Coach Bio) | Chris Bosco — Assistant Coach | ✅ Ready |
@@ -162,7 +162,7 @@ Weekends are unscheduled — capture opportunistically at live events.
 | 12/21 | Mon | The Pitch — Value Props (Service) | "Plus" communities: NFO, Nuclear Power, Medicine, Civil Eng, Supply | 🔴 Needs input |
 | 12/22 | Tue | People (Player Spotlight) | Recruit/commit feature — name, one-line bio, photo | 🔴 Needs input |
 | 12/23 | Wed | USNA Life (USNA Life) | Bancroft Hall / dorm life | 🔴 Needs input |
-| 12/24 | Thu | Facility & Program (Program History) | Patriot League: 11 titles in the last 16 years (2009-2024), reigning 2024-25 champs | 🟡 Needs design |
+| 12/24 | Thu | Facility & Program (Program History) | Patriot League: 6 titles (1994, '98, '99, '02, '11, '16), runner-up to Army in 2019 & 2024 | 🟡 Needs design |
 | 12/25 | Fri | Reactive / Pipeline (Commits & Signings) | React to real commit/signing news (skip if none) | 🔴 Needs input |
 | 12/28 | Mon | The Pitch — Value Props (Academics) | Overview — "23 Majors. Chart Your Course." | ✅ Ready |
 | 12/29 | Tue | People (Alumni Spotlight) | Pro-pipeline or post-service career feature — name, story, photo | 🔴 Needs input |

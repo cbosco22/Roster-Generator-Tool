@@ -54,15 +54,16 @@ All three on-field coaches have solid, sourced bios. Fills 3 of the "Coach Bio" 
 This is a strong standalone stream I hadn't built into the bank yet — proposing it as a new "Program History" thread (could live inside the Baseball pillar or as its own Monday/Thursday rotation item).
 
 - Program started **1893** — 2026 is the **131st season**.
-- **11 NCAA Tournament appearances**, including 2 Elite Eight runs (1954, 1986), NIT in 1962. 17 top-5 regional finishes, most recently 2024 (4th place). 2016 team's 43 wins is the program record.
-- **Patriot League:** won 11 of the last 16 titles (2009, '10, '11, '13, '14, '15, '16, '21, '22, '23, '24), reigning 2024–25 Patriot League Champions. 13 All-America selections (2008: Greg Sprink).
-- **2026 in-season honor:** Bendik named Patriot League Pitcher of the Year, 7 Mids earned All-League honors — this is recent/current, good near-term post.
+- **10 NCAA Tournament appearances**, most recently 2016 (Raleigh Regional, eliminated by NC State). 2016 team's 43 wins is the program record, capped by a Patriot League title.
+- **Patriot League:** won 6 titles — 1994, '98, '99, '02, '11, '16 (most recent 2016). Runner-up to Army in the championship series in 2019 and 2024. Army won 6 straight Patriot League titles 2019–2024; Holy Cross won 2025. Navy is **not** the reigning champion.
+- **CORRECTION 2026-07-08:** the previous version of this section claimed "11 NCAA Tournament appearances incl. 2 Elite Eight runs (1954/1986), NIT 1962" and "11 Patriot League titles since 2009, reigning 2024–25 champs" — both fabricated/wrong (the Elite Eight/NIT figures are Navy **basketball's** history, not baseball's; the real Patriot League title count is 6, last won 2016). Caught after a live post (Day 14 timeframe) went out with bad data. The "13 All-America selections (2008: Greg Sprink)" claim is also suspect — Sprink was a Navy **basketball** player — and has been dropped pending verification. Don't reuse the old numbers.
+- **2026 in-season honor:** Bendik named Patriot League Pitcher of the Year, 7 Mids earned All-League honors — this is recent/current, good near-term post, **not yet independently re-verified after the above correction.**
 - **MLB alumni:**
   - Nemo Gaines — first Midshipman ever in MLB (Washington Senators, 1921)
   - Mitch Harris — 1st Navy grad in MLB since Gaines (94-year gap!), Cardinals debut April 21, 2015
   - Noah Song — highest-ever Navy MLB draft pick (Red Sox, 4th round, #137 overall, 2019); 9th Navy grad drafted
   - Oliver Drake — Orioles, 43rd round 2008, 6-year MLB career
-- Source: [navysports.com Patriot League history](https://navysports.com/sports/2022/6/6/patriot-league-history.aspx), [2026 PL awards](https://navysports.com/news/2026/5/6/baseball-bendik-named-patriot-league-pitcher-of-the-year-seven-mids-earn-all-league-honors.aspx), [Baseball Almanac](https://www.baseball-almanac.com/college/United_States_Naval_Academy_Baseball_Players.shtml)
+- Source: MLB alumni facts (Gaines, Harris, Song, Drake) independently re-verified 2026-07-08 via multiple news/reference sources (MLB.com, SABR, Baseball-Reference, contemporary news coverage). Patriot League title count and NCAA appearance count re-verified 2026-07-08 the same way after the correction above; original navysports.com citations below were never successfully fetched (site blocks automated access) and can't be used to re-check anything — treat as unverified: [navysports.com Patriot League history](https://navysports.com/sports/2022/6/6/patriot-league-history.aspx), [2026 PL awards](https://navysports.com/news/2026/5/6/baseball-bendik-named-patriot-league-pitcher-of-the-year-seven-mids-earn-all-league-honors.aspx), [Baseball Almanac](https://www.baseball-almanac.com/college/United_States_Naval_Academy_Baseball_Players.shtml)
 
 **"94-year gap" (Gaines → Harris) is a genuinely great hook for a single post on its own.**
 

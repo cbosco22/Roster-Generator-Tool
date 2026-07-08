@@ -30,9 +30,9 @@ Everything in here already has a rendered graphic + written caption sitting in `
 | 16 | 🎥 Video | Service assignment video #2 | *(Chris to find)* |
 | 17 | Graphic | Every Swing. Broken Down. (TruMedia) | `exports/Navy_Baseball_Tech_TruMedia.png` |
 | 18 | Graphic | $5M. Breaking Ground. | `exports/Navy_Baseball_Renovation.png` |
-| 19 | Graphic | 131 Seasons. | `exports/Navy_Baseball_History_1893.png` |
+| 19 | Graphic | 131 Seasons. *(corrected 2026-07-08 — old stats mixed in Navy basketball history by mistake; see RESEARCH_FINDINGS.md)* | `exports/Navy_Baseball_History_1893.png` |
 | 20 | 🎥 Video | Service assignment video #3 | *(Chris to find)* |
-| 21 | Graphic | 11 Titles. 16 Years. | `exports/Navy_Baseball_Patriot_League.png` |
+| 21 | Graphic | 6 Titles. 3 Decades. *(rebuilt 2026-07-08, was "11 Titles. 16 Years." — that version had a fabricated title count/reigning-champ claim, caught before posting; see RESEARCH_FINDINGS.md)* | `exports/Navy_Baseball_Patriot_League.png` |
 | 22 | Graphic | **Noah Song — Alumni Spotlight** *(held back — first solo alumni highlight)* | `exports/Navy_Baseball_Alumni_Noah_Song.png` |
 | 23 | Graphic | Led By Their Own *(pushed way back — same Brigade/Battalion/Company facts as Day 11, needed real distance not just a day or two)* | `exports/Navy_Baseball_USNA_Leadership.png` |
 
