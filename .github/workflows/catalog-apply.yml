@@ -1,0 +1,43 @@
+# Catalog apply — push a committed roster JSON into the shared catalog +
+# pool, on demand. The manual-source lane of the sweep (PG extension
+# scrapes, PDF-derived rosters): commit the JSON under data/catalog/,
+# dispatch this with the path, and the event appears in every program's
+# New-event dropdown. Needs the SWEEP_DB_URL secret (sweep_writer role).
+name: Catalog apply
+
+on:
+  workflow_dispatch:
+    inputs:
+      file:
+        description: "Repo path to the roster JSON"
+        required: true
+        default: "data/catalog/pg-17u-national-elite.json"
+      name:
+        description: "Event name override (else the JSON's own)"
+        required: false
+      schedule_url:
+        description: "Schedule URL for one-tap Refresh (else the JSON's url)"
+        required: false
+      location:
+        description: "City, ST"
+        required: false
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install deps
+        run: pip install requests beautifulsoup4 psycopg2-binary
+      - name: Apply to catalog + pool
+        env:
+          SWEEP_DB_URL: ${{ secrets.SWEEP_DB_URL }}
+        run: >
+          python -m sweep.catalog_apply --file "${{ github.event.inputs.file }}"
+          --name "${{ github.event.inputs.name }}"
+          --schedule-url "${{ github.event.inputs.schedule_url }}"
+          --location "${{ github.event.inputs.location }}"
