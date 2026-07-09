@@ -5,11 +5,11 @@
 insert into members (program_id, user_id, role, initials, display_name)
 select p.id, u.id, v.role, v.initials, v.display_name
 from (values
-  ('bosco.chris01@gmail.com', 'admin', 'CB', 'Chris Bosco')
+  ('bosco.chris01@gmail.com', 'admin', 'CB', 'Chris Bosco'),
+  ('ristano@usna.edu',        'coach', 'CR', 'Coach Ristano'),
+  ('moritz@usna.edu',         'coach', 'AM', 'Coach Moritz')
   -- ('coach-ap@usna.edu',  'coach', 'AP', 'Coach AP'),
-  -- ('coach-tr@usna.edu',  'coach', 'TR', 'Coach TR'),
-  -- ('coach-cr@usna.edu',  'coach', 'CR', 'Coach CR'),
-  -- ('coach-am@usna.edu',  'coach', 'AM', 'Coach AM')
+  -- ('coach-tr@usna.edu',  'coach', 'TR', 'Coach TR')
 ) as v(email, role, initials, display_name)
 join programs p on p.slug = 'navy'
 join auth.users u on lower(u.email) = lower(v.email)
