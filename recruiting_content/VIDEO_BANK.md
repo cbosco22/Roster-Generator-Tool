@@ -12,7 +12,7 @@ A second content stream, separate from the static graphics in `TOPIC_BANK.md`. R
 
 | # | Title | YouTube URL | Source | Suggested Caption | Status |
 |---|-------|-------------|--------|--------------------|--------|
-| 1 | *(need title from Chris)* | https://youtu.be/9aZ-H7OkQMs | Annapolis, MD slot (Day 8) | *(need caption info)* | 🟡 |
+| 1 | Annapolis Drone Flyover | https://youtu.be/9aZ-H7OkQMs | Annapolis, MD slot (Day 8) | Annapolis — home of the midshipmen since 1845. ⚓ #NavyBaseball | ✅ |
 | 2 | | | | | 🔴 |
 | 3 | | | | | 🔴 |
 
