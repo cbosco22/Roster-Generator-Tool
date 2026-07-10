@@ -12,7 +12,7 @@ A second content stream, separate from the static graphics in `TOPIC_BANK.md`. R
 
 | # | Title | YouTube URL | Source | Suggested Caption | Status |
 |---|-------|-------------|--------|--------------------|--------|
-| 1 | | | | | 🔴 |
+| 1 | *(need title from Chris)* | https://youtu.be/9aZ-H7OkQMs | Annapolis, MD slot (Day 8) | *(need caption info)* | 🟡 |
 | 2 | | | | | 🔴 |
 | 3 | | | | | 🔴 |
 
