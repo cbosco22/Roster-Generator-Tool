@@ -97,7 +97,7 @@ Days 24–37 of `POSTING_QUEUE.md`. Built 2026-07-03 in the reworked design syst
 > The degree out-earns. $131K median mid-career salary for Navy grads vs. ~$90K national average — ranked #2 in the nation for alumni earning potential (PayScale). ⚓ #NavyBaseball
 
 **22. Academics G2 — Math & Science** — `exports/Navy_Baseball_Academics_G2.png` *(Sheet)*
-> Group 2: Math & Science. Quantitative Economics — the Academy's business & finance path — plus Computer Science, Cyber Operations, and more. Numbers people, welcome home. ⚓ #NavyBaseball
+> Group 2 Majors: Math & Science. Quantitative Economics — the Academy's business & finance path — plus Operations Research, Mathematics, Chemistry, Oceanography, General Science, and Physics. Numbers people, welcome home. ⚓ #NavyBaseball
 
 **23. Retired. At 42.** — `exports/Navy_Baseball_LifeAfter_RetireBy42.png` *(Data Card)*
 > Retired. At 42. Serve 20 years and the pension starts the day you're done — healthcare for life included. Estimated lifetime retirement value: $3.5M+. ⚓ #NavyBaseball
